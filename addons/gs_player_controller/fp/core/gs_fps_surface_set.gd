@@ -14,7 +14,7 @@ extends Resource
 @export var fallback: GSFpsSurface = null
 
 ## Metadata key read from a collider node by [method resolve_from_node].
-@export var metadata_key: StringName = &"dot_fps_surface"
+@export var metadata_key: StringName = &"gs_fps_surface"
 
 ## Also accept a group name matching this prefix, e.g. [code]surface_ice[/code].
 ## Metadata wins when a node has both.
@@ -88,7 +88,7 @@ func invalidate() -> void:
 ## to tell it from "marked as default".
 static func resolve_from_node(
 	node: Node,
-	metadata: StringName = &"dot_fps_surface",
+	metadata: StringName = &"gs_fps_surface",
 	prefix: String = "surface_"
 ) -> StringName:
 	if node == null:

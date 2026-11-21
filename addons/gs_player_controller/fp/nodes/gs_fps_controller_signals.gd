@@ -92,7 +92,7 @@ func _consume_external_velocity(s: GSFpsState, replaying: bool) -> void:
 
 
 const CHANNEL := "fps"
-const SERVICE := &"dot_fps_controller"
+const SERVICE := &"gs_fps_controller"
 
 ## Who supplies commands and drives ticks.
 enum Drive {
@@ -138,7 +138,7 @@ enum Drive {
 @export var style: GSFpsStyle = null
 
 ## JSON file layered over the exported defaults. Empty disables the file layer.
-## Layering order: exported defaults, this file, [code]DOT_FPS_*[/code], [code]--fps-*[/code].
+## Layering order: exported defaults, this file, [code]GS_FPS_*[/code], [code]--fps-*[/code].
 @export var config_file: String = ""
 
 ## Apply the environment and command-line layers.

@@ -125,7 +125,7 @@ func _pair(name: String, bodies: Array[GSFpsBody], tun: GSFpsTunables, clock: Ar
 
 
 func _run_equivalence() -> void:
-	print("dot-player-controller motor perf equivalence self-test")
+	print("gs-player-controller motor perf equivalence self-test")
 	_build_world()
 	_make_flat_world()
 	await get_tree().physics_frame

@@ -5,12 +5,12 @@
 # Sibling repositories, linked for local development:
 #   ln -s ../../<repo>/addons/<addon> addons/<addon>
 # Consumers copy every one of them into their own project.
-/addons/dot_core
-/addons/dot_profile
-/addons/dot_net
-/addons/dot_player
-# dot-sim, the optional native library (examples/motor_native_parity); its CI job builds it.
-/addons/dot_sim
+/addons/gs_core
+/addons/gs_profile
+/addons/gs_net
+/addons/gs_player
+# gs-sim, the optional native library (examples/motor_native_parity); its CI job builds it.
+/addons/gs_sim
 
 # Exports
 build/
@@ -22,5 +22,5 @@ Thumbs.db
 
 # Editors
 .vscode/
-/addons/dot_combat
-/addons/dot_weapon
+/addons/gs_combat
+/addons/gs_weapon

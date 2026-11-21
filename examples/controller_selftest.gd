@@ -1,6 +1,6 @@
 extends "res://examples/controller_selftest_base.gd"
 
-## Exercises dot-player-controller with a stub controller, no physics and no input. Run: [code]godot --headless --path . res://examples/controller_selftest.tscn[/code]
+## Exercises gs-player-controller with a stub controller, no physics and no input. Run: [code]godot --headless --path . res://examples/controller_selftest.tscn[/code]
 ## The addon is abstract, so this checks the part that is not: intent edges, the look arithmetic every project rewrites, and the switch handover. The stub is also a worked example of the five methods a subclass overrides.
 
 const SECTIONS := 10
@@ -13,7 +13,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_line("dot-player-controller self-test")
+	_line("gs-player-controller self-test")
 	_line("")
 
 	_test_intent()

@@ -19,7 +19,7 @@ func _check(ok: bool, what: String) -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller lift cycle self-test")
+	print("gs-player-controller lift cycle self-test")
 	var lift := GSFpsLiftCycle.new(3.0, 3.0)
 	_check(is_equal_approx(lift.period(), 12.0), "period is two rests and two trips")
 	_check(lift.fraction(0.0) == 0.0 and lift.fraction(2.9) == 0.0, "rests at the bottom")

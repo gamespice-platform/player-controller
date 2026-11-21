@@ -120,7 +120,7 @@ func _check(ok: bool, what: String) -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller feel pin self-test")
+	print("gs-player-controller feel pin self-test")
 	_box(Vector3(600, 2, 600), Vector3(0, -1, 0))
 	# A staircase of single boxes across -z, each its own height, spaced far apart.
 	var heights := [0.2, 0.3, 0.34, 0.4, 0.5]

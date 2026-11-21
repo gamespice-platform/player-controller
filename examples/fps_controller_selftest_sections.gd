@@ -493,12 +493,12 @@ func _landing_dip_checks(frame: float) -> Array:
 func _test_wheel_jump() -> void:
 	_section("a wheel tick is one jump")
 
-	var had := InputMap.has_action(&"dot_fps_jump")
-	var kept: Array = InputMap.action_get_events(&"dot_fps_jump") if had else []
+	var had := InputMap.has_action(&"gs_fps_jump")
+	var kept: Array = InputMap.action_get_events(&"gs_fps_jump") if had else []
 	if not had:
-		InputMap.add_action(&"dot_fps_jump")
-	InputMap.action_erase_events(&"dot_fps_jump")
-	InputMap.action_add_event(&"dot_fps_jump", _wheel_event(false))
+		InputMap.add_action(&"gs_fps_jump")
+	InputMap.action_erase_events(&"gs_fps_jump")
+	InputMap.action_add_event(&"gs_fps_jump", _wheel_event(false))
 
 	var s := GSFpsSampler.new(GSFpsTunables.with_profile("legacy"))
 	s.handle_event(_wheel_event(true))
@@ -559,12 +559,12 @@ func _test_wheel_jump() -> void:
 	_check(grounded and rose, "a standing player jumps on one wheel tick", "grounded %s, vy %.2f" % [grounded, controller.state.velocity.y])
 
 	world.queue_free()
-	InputMap.action_erase_events(&"dot_fps_jump")
+	InputMap.action_erase_events(&"gs_fps_jump")
 	if had:
 		for e in kept:
-			InputMap.action_add_event(&"dot_fps_jump", e)
+			InputMap.action_add_event(&"gs_fps_jump", e)
 	else:
-		InputMap.erase_action(&"dot_fps_jump")
+		InputMap.erase_action(&"gs_fps_jump")
 	await get_tree().process_frame
 	_done()
 

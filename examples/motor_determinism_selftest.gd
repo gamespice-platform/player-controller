@@ -142,7 +142,7 @@ func _check(ok: bool, what: String) -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller motor determinism self-test")
+	print("gs-player-controller motor determinism self-test")
 	_build_world()
 	await get_tree().physics_frame
 	await get_tree().physics_frame

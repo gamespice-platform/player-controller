@@ -1,8 +1,8 @@
 # size
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
-addons/dot_player_controller/fp/motion/dot_fps_motor.gd	1248
-addons/dot_player_controller/fp/motion/dot_fps_motor.gd::_categorise_ground_settled	117
-addons/dot_player_controller/fp/nodes/dot_fps_controller.gd	958
+addons/gs_player_controller/fp/motion/gs_fps_motor.gd	1248
+addons/gs_player_controller/fp/motion/gs_fps_motor.gd::_categorise_ground_settled	117
+addons/gs_player_controller/fp/nodes/gs_fps_controller.gd	958
 examples/fps_controller_selftest.gd::_test_change_signals	81
 examples/movement_selftest.gd	2265
 examples/movement_selftest.gd::_test_admin_modifiers	142

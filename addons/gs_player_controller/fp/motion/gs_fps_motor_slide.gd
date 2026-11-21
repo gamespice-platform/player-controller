@@ -1,8 +1,8 @@
-extends "dot_fps_motor_walls.gd"
+extends "gs_fps_motor_walls.gd"
 
 ## The motor's collide-and-slide: the ground probes and their per-tick cache, the slide, stepping, creases,
 ## depenetration and the snap to ground. Split out of [GSFpsMotor] for file size; it is the layer between
-## that and dot_fps_motor_walls.gd, and nothing outside the motor names this script.
+## that and gs_fps_motor_walls.gd, and nothing outside the motor names this script.
 
 
 func _is_floor(normal: Vector3) -> bool:
@@ -306,7 +306,7 @@ func _leave_face(
 	return false
 
 
-## The duplicate-plane leg's answer in a wedge (`g2gfast-surf-crease-hang-1`): find the second face and spend the leg along the crease. True and [param result] moved if that got anywhere; false and untouched otherwise.
+## The duplicate-plane leg's answer in a wedge (`airdrift-surf-crease-hang-1`): find the second face and spend the leg along the crease. True and [param result] moved if that got anywhere; false and untouched otherwise.
 ## A surfer in the V of two slabs sits in both and the rest query names one of two equal contacts; named the same face twice, the leg, the lift and the split all stop at fraction zero and the rider hangs.
 ## Asked before [method _leave_face] and [method _split_leg], because both can succeed by a hair there and the same ride would finish in different times.
 func _leave_crease(

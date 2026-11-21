@@ -1,8 +1,8 @@
 @tool
 class_name GSFpsTunables
-extends "dot_fps_tunables_movement.gd"
+extends "gs_fps_tunables_movement.gd"
 
-## Every number the movement simulation reads, layered like every [GSConfig]: exported defaults, JSON file, [code]DOT_FPS_*[/code] environment, [code]--fps-*[/code] arguments.
+## Every number the movement simulation reads, layered like every [GSConfig]: exported defaults, JSON file, [code]GS_FPS_*[/code] environment, [code]--fps-*[/code] arguments.
 ## Must be identical on client and server or reconciliation corrects forever; see [method fingerprint].
 ## Defaults are [constant PROFILE_CLASSIC]; [constant PROFILE_LEGACY] is the older set ([method apply_profile]). Every number is also a cvar ([method cvar_specs]).
 
@@ -176,7 +176,7 @@ func load_layered(file_path: String = "") -> GSResult:
 
 
 func env_prefix() -> String:
-	return "DOT_FPS_"
+	return "GS_FPS_"
 
 
 func cli_prefix() -> String:

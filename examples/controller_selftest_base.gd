@@ -9,9 +9,9 @@ var _section_count := 0
 
 ## Files that query the physics space or move a body. With physics on its own thread these may only run inside the physics step, so a new one fails here until it is listed in docs/threading.md.
 const QUERY_FILES: Array[String] = [
-	"fp/motion/dot_fps_physics_body_native.gd",
-	"fp/nodes/dot_fps_wall_probe.gd",
-	"tp/nodes/dot_tps_controller.gd",
+	"fp/motion/gs_fps_physics_body_native.gd",
+	"fp/nodes/gs_fps_wall_probe.gd",
+	"tp/nodes/gs_tps_controller.gd",
 ]
 const QUERY_NEEDLES: Array[String] = ["direct_space_state", "space.intersect_", "space.cast_motion(", "space.get_rest_info(", "body.move_and_slide("]
 const FRAME_ENTRY_NEEDLES: Array[String] = ["func _input(", "func _unhandled_input(", "call_deferred(", "await "]
@@ -37,7 +37,7 @@ func _func_body(text: String, signature: String) -> String:
 func _test_space_query_audit() -> void:
 	_section("space-query audit")
 	var scripts: Array[String] = []
-	_audit_scripts("res://addons/dot_player_controller", scripts)
+	_audit_scripts("res://addons/gs_player_controller", scripts)
 	var found: Array[String] = []
 	var frame_entry: Array[String] = []
 	var in_process: Array[String] = []
@@ -50,7 +50,7 @@ func _test_space_query_audit() -> void:
 				queries = true
 		if not queries:
 			continue
-		var rel := path.trim_prefix("res://addons/dot_player_controller/")
+		var rel := path.trim_prefix("res://addons/gs_player_controller/")
 		found.append(rel)
 		for n in FRAME_ENTRY_NEEDLES:
 			if text.contains(n):
@@ -75,9 +75,9 @@ func _test_space_query_audit() -> void:
 		if not doc.contains(f.get_file()):
 			missing.append(f)
 	_check(missing.is_empty(), "docs/threading.md names every one %s" % [missing])
-	var tps := FileAccess.get_file_as_string("res://addons/dot_player_controller/tp/nodes/dot_tps_controller.gd")
+	var tps := FileAccess.get_file_as_string("res://addons/gs_player_controller/tp/nodes/gs_tps_controller.gd")
 	_check(tps.count("_apply_intent(") == 1, "GSTpsController._apply_intent has no caller of its own: only simulate reaches it")
-	var fps := FileAccess.get_file_as_string("res://addons/dot_player_controller/fp/nodes/dot_fps_controller.gd")
+	var fps := FileAccess.get_file_as_string("res://addons/gs_player_controller/fp/nodes/gs_fps_controller.gd")
 	_check(_func_body(fps, "func _physics_process(").contains("simulate_tick("), "GSFpsController runs its own ticks from _physics_process")
 
 

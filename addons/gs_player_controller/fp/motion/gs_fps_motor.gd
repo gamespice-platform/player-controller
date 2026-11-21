@@ -1,5 +1,5 @@
 class_name GSFpsMotor
-extends "dot_fps_motor_native.gd"
+extends "gs_fps_motor_native.gd"
 
 ## The movement simulation. Deterministic, engine-independent, and the only place movement rules live.
 ##
@@ -142,7 +142,7 @@ func batch_resume(state: GSFpsState, command: GSFpsCommand, delta: float) -> voi
 func batch_cancel(state: GSFpsState = null, command: GSFpsCommand = null, delta: float = 0.0) -> void:
 	if batch_clocks != 0:
 		if state == null or command == null:
-			push_error("GSFpsMotor.batch_cancel: the prepared row left its clocks to dot-sim; pass its state, command and delta")
+			push_error("GSFpsMotor.batch_cancel: the prepared row left its clocks to gs-sim; pass its state, command and delta")
 		else:
 			_batch_settle(state, command, delta)
 	batch_clocks = 0

@@ -1,6 +1,6 @@
 extends "res://examples/motor_native_tick_parity.gd"
 
-## Holds [GSFpsMotorBatch] (several players' motor ticks in runs of one dot-sim call) to the players' loop it replaces, [method GSFpsMotor.simulate] one player after another, to the bit: eight players walking into each other on random streams, six in dot-sim's hull world, one with no hulls and one gathering by script, at two rates under two tunable sets. A push between the add and a player's turn, a teleport after its tick and a death during another player's turn take the rows after them back; every tick's state and the counters stay identical. One player ticks every other tick two ticks long ([method GSFpsMotorBatch.add]'s delta), as a server's far bot does. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_batch_parity.tscn[/code]
+## Holds [GSFpsMotorBatch] (several players' motor ticks in runs of one gs-sim call) to the players' loop it replaces, [method GSFpsMotor.simulate] one player after another, to the bit: eight players walking into each other on random streams, six in gs-sim's hull world, one with no hulls and one gathering by script, at two rates under two tunable sets. A push between the add and a player's turn, a teleport after its tick and a death during another player's turn take the rows after them back; every tick's state and the counters stay identical. One player ticks every other tick two ticks long ([method GSFpsMotorBatch.add]'s delta), as a server's far bot does. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_batch_parity.tscn[/code]
 
 const PLAYERS := 8
 const BATCH_TICKS := 1500
@@ -188,11 +188,11 @@ func _batch_runs() -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller motor batch parity")
+	print("gs-player-controller motor batch parity")
 	var expected := 1
 	if not GSFpsPhysicsBody.native_available() or not GSFpsMotorBatch.available() or not ClassDB.class_exists(&"GSSimHullWorld"):
-		print("  dot-sim's motor batch is not loaded: skipped")
-		if (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) == "1" and not GSFpsPhysicsBody.native_available():
+		print("  gs-sim's motor batch is not loaded: skipped")
+		if (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) == "1" and not GSFpsPhysicsBody.native_available():
 			_check(false, "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		expected = 0
 	else:

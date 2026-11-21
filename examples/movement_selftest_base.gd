@@ -195,7 +195,7 @@ static func _drag(index: int, to: Vector2) -> InputEventScreenDrag:
 	return event
 
 
-## A stand-in for [code]GSNetWriter[/code] / [code]GSNetReader[/code]; dot-net must not be installed here.
+## A stand-in for [code]GSNetWriter[/code] / [code]GSNetReader[/code]; gs-net must not be installed here.
 ## It records the duck-typed calls of [method GSFpsCommand.write] so the contract is checked
 ## without the dependency (a method-name typo would otherwise only fail in the host game).
 class FakeWire extends RefCounted:

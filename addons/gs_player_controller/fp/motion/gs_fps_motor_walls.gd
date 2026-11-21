@@ -1,4 +1,4 @@
-extends "dot_fps_motor_base.gd"
+extends "gs_fps_motor_base.gd"
 
 ## The motor's geometry helpers and its wall running and wall jumping, split out of
 ## [GSFpsMotor] to keep that file under the size gate; it is the layer between them.
@@ -428,7 +428,7 @@ func _wall_jump_run_in_script(state: GSFpsState) -> bool:
 		) else 0
 		if _native_runs_after_wall_jump == 0 and ClassDB.class_exists(&"GSSimFpsBody"):
 			# Said once, loudly: every air tick after a wall jump then leaves GameSpice Sim's batch for the script tail, about a third of a 32-bot server's motor time on GameSpice Sim v0.2.7.
-			GSLog.warn(CHANNEL, "dot-sim has no GSSimFpsBody.runs_after_wall_jump (older than v0.2.8): ticks after a wall jump run in script; update dot-sim")
+			GSLog.warn(CHANNEL, "gs-sim has no GSSimFpsBody.runs_after_wall_jump (older than v0.2.8): ticks after a wall jump run in script; update gs-sim")
 	return _native_runs_after_wall_jump == 0 and _may_run_after_wall_jump(state)
 
 

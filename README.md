@@ -3,9 +3,9 @@
 Everything that drives a player: a shared base, a first-person movement model built for prediction and reconciliation, and a third-person model with a camera rig.
 
 ```
-addons/dot_player_controller/
+addons/gs_player_controller/
   core/, nodes/   intent, look, the abstract base, the switch
-  fp/             first-person movement (formerly dot-fps-controller; class names unchanged)
+  fp/             first-person movement (formerly gs-fps-controller; class names unchanged)
   tp/             third-person movement and camera rig
 ```
 
@@ -13,10 +13,10 @@ You can delete `fp/` or `tp/` if you only need one. A vehicle, ladder or spectat
 
 ## Install
 
-1. Copy `addons/dot_player_controller/`, `addons/dot_player/` and `addons/dot_core/` into your project.
+1. Copy `addons/gs_player_controller/`, `addons/gs_player/` and `addons/gs_core/` into your project.
 2. Enable all three in *Project > Project Settings > Plugins*.
 
-`addons/dot_net/` is optional and only used by `GSFpsNetSync`.
+`addons/gs_net/` is optional and only used by `GSFpsNetSync`.
 
 Needs Godot 4.7 or newer.
 
@@ -60,7 +60,7 @@ The simulation is a pure function of (state, command, delta, world), so a client
 | --- | --- |
 | `GSFpsCommand` | One tick of player intent, packed to 49 bits. |
 | `GSFpsState` | Everything carried between ticks. |
-| `GSFpsTunables` | Every movement number, layered: defaults, JSON, `DOT_FPS_*` environment, `--fps-*` command line. Also `jump_reach(rise)`, `jump_airtime(rise)`, `climb_limit()` for level designers. |
+| `GSFpsTunables` | Every movement number, layered: defaults, JSON, `GS_FPS_*` environment, `--fps-*` command line. Also `jump_reach(rise)`, `jump_airtime(rise)`, `climb_limit()` for level designers. |
 | `GSFpsMotor` | The deterministic simulation. |
 | `GSFpsBody` | Collision queries: `GSFpsPhysicsBody` for real geometry, `GSFpsFlatBody` for tests. |
 | `GSFpsController` | The node. Drives the motor, writes to the scene, resizes the collider. |
@@ -91,7 +91,7 @@ The defaults are a classic competitive-shooter profile (see [docs/motor.md](docs
 
 ### Extending it
 
-- **Surfaces:** set `dot_fps_surface = "ice"` on a collider (or put it in a `surface_ice` group) and give the controller a `GSFpsSurfaceSet`.
+- **Surfaces:** set `gs_fps_surface = "ice"` on a collider (or put it in a `surface_ice` group) and give the controller a `GSFpsSurfaceSet`.
 - **Modifiers:** `GSFpsModifier` scales speed, acceleration, gravity, friction and jumping, denies movement, or applies an impulse.
 - **Admin abilities:** `admin_abilities = true` registers noclip, freeze, and speed and gravity steps that the owning client predicts.
 - **Movement modes:** subclass `GSFpsMoveMode`.

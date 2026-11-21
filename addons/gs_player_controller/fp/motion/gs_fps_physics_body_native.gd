@@ -1,7 +1,7 @@
 extends GSFpsBody
 
 ## [GSFpsPhysicsBody]'s space binding, query parameters, cost accounting and the native (GameSpice Sim) fast path.
-## Split out of dot_fps_physics_body.gd for file size; nothing outside the body names this script.
+## Split out of gs_fps_physics_body.gd for file size; nothing outside the body names this script.
 
 const CHANNEL := "fps.body"
 
@@ -41,7 +41,7 @@ var _native_space: PhysicsDirectSpaceState3D = null
 var _native_exclude: Array[RID] = []
 
 
-## Whether dot-sim's native body is loaded and enabled.
+## Whether gs-sim's native body is loaded and enabled.
 static func native_available() -> bool:
 	if _native_known < 0:
 		_native_known = 1 if ClassDB.class_exists(NATIVE_CLASS) else 0
@@ -231,7 +231,7 @@ func _perf_caches_changed() -> void:
 ## Per engine query kind (cast, rest, overlap, ray): calls and microseconds, filled only while [member profile] is on.
 static var profile: bool = false
 static var prof := PackedInt64Array([0, 0, 0, 0, 0, 0, 0, 0])
-## The system queries are charged to in GSFrameCost (dot-profiler's query table) while it is enabled.
+## The system queries are charged to in GSFrameCost (gs-profiler's query table) while it is enabled.
 static var cost_system: StringName = &"p_controller"
 
 

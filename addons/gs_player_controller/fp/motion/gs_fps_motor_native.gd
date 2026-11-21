@@ -1,8 +1,8 @@
-extends "dot_fps_motor_slide.gd"
+extends "gs_fps_motor_slide.gd"
 
 ## The motor's native side: the tunables and input rows it hands GameSpice Sim, the answers it writes back, and the rest
 ## stamp that lets a settled walker skip its ground probe. Split out of [GSFpsMotor] for file size; it is the layer
-## between that and dot_fps_motor_slide.gd, and nothing outside the motor names this script.
+## between that and gs_fps_motor_slide.gd, and nothing outside the motor names this script.
 
 
 ## [member native_tick]'s tunables for this tick, or empty when this tick may not run natively.

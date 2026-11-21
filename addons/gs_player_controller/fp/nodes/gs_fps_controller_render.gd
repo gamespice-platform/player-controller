@@ -1,5 +1,5 @@
 @tool
-extends "dot_fps_controller_signals.gd"
+extends "gs_fps_controller_signals.gd"
 
 ## How [GSFpsController] is drawn between ticks, kept apart so the controller file stays small.
 

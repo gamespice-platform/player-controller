@@ -1,6 +1,6 @@
 extends Node
 
-## Exercises dot-player-controller with a motor driven by hand and a real body. Run: [code]godot --headless --path . res://examples/tps_selftest.tscn[/code]
+## Exercises gs-player-controller with a motor driven by hand and a real body. Run: [code]godot --headless --path . res://examples/tps_selftest.tscn[/code]
 ## The motor is a pure function, so coyote time, the jump buffer, camera-relative movement and shortest-way-round turning are checked as arithmetic; the controller and camera rig run against a real [CharacterBody3D] in a real tree, because a spring arm is not a value.
 
 const SECTIONS := 8
@@ -17,7 +17,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_line("dot-player-controller self-test")
+	_line("gs-player-controller self-test")
 	_line("")
 
 	_test_tunables()
@@ -118,7 +118,7 @@ func _test_tunables() -> void:
 		+ "camera behaves differently on two machines when it is written that way"
 	)
 	_check(is_equal_approx(GSTpsTunables.smoothing(0.0, 0.016), 1.0), "a rate of zero is rigid")
-	_check(t.env_prefix() == "DOT_TPS_", "and the config layers the family's way")
+	_check(t.env_prefix() == "GS_TPS_", "and the config layers the family's way")
 
 
 func _test_state() -> void:

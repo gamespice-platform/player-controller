@@ -1,9 +1,9 @@
 # comments
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
-addons/dot_player_controller/fp/motion/dot_fps_motor.gd::long_block	1
-addons/dot_player_controller/fp/net/dot_fps_net_sync.gd::long_block	1
-addons/dot_player_controller/fp/nodes/dot_fps_controller.gd::long_block	3
-addons/dot_player_controller/fp/nodes/dot_fps_touch_sampler.gd::long_block	1
-addons/dot_player_controller/nodes/dot_player_controller.gd::long_block	1
-addons/dot_player_controller/nodes/dot_player_controller_switch.gd::long_block	1
+addons/gs_player_controller/fp/motion/gs_fps_motor.gd::long_block	1
+addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::long_block	1
+addons/gs_player_controller/fp/nodes/gs_fps_controller.gd::long_block	3
+addons/gs_player_controller/fp/nodes/gs_fps_touch_sampler.gd::long_block	1
+addons/gs_player_controller/nodes/gs_player_controller.gd::long_block	1
+addons/gs_player_controller/nodes/gs_player_controller_switch.gd::long_block	1
 examples/movement_selftest.gd::long_block	2

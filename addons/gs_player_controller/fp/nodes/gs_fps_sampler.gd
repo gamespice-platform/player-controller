@@ -7,21 +7,21 @@ extends RefCounted
 
 ## Action names, keyed by role. Assign to remap without subclassing.
 var actions: Dictionary = {
-	"left": &"dot_fps_left",
-	"right": &"dot_fps_right",
-	"forward": &"dot_fps_forward",
-	"back": &"dot_fps_back",
-	"jump": &"dot_fps_jump",
-	"crouch": &"dot_fps_crouch",
-	"sprint": &"dot_fps_sprint",
-	"walk": &"dot_fps_walk",
-	"noclip": &"dot_fps_noclip",
+	"left": &"gs_fps_left",
+	"right": &"gs_fps_right",
+	"forward": &"gs_fps_forward",
+	"back": &"gs_fps_back",
+	"jump": &"gs_fps_jump",
+	"crouch": &"gs_fps_crouch",
+	"sprint": &"gs_fps_sprint",
+	"walk": &"gs_fps_walk",
+	"noclip": &"gs_fps_noclip",
 	# Optional. Bound to a stick, these turn the view at a rate; unbound, they cost
 	# a dictionary lookup and nothing else.
-	"look_left": &"dot_fps_look_left",
-	"look_right": &"dot_fps_look_right",
-	"look_up": &"dot_fps_look_up",
-	"look_down": &"dot_fps_look_down",
+	"look_left": &"gs_fps_look_left",
+	"look_right": &"gs_fps_look_right",
+	"look_up": &"gs_fps_look_up",
+	"look_down": &"gs_fps_look_down",
 }
 
 ## Degrees per second at full deflection for the analogue look actions.
@@ -248,15 +248,15 @@ static func register_default_actions(sampler: GSFpsSampler = null) -> PackedStri
 	}
 
 	var names := {
-		"left": &"dot_fps_left",
-		"right": &"dot_fps_right",
-		"forward": &"dot_fps_forward",
-		"back": &"dot_fps_back",
-		"jump": &"dot_fps_jump",
-		"crouch": &"dot_fps_crouch",
-		"sprint": &"dot_fps_sprint",
-		"walk": &"dot_fps_walk",
-		"noclip": &"dot_fps_noclip",
+		"left": &"gs_fps_left",
+		"right": &"gs_fps_right",
+		"forward": &"gs_fps_forward",
+		"back": &"gs_fps_back",
+		"jump": &"gs_fps_jump",
+		"crouch": &"gs_fps_crouch",
+		"sprint": &"gs_fps_sprint",
+		"walk": &"gs_fps_walk",
+		"noclip": &"gs_fps_noclip",
 	}
 
 	if sampler != null:

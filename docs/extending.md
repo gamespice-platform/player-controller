@@ -67,7 +67,7 @@ Two deliberate costs. **The multipliers are a ladder** (`SPEED_STEPS`, `GRAVITY_
 - **Nothing may be stored on the mode object.** One instance serves every player and a rewind does not restore it. State goes in `GSFpsState`.
 - **Register through `GSFpsController.extra_modes`.** A mode registered by hand on the motor is lost the first time a style rebuilds it; `fps_controller_selftest` asserts one survives two.
 
-`GSFpsSwimMode` (`fp/motion/dot_fps_swim_mode.gd`) is the first built-in custom mode:
+`GSFpsSwimMode` (`fp/motion/gs_fps_swim_mode.gd`) is the first built-in custom mode:
 
 - **Water is a list of axis-aligned boxes** (`volumes`) the game hands over from its map, never an `Area3D`: overlap signals arrive after the physics step, and a client replaying ticks cannot ask an area where it was. A box list answers any question any number of times, the same on both ends.
 - **Entering is the game's once-a-tick call** (`update(motor, state)`, from per-tick logic that also runs during a replay), when the waist (`waist`, 1 m above the feet) is in a volume. **Leaving is the mode's own**, the moment the waist is out: it hands the player to AIR.

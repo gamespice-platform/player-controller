@@ -87,7 +87,7 @@ extends GSConfig
 
 
 func env_prefix() -> String:
-	return "DOT_TPS_"
+	return "GS_TPS_"
 
 
 func cli_prefix() -> String:

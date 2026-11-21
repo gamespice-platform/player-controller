@@ -24,15 +24,15 @@ jobs:
             efficiency: true
             hygiene: true
         secrets:
-            DEPS_TOKEN: ${{ secrets.DOT_DEPS_TOKEN }}
+            DEPS_TOKEN: ${{ secrets.GS_DEPS_TOKEN }}
 
-    # dot-sim's native collision body against this addon's script one (examples/motor_native_parity):
+    # gs-sim's native collision body against this addon's script one (examples/motor_native_parity):
     # the motor replays recorded input streams at 22/33/66 Hz in script and native and every tick must
     # be identical, then thousands of random queries are compared field by field. Web clients run the
     # script and native ones the library, and they play together, so this is a gate, not a benchmark.
-    # dot-sim is resolved from .gitignore like every addon (its main has the motor module).
-    # DOT_SIM_REQUIRE_NATIVE is set only when the
-    # checkout has the motor module, so a dot-sim without it is a skip rather than a red build.
+    # gs-sim is resolved from .gitignore like every addon (its main has the motor module).
+    # GS_SIM_REQUIRE_NATIVE is set only when the
+    # checkout has the motor module, so a gs-sim without it is a skip rather than a red build.
     motor-native-parity:
         needs: validate
         runs-on: ubuntu-latest
@@ -45,33 +45,33 @@ jobs:
               with:
                   repository: gamespice-platform/ci
                   ref: v1
-                  path: dot-ci
+                  path: gs-ci
             - name: Install the runtime's shared libraries
               run: |
                   sudo apt-get update -qq
                   sudo apt-get install -y -qq --no-install-recommends libfontconfig1 libx11-6 libxcursor1 libxinerama1 libxrandr2 libxi6
             - name: Fetch the pinned runtime
               run: |
-                  GODOT="$(dot-ci/scripts/fetch-godot.sh --dest ~/.godot-ci/$(dot-ci/scripts/fetch-godot.sh --version))"
+                  GODOT="$(gs-ci/scripts/fetch-godot.sh --dest ~/.godot-ci/$(gs-ci/scripts/fetch-godot.sh --version))"
                   echo "GODOT=$GODOT" >> "$GITHUB_ENV"
                   "$GODOT" --version
             - name: Resolve the addons this project declares
               env:
-                  DEPS_TOKEN: ${{ secrets.DOT_DEPS_TOKEN }}
-              run: dot-ci/scripts/resolve-deps.sh project
-            - name: Require the native motor when dot-sim has it
+                  DEPS_TOKEN: ${{ secrets.GS_DEPS_TOKEN }}
+              run: gs-ci/scripts/resolve-deps.sh project
+            - name: Require the native motor when gs-sim has it
               run: |
-                  cd project/.deps/dot-sim
-                  if grep -q GSSimFpsBody addons/dot_sim/dot_sim.gd; then echo "DOT_SIM_REQUIRE_NATIVE=1" >> "$GITHUB_ENV"; fi
+                  cd project/.deps/gs-sim
+                  if grep -q GSSimFpsBody addons/gs_sim/gs_sim.gd; then echo "GS_SIM_REQUIRE_NATIVE=1" >> "$GITHUB_ENV"; fi
                   git log --oneline -1
             - uses: dtolnay/rust-toolchain@stable
             - uses: Swatinem/rust-cache@v2
               with:
-                  workspaces: project/.deps/dot-sim/rust
+                  workspaces: project/.deps/gs-sim/rust
                   key: motor-native-parity
-            - name: Build and install dot-sim
-              run: bash project/.deps/dot-sim/ci/install.sh --platform linux-x86_64
+            - name: Build and install gs-sim
+              run: bash project/.deps/gs-sim/ci/install.sh --platform linux-x86_64
             - name: The parity suite, native loaded
               env:
                   SUITES: examples/motor_native_parity examples/motor_native_tick_parity examples/motor_batch_parity examples/motor_determinism_selftest
-              run: dot-ci/scripts/check.sh project
+              run: gs-ci/scripts/check.sh project

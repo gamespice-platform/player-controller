@@ -1,6 +1,6 @@
 # API levels
 
-Moved from `dot_player_controller_api.gd`; one line per level, newest last. The rule for bumping is on GameSpice Core's `GSAddonApi`.
+Moved from `gs_player_controller_api.gd`; one line per level, newest last. The rule for bumping is on GameSpice Core's `GSAddonApi`.
 
 - 1: everything before this file existed.
 - 2: GSPlayerViewRules (mp_forceview) and GSPlayerBodyRules (mp_solidplayers: mask(), apply_to(), apply_hull()); GSFpsBody.pass_out_mask, GSFpsController.set_pass_out_layers; GSTpsCameraRig's arm is a GameSpice Core GSCameraBoom (same spring_length, margin, collision_mask, add_excluded_object), fade_mask/set_fade_mask() and its fade.
@@ -16,11 +16,11 @@ Moved from `dot_player_controller_api.gd`; one line per level, newest last. The 
 - 12: GSPlayerController.apply_external_velocity(dv): a push (tornado, explosion) the controller keeps.
 - 13: GSPlayerViewRules.first_person_body (BODY_OFF, BODY_LEGS, BODY_FULL), own_body(choice) and the `mp_fp_body` cvar (off, legs and feet, whole body; default legs). `mp_fp_legs` is still accepted by set_cvar but no longer registered; `first_person_legs` reads the new value.
 - 14: `GSFpsMotor.idle_fast_path`, `idle_full_every` and `idle_ticks`: a cheap tick for a settled, idle, grounded body that wakes on any change (docs/collision.md).
-- 15: `GSFpsPhysicsBody.cost_system`: while dot-core's `GSFrameCost` is enabled (dot-core level 30), every script-path query and each native slide, sweep and rest call is charged to it by kind, so dot-profiler's query table shows the controller's collision work.
+- 15: `GSFpsPhysicsBody.cost_system`: while gs-core's `GSFrameCost` is enabled (gs-core level 30), every script-path query and each native slide, sweep and rest call is charged to it by kind, so gs-profiler's query table shows the controller's collision work.
 - 16: `GSFpsMotor.native_tick` and `native_full`: a player tick in one native GameSpice Sim call (halves, or the whole tick with `native_full`), bit-identical to the script; `GSFpsBody.native_tick` is the hook a body answers it through.
 - 17: `GSFpsBody.set_hull_world(world, slot)` (hulls from GameSpice Sim's `GSSimHullWorld`, mode 3) and its hull-body and physics-body overrides; a no-op returning false without the library.
 - 18: a settled body (`reuse_settled_ground`, native start included) no longer keeps its ground stamp for ever when it stands still: a start check that reused the stamp does not excuse the end check, so a floor removed under it is noticed within two ticks. No new API; a game that needs the fix guards on this level. With `native_full` the fix is in GameSpice Sim's `full.rs`, so the library must be GameSpice Sim v0.2.2 or newer (an older library keeps the stale stamp; the script path is correct at any version, and `motor_native_tick_parity` fails against an older library).
-- 19: `GSFpsMotorBatch` (`start`, `add`, `finish`, `skip`, `moved_after`): every player's motor tick of a game tick in one dot-sim call (`GSSimMotorBatch`), bit-identical to ticking them one by one; with it `GSFpsController.begin_tick` and `end_tick` (a tick's start and end around a batched motor step), `has_external_velocity`, and `GSFpsBody.native_batch` and `native_batch_done`, the hooks a body joins a batch through.
+- 19: `GSFpsMotorBatch` (`start`, `add`, `finish`, `skip`, `moved_after`): every player's motor tick of a game tick in one gs-sim call (`GSSimMotorBatch`), bit-identical to ticking them one by one; with it `GSFpsController.begin_tick` and `end_tick` (a tick's start and end around a batched motor step), `has_external_velocity`, and `GSFpsBody.native_batch` and `native_batch_done`, the hooks a body joins a batch through.
 - 20: `GSFpsController.phase_timers` (static): fills `phase_us` without `GSFpsMotor.profile`, which also switches the native motor off, so a bench times the controller's phases on the path players really run.
 - 21: `GSFpsSlidePreset` (`apply_run`, `apply_sprint`): the two slide setups FC and Zombie Zone each carried, as shared data over `GSFpsTunables.slide_*`.
 - 22: `GSFpsLiftCycle.gate_open(seconds, at_top)`: true only while the car stands at that stop, so a game can shut a barrier across a landing's edge whenever the car is elsewhere.

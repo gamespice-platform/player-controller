@@ -17,7 +17,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller controller self-test")
+	print("gs-player-controller controller self-test")
 	print("")
 
 	await _test_zero_configuration()
@@ -74,7 +74,7 @@ func _test_surfaces_from_scene() -> void:
 	# Mark the floor the way a level designer would, and check the controller
 	# resolves it without being told anything about that particular collider.
 	var ground := world.get_child(0)
-	ground.set_meta(&"dot_fps_surface", "ice")
+	ground.set_meta(&"gs_fps_surface", "ice")
 
 	var ice := GSFpsSurface.make(&"ice")
 	ice.friction_scale = 0.02
@@ -295,7 +295,7 @@ func _test_zero_configuration() -> void:
 ## makes a player's body between ticks (a join): the bind must not ask for the space there.
 func _test_threaded_bind() -> void:
 	_section("a body made between ticks on a threaded server binds in the step")
-	var native := load("res://addons/dot_player_controller/fp/motion/dot_fps_physics_body_native.gd") as GDScript
+	var native := load("res://addons/gs_player_controller/fp/motion/gs_fps_physics_body_native.gd") as GDScript
 	var was: bool = native.get(&"threaded_physics")
 	native.set(&"threaded_physics", true)
 	await get_tree().process_frame

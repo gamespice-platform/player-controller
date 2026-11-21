@@ -21,7 +21,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller classic profile self-test")
+	print("gs-player-controller classic profile self-test")
 	_test_profiles()
 	_test_cvars()
 	_test_ground()

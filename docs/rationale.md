@@ -2,7 +2,7 @@
 
 Long reasoning that used to sit above the code, kept here so the code carries one-line docs. Each section names the file it came from.
 
-## GSPlayerBodyRules (core/dot_player_body_rules.gd)
+## GSPlayerBodyRules (core/gs_player_body_rules.gd)
 
 Usage, on every machine: set the player's mask with `world.body_rules.mask(physics.collision_mask(&"player"), physics.layer_mask(&"player"))`, and once the body is built call `world.body_rules.apply_hull(player, tunables.stand_height, tunables.radius)`.
 
@@ -14,13 +14,13 @@ Usage, on every machine: set the player's mask with `world.body_rules.mask(physi
 
 Two bodies that start overlapping (a shared spawn, a teleport) are never stuck: the cast ignores what it starts inside, and `apply_to` tells the controller every other question ignores the players' layer, so they walk apart, or through, and are solid once clear. Without that second half both pushed into each other's hull and stood still.
 
-## GSTpsCameraRig (tp/nodes/dot_tps_camera_rig.gd)
+## GSTpsCameraRig (tp/nodes/gs_tps_camera_rig.gd)
 
 The camera is most of what makes third person work, and the shoulder offset is most of the camera: a camera on the character's centre line puts the character between the player and whatever they are shooting at; offsetting it sideways is why a third-person shooter can have a crosshair that means something. The rig is built in code because a scene is a thing a game has to merge when this addon changes, and the tree is five nodes:
 
 ```
 GSTpsCameraRig          moved to the character, yaw applied here
-  GSCameraBoom          pitch, the shoulder offset and collision (dot-core)
+  GSCameraBoom          pitch, the shoulder offset and collision (gs-core)
     Marker3D             where the boom put the camera
       Camera3D
         GSCameraFade    characters between the camera and the rig fade
@@ -30,13 +30,13 @@ GSTpsCameraRig          moved to the character, yaw applied here
 
 **exclude_own_body.** The rig hangs off the player, so the arm's cast starts inside the player's own collider. The boom's sweeps ignore a shape they start in, so today this is belt and braces for the arm; it is what keeps the player's own body off the fade's list. A `SpringArm3D` excludes nothing unless told, so on a third-person game whose player is a `CharacterBody3D` the arm collides on its first millimetre and collapses to the margin: the camera sits inside the character's head at every distance with every tunable reading as configured. It went unnoticed because `tps_selftest` builds no physics world, so its arm collides with nothing and reports the full length. It walks up rather than taking the body as an argument because the rig is built before the controller has resolved its player.
 
-## GSFpsSurface.push (fp/core/dot_fps_surface.gd)
+## GSFpsSurface.push (fp/core/gs_fps_surface.gd)
 
 It competes with friction, and friction wins by default. Ground friction is applied as though the player were moving at least `GSFpsTunables.stop_speed`, so a push below `stop_speed * friction * friction_scale` (24 m/s² with the shipped defaults) cannot move a standing player at all, and one just above it produces a crawl. A conveyor that visibly moves someone wants a value several times that, or a low `friction_scale` to go with it. The equilibrium speed is `push / (friction * friction_scale)` once that speed exceeds `stop_speed`.
 
 `from_physics`: the top speed comes down with `dampening`, the extra velocity a material takes off on contact: 1 - 0.15 per unit, never under 0.4 (mud 2.5 -> 0.63, sand 1.2 -> 0.82, snow 0.8 -> 0.88). Ice keeps its top speed, which is what makes it ice and not mud. `jump_scale` carries over (rubber 1.8, mud 0.8).
 
-## GSFpsAdminModifiers (fp/core/dot_fps_admin_modifiers.gd)
+## GSFpsAdminModifiers (fp/core/gs_fps_admin_modifiers.gd)
 
 Usage: `controller.admin_abilities = true` on the server and the client, then `GSFpsAdminModifiers.set_noclip(controller, true)` / `set_speed(controller, 2.0)` server side.
 
@@ -46,7 +46,7 @@ Usage: `controller.admin_abilities = true` on the server and the client, then `G
 
 **Registration is part of the wire contract.** `register` must run on every machine, in the same order relative to a game's own modifiers, which is why `GSFpsController.admin_abilities` does it straight after `_register_extensions`, and why a game should turn it on for every player rather than only for the ones an admin has touched.
 
-## GSFpsMoveMode (fp/motion/dot_fps_move_mode.gd)
+## GSFpsMoveMode (fp/motion/gs_fps_move_mode.gd)
 
 Ground, air and noclip are built into `GSFpsMotor` because every first-person game has them and they are what the tunables describe. Everything else is a game's own decision about feel, and the previous answer, "fork the motor", was the wrong one.
 
@@ -68,7 +68,7 @@ motor.set_mode(state, ladder)
 
 **The determinism contract applies exactly as it does to the motor.** A mode runs inside client-side prediction and the server's authoritative tick, and a replay re-runs it. It may not read the keyboard, the wall clock, an unseeded random stream or a node's transform; anything it needs to remember between ticks belongs in `GSFpsState`, not on the mode object, which every player using it shares and a rewind does not restore. `GSFpsMotor` exposes `accelerate`, `move_and_slide`, `probe` and the surface and modifier aggregates.
 
-## GSFpsSwimMode (fp/motion/dot_fps_swim_mode.gd)
+## GSFpsSwimMode (fp/motion/gs_fps_swim_mode.gd)
 
 **Water is data, not an area.** `volumes` is a list of axis-aligned boxes the game hands over (from its map), and every question is a containment test against it: an `Area3D`'s overlap signals arrive after the physics step, on the main loop, and a client replaying ten ticks of prediction cannot ask an area where it WAS. A box list can be asked anything, any number of times, and gives both ends the same answer. Entering is the game's call, once a tick (`update`); leaving is the mode's own: the moment the waist is out of every volume it hands the player to AIR. Both read only `volumes` and the state.
 

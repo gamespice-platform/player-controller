@@ -19,7 +19,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller movement self-test")
+	print("gs-player-controller movement self-test")
 	print("")
 
 	_run_flat()
@@ -707,7 +707,7 @@ func _surfaces_from_physics() -> void:
 	mud_physics.jump_scale = 0.8
 	var mud := GSFpsSurface.from_physics(mud_physics)
 	_check(mud.id == &"mud" and is_equal_approx(mud.friction_scale, 1.2) and is_equal_approx(mud.accelerate_scale, 0.6),
-		"a surface read off dot-physics takes traction as friction and move_scale as acceleration")
+		"a surface read off gs-physics takes traction as friction and move_scale as acceleration")
 	_check(is_equal_approx(mud.max_speed_scale, 0.625) and is_equal_approx(mud.jump_scale, 0.8),
 		"its dampening lowers the top speed, and its jump carries over", "%.3f" % mud.max_speed_scale)
 	_check(mud.fall_damping == 0.0 and GSFpsSurface.make(&"snow").describe()["fall_damping"] == 0.0,
@@ -736,7 +736,7 @@ func _surface_resolver_checks() -> void:
 	# And the resolver contract: a surface id must come from something both machines
 	# see, so the same node metadata resolves the same on either side.
 	var marker := Node3D.new()
-	marker.set_meta(&"dot_fps_surface", "ice")
+	marker.set_meta(&"gs_fps_surface", "ice")
 	_check( GSFpsSurfaceSet.resolve_from_node(marker) == &"ice", "a surface resolves from node metadata" )
 
 	var grouped := Node3D.new()

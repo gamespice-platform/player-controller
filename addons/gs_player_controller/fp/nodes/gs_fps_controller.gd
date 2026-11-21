@@ -1,6 +1,6 @@
 @tool
 class_name GSFpsController
-extends "dot_fps_controller_render.gd"
+extends "gs_fps_controller_render.gd"
 
 ## The player controller. Add it under a [Node3D] and it moves.
 ##
@@ -297,7 +297,7 @@ func is_replaying() -> bool:
 	return _replaying
 
 
-## Marks the following ticks as a replay. dot-net's reconciliation calls this.
+## Marks the following ticks as a replay. gs-net's reconciliation calls this.
 func begin_replay() -> void:
 	_replaying = true
 

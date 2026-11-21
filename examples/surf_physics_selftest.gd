@@ -18,7 +18,7 @@ func _ready() -> void:
 
 func _run() -> void:
 	_t = _tunables()
-	print("dot-player-controller surf self-test, against the physics server")
+	print("gs-player-controller surf self-test, against the physics server")
 	print("")
 
 	await _test_rest_contact_sees_what_a_sweep_cannot()
@@ -514,7 +514,7 @@ func _test_a_simulator_is_the_motor() -> void:
 
 # The crease of two surf slabs
 
-## `g2gfast-surf-crease-hang-1`: in the V of two 50 degree slabs the capsule sits in both faces equally deep, and which one the rest query names is the physics server's business.
+## `airdrift-surf-crease-hang-1`: in the V of two 50 degree slabs the capsule sits in both faces equally deep, and which one the rest query names is the physics server's business.
 ## Ridden here from 48 starts (two places in the world, six along the crease, four micrometre offsets across it), because each start is a different tie.
 ## Armed: with [method GSFpsMotor._leave_crease] skipped, all 48 freeze at some point (worst 218 ticks) and the shortest ride covers 3.1 m of 23.
 func _test_a_surfer_rides_the_crease_of_two_slabs() -> void:

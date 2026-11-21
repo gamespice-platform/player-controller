@@ -1,8 +1,8 @@
 @tool
-extends "dot_fps_tunables_base.gd"
+extends "gs_fps_tunables_base.gd"
 
 ## The first exported groups of [GSFpsTunables] (look, profile, speeds, ground and air movement, jumping, surf, crouching).
-## Split out of dot_fps_tunables_base.gd for file size and layered above it so the property order is unchanged
+## Split out of gs_fps_tunables_base.gd for file size and layered above it so the property order is unchanged
 ## (a derived script lists its properties first). Never instantiate this directly; use [GSFpsTunables].
 
 

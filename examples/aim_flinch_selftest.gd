@@ -17,7 +17,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	print("dot-player-controller aim flinch self-test")
+	print("gs-player-controller aim flinch self-test")
 	_test_default_keeps_aiming()
 	_test_legacy_drops_aiming()
 	_test_decay_and_scaling()

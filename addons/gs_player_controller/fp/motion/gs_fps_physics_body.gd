@@ -1,5 +1,5 @@
 class_name GSFpsPhysicsBody
-extends "dot_fps_physics_body_native.gd"
+extends "gs_fps_physics_body_native.gd"
 
 ## [GSFpsBody] backed by Godot's 3D physics server. The implementation a game uses.
 ## Queries use a capsule shape the motor sizes per call instead of the player's own [CollisionShape3D], so asking "would I fit standing" never mutates the thing measured.

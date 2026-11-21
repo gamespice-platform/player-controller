@@ -31,7 +31,7 @@ func _ready() -> void:
 	if view != null:
 		view.bob_amount = 0.035
 
-	print("dot-player-controller sandbox")
+	print("gs-player-controller sandbox")
 	print(_controller.tunables.describe_summary())
 	print("F1 state · F2 speed pad · V noclip · esc mouse")
 
@@ -41,11 +41,11 @@ func _ready() -> void:
 func _mark_surfaces() -> void:
 	var ramp := get_node_or_null("World/Area_One/SurfRamp")
 	if ramp != null:
-		ramp.set_meta(&"dot_fps_surface", "ice")
+		ramp.set_meta(&"gs_fps_surface", "ice")
 
 	for child in $World/Area_One.get_children():
 		if child.name.begins_with("Step"):
-			child.set_meta(&"dot_fps_surface", "metal")
+			child.set_meta(&"gs_fps_surface", "metal")
 
 
 func _register_movement_extras() -> void:
