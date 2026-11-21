@@ -1,7 +1,7 @@
-class_name DotTpsSampler
+class_name GSTpsSampler
 extends Node
 
-## Devices to [DotPlayerIntent]. The only node in this addon that reads input, kept apart from the
+## Devices to [GSPlayerIntent]. The only node in this addon that reads input, kept apart from the
 ## controller so a replay cannot pick up what the player is holding now.
 ## Action names are exported because GameSpice UI owns rebinding.
 
@@ -64,8 +64,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## One tick of intent. Call once per simulated tick, on the machine with the player.
-func sample(tick: int, delta: float) -> DotPlayerIntent:
-	var intent := DotPlayerIntent.new()
+func sample(tick: int, delta: float) -> GSPlayerIntent:
+	var intent := GSPlayerIntent.new()
 	intent.tick = tick
 
 	intent.move = Vector2(
@@ -76,25 +76,25 @@ func sample(tick: int, delta: float) -> DotPlayerIntent:
 	var buttons := 0
 
 	if _pressed(jump):
-		buttons |= DotPlayerIntent.Btn.JUMP
+		buttons |= GSPlayerIntent.Btn.JUMP
 
 	if _pressed(crouch):
-		buttons |= DotPlayerIntent.Btn.CROUCH
+		buttons |= GSPlayerIntent.Btn.CROUCH
 
 	if _pressed(sprint):
-		buttons |= DotPlayerIntent.Btn.SPRINT
+		buttons |= GSPlayerIntent.Btn.SPRINT
 
 	if _pressed(aim):
-		buttons |= DotPlayerIntent.Btn.ZOOM
+		buttons |= GSPlayerIntent.Btn.ZOOM
 
 	if _pressed(attack):
-		buttons |= DotPlayerIntent.Btn.ATTACK
+		buttons |= GSPlayerIntent.Btn.ATTACK
 
 	if _pressed(use_action):
-		buttons |= DotPlayerIntent.Btn.USE
+		buttons |= GSPlayerIntent.Btn.USE
 
 	if _pressed(swap_shoulder):
-		buttons |= DotPlayerIntent.Btn.ABILITY_3
+		buttons |= GSPlayerIntent.Btn.ABILITY_3
 
 	intent.buttons = buttons
 	intent.diff_from(_last_buttons)
@@ -144,7 +144,7 @@ func _note_missing(action: StringName) -> void:
 		return
 
 	_missing[action] = true
-	DotLog.debug(CHANNEL, "no such input action", {"action": String(action)})
+	GSLog.debug(CHANNEL, "no such input action", {"action": String(action)})
 
 
 ## Which actions this project has not defined. For a settings screen or a bug report.

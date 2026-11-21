@@ -67,7 +67,7 @@ func _test_wall_run() -> void:
 
 
 ## Entry refusals: too slow, on the ground, no forward held, and head-on.
-func _wall_run_entry_refusals(t: DotFpsTunables) -> void:
+func _wall_run_entry_refusals(t: GSFpsTunables) -> void:
 	# Entry needs speed along the wall.
 	var slow_motor := _motor(t, _wall_world())
 	var slow := _beside_wall(4.0)
@@ -76,7 +76,7 @@ func _wall_run_entry_refusals(t: DotFpsTunables) -> void:
 
 	var floor_motor := _motor(t, _wall_world())
 	var grounded := _beside_wall(9.0, 0.0, 0.0)
-	grounded.mode = DotFpsState.Mode.GROUND
+	grounded.mode = GSFpsState.Mode.GROUND
 	grounded.time_since_grounded = 0.0
 	_run_along(floor_motor, grounded, 30)
 	_check(floor_motor.wall_runs == 0 and grounded.is_grounded(), "on the ground beside a wall is no run")
@@ -97,7 +97,7 @@ func _wall_run_entry_refusals(t: DotFpsTunables) -> void:
 
 
 ## Releasing forward and landing both end a run.
-func _wall_run_ends(t: DotFpsTunables) -> void:
+func _wall_run_ends(t: GSFpsTunables) -> void:
 	var drop_motor := _motor(t, _wall_world())
 	var drop := _beside_wall(9.0)
 	_run_along(drop_motor, drop, 10)
@@ -115,7 +115,7 @@ func _wall_run_ends(t: DotFpsTunables) -> void:
 
 
 ## A run just past a ledge's end keeps the wall beside it.
-func _wall_run_ledge(t: DotFpsTunables) -> void:
+func _wall_run_ledge(t: GSFpsTunables) -> void:
 	# The uncrouch after a slide-jump drops the feet under the ledge's top; nearest-wins then took
 	# the ledge's end face, whose "along" speed is nothing, and ended the run.
 	var ledged := _wall_world()
@@ -135,7 +135,7 @@ func _wall_run_ledge(t: DotFpsTunables) -> void:
 
 func _test_wall_run_corridor() -> void:
 	_section("a wall run along a corridor, end to end")
-	var jump := DotFpsCommand.BUTTON_JUMP
+	var jump := GSFpsCommand.BUTTON_JUMP
 	var t := _wall_tunables()
 	var wall_x := 1.0
 
@@ -193,7 +193,7 @@ func _test_wall_run_corridor() -> void:
 func _test_wall_run_auto() -> void:
 	_section("an airborne touch of a wall starts a run with no press")
 
-	var jump := DotFpsCommand.BUTTON_JUMP
+	var jump := GSFpsCommand.BUTTON_JUMP
 	var t := _wall_tunables()
 	t.wall_run_min_speed = 20.0
 	t.wall_jump_max_per_air = 3
@@ -234,7 +234,7 @@ func _test_wall_no_stick_walking() -> void:
 
 		var motor := _motor(t, _wall_world())
 		var walker := _beside_wall(0.0, 0.0, 0.0)
-		walker.mode = DotFpsState.Mode.GROUND
+		walker.mode = GSFpsState.Mode.GROUND
 		walker.position.y = 0.0
 		walker.time_since_grounded = 0.0
 		for _i in range(60):
@@ -257,15 +257,15 @@ func _test_wall_no_stick_walking() -> void:
 	_done()
 
 
-func _size_world(top: float) -> DotFpsFlatBody:
-	var world := DotFpsFlatBody.with_floor(0.0)
+func _size_world(top: float) -> GSFpsFlatBody:
+	var world := GSFpsFlatBody.with_floor(0.0)
 	world.add_box(AABB(Vector3(1.0, 0.0, -200.0), Vector3(0.5, top, 200.0)))
 	return world
 
 
 ## Runs a player beside an object of height [param top] and reports whether a run started, and
 ## whether the yaw or the view turn ever moved; a second motor replays the same ticks.
-func _size_trial(t: DotFpsTunables, top: float, press_at: int = -1) -> Dictionary:
+func _size_trial(t: GSFpsTunables, top: float, press_at: int = -1) -> Dictionary:
 	var motor := _motor(t, _size_world(top))
 	var twin := _motor(t, _size_world(top))
 	var s := _beside_wall(8.0, 0.0, 1.0 if top > 2.0 else maxf(top - 0.2, 0.05))
@@ -274,7 +274,7 @@ func _size_trial(t: DotFpsTunables, top: float, press_at: int = -1) -> Dictionar
 	var steady := true
 	var agree := true
 	for i in range(30):
-		var buttons := DotFpsCommand.BUTTON_JUMP if i == press_at else 0
+		var buttons := GSFpsCommand.BUTTON_JUMP if i == press_at else 0
 		motor.simulate(s, _command(1.0, 0.0, 0.0, buttons), STEP)
 		twin.simulate(mirror, _command(1.0, 0.0, 0.0, buttons), STEP)
 		steady = steady and s.yaw == 0.0 and s.pitch == 0.0 and motor.view_turn == 0.0
@@ -311,7 +311,7 @@ func _test_wall_run_min_size() -> void:
 
 	t.wall_run_min_height = 2.0
 	t.wall_run_min_length = 5.0
-	var stub := DotFpsFlatBody.with_floor(0.0)
+	var stub := GSFpsFlatBody.with_floor(0.0)
 	stub.add_box(AABB(Vector3(1.0, 0.0, -3.0), Vector3(0.5, 12.0, 3.0)))
 	var stub_motor := _motor(t, stub)
 	var q := _beside_wall(8.0, 0.0, 3.0)
@@ -324,7 +324,7 @@ func _test_wall_run_min_size() -> void:
 func _test_wall_run_on_jump() -> void:
 	_section("a jump press starts a wall run")
 
-	var jump := DotFpsCommand.BUTTON_JUMP
+	var jump := GSFpsCommand.BUTTON_JUMP
 	var t := _wall_tunables()
 
 	# Off by default: the press is a wall jump, not a run.
@@ -385,7 +385,7 @@ func _test_wall_run_on_jump() -> void:
 
 
 ## How a jump-started run turns the view along the wall.
-func _wall_run_view_checks(motor: DotFpsMotor, jump: int) -> void:
+func _wall_run_view_checks(motor: GSFpsMotor, jump: int) -> void:
 	_check(motor.view_turn == 0.0, "the view is left alone unless wall_run_turn_view is on")
 	var tv := _wall_tunables()
 	tv.wall_run_on_jump = true
@@ -442,7 +442,7 @@ func _wall_run_view_checks(motor: DotFpsMotor, jump: int) -> void:
 
 
 ## The ways a jump-started wall run ends: time cap, lost wall, stopping, forward released.
-func _wall_run_end_checks(t: DotFpsTunables, jump: int) -> void:
+func _wall_run_end_checks(t: GSFpsTunables, jump: int) -> void:
 	# End 2: the time cap.
 	var tc := _wall_tunables()
 	tc.wall_run_on_jump = true
@@ -499,13 +499,13 @@ func _wall_run_cooldown_checks(jump: int) -> void:
 	cd_motor.simulate(cd, _command(0.0, 0.0, 0.0), STEP)
 	_check(not cd.is_wall_running() and cd.wall_run_cooldown_left > 0.4, "an ended run starts the cooldown",
 		"%.2f" % cd.wall_run_cooldown_left)
-	var packed := DotFpsNetSync.pack_timers(cd)
-	var restored := DotFpsState.new()
-	DotFpsNetSync.unpack_timers(restored, packed)
+	var packed := GSFpsNetSync.pack_timers(cd)
+	var restored := GSFpsState.new()
+	GSFpsNetSync.unpack_timers(restored, packed)
 	_check_near(restored.wall_run_cooldown_left, cd.wall_run_cooldown_left, 0.01, "and the cooldown rides in the rewind timers")
 
 	# The cvars reach the tunables.
-	var cv := DotFpsTunables.new()
+	var cv := GSFpsTunables.new()
 	_check(cv.set_cvar("sv_wallrun_onjump", "1") and cv.wall_run_on_jump
 		and cv.set_cvar("sv_wallrun_cooldown", "0.7") and absf(cv.wall_run_cooldown - 0.7) < 0.001,
 		"sv_wallrun_onjump and sv_wallrun_cooldown set the tunables")
@@ -514,7 +514,7 @@ func _wall_run_cooldown_checks(jump: int) -> void:
 func _test_wall_jump() -> void:
 	_section("wall jumping")
 
-	var jump := DotFpsCommand.BUTTON_JUMP
+	var jump := GSFpsCommand.BUTTON_JUMP
 
 	var off_motor := _motor(_tunables(), _wall_world())
 	var off := _beside_wall(9.0, -1.0)
@@ -583,7 +583,7 @@ func _test_wall_jump() -> void:
 
 ## Per airborne stretch: a budget across every wall, refilled by landing.
 func _wall_jump_budget() -> void:
-	var jump := DotFpsCommand.BUTTON_JUMP
+	var jump := GSFpsCommand.BUTTON_JUMP
 	var budget := _wall_tunables()
 	budget.wall_jump_max_per_wall = 0
 	budget.wall_jump_max_per_air = 2
@@ -611,9 +611,9 @@ func _test_wall_replay() -> void:
 	t.wall_slide_speed = 2.0
 	# A push fast enough to cross the corridor before the fall outruns a run: the jump redirects carried speed, it adds none.
 	t.wall_jump_push_speed = 12.0
-	var commands: Array[DotFpsCommand] = []
+	var commands: Array[GSFpsCommand] = []
 	for i in range(240):
-		var buttons := DotFpsCommand.BUTTON_JUMP if i % 45 == 30 else 0
+		var buttons := GSFpsCommand.BUTTON_JUMP if i % 45 == 30 else 0
 		# Looking a little off along the corridor, so each jump crosses it.
 		var yaw := sin(float(i) * 0.07) * 12.0
 		commands.append(_command(1.0, sin(float(i) * 0.05) * 0.3, yaw, buttons))
@@ -622,7 +622,7 @@ func _test_wall_replay() -> void:
 		var full_motor := _motor(t, _wall_world())
 		var full := _beside_wall(9.0)
 		var positions: Array[Vector3] = []
-		var snapshot: DotFpsState = null
+		var snapshot: GSFpsState = null
 		var split := -1
 		for i in range(commands.size()):
 			full_motor.simulate(full, commands[i], rate)
@@ -640,7 +640,7 @@ func _test_wall_replay() -> void:
 		# a client's rewind does. At 60 Hz it is the state itself (the timers quantise).
 		var replay := snapshot.duplicate_state()
 		if rate != STEP:
-			DotFpsNetSync.unpack_flags(replay, DotFpsNetSync.pack_flags(snapshot))
+			GSFpsNetSync.unpack_flags(replay, GSFpsNetSync.pack_flags(snapshot))
 		var replay_motor := _motor(t, _wall_world())
 		var same := true
 		for i in range(split, commands.size()):
@@ -671,16 +671,16 @@ func _test_wall_replay() -> void:
 func _test_wall_replay_128() -> void:
 	_section("net_timers2 rewinds a wall run exactly at 128 Hz")
 	var rate := 1.0 / 128.0
-	DotFpsNetSync.set_tick_rate(128)
+	GSFpsNetSync.set_tick_rate(128)
 	var t := _wall_tunables()
 	t.wall_slide_speed = 2.0
-	var commands: Array[DotFpsCommand] = []
+	var commands: Array[GSFpsCommand] = []
 	for i in range(480):
-		var buttons := DotFpsCommand.BUTTON_JUMP if i % 90 == 60 else 0
+		var buttons := GSFpsCommand.BUTTON_JUMP if i % 90 == 60 else 0
 		commands.append(_command(1.0, sin(float(i) * 0.05) * 0.3, sin(float(i) * 0.035) * 12.0, buttons))
 	var full_motor := _motor(t, _wall_world())
 	var full := _beside_wall(9.0)
-	var states: Array[DotFpsState] = []
+	var states: Array[GSFpsState] = []
 	for c in commands:
 		full_motor.simulate(full, c, rate)
 		states.append(full.duplicate_state())
@@ -700,8 +700,8 @@ func _test_wall_replay_128() -> void:
 			replay.slide_time = 99.0
 			replay.slide_cooldown_left = 99.0
 			replay.wall_run_time = 99.0
-			DotFpsNetSync.pull(states[k], carrier)
-			DotFpsNetSync.push(carrier, replay)
+			GSFpsNetSync.pull(states[k], carrier)
+			GSFpsNetSync.push(carrier, replay)
 			var replay_motor := _motor(t, _wall_world())
 			for j in range(k + 1, k + lead + 1):
 				replay_motor.simulate(replay, commands[j], rate)
@@ -710,7 +710,7 @@ func _test_wall_replay_128() -> void:
 		counts.append([bad, tested])
 	plain.free()
 	timed.free()
-	DotFpsNetSync.set_tick_rate(64)
+	GSFpsNetSync.set_tick_rate(64)
 	_check(counts[0][1] > 20 and counts[0][0] == 0, "every wall-run rewind through net_timers2 lands where the server did", "%d of %d diverged" % counts[0])
 	_check(counts[1][0] > 0, "negative control: a rewind through the 1/64 s flags diverges at 128 Hz", "%d of %d diverged" % counts[1])
 	_done()

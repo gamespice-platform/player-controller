@@ -21,18 +21,18 @@ var _completed := 0
 
 
 ## A controller that refuses input, of the kind a respawn freeze would use.
-class FrozenController extends DotFpsController:
+class FrozenController extends GSFpsController:
 	var frozen := true
 	var registered := 0
 
 	func _register_extensions() -> void:
 		registered += 1
 
-		var slow := DotFpsModifier.make(&"slow")
+		var slow := GSFpsModifier.make(&"slow")
 		slow.max_speed_scale = 0.25
 		motor.register_modifier(slow)
 
-	func _accept_command(_command: DotFpsCommand) -> bool:
+	func _accept_command(_command: GSFpsCommand) -> bool:
 		return not frozen
 
 
@@ -87,13 +87,13 @@ func _make_world() -> Node3D:
 
 
 ## The conventional player layout, with nothing wired by hand: Player / Collision, Head / Camera, View, Controller.
-## [param configure] runs before the controller enters the tree, because DotFpsController wires itself in _ready;
+## [param configure] runs before the controller enters the tree, because GSFpsController wires itself in _ready;
 ## configuring afterwards silently tests the defaults.
 func _make_player(
 	world: Node3D,
-	drive: DotFpsController.Drive,
+	drive: GSFpsController.Drive,
 	configure: Callable = Callable()
-) -> DotFpsController:
+) -> GSFpsController:
 	var player := CharacterBody3D.new()
 	player.name = "Player"
 	world.add_child(player)
@@ -111,11 +111,11 @@ func _make_player(
 	camera.name = "Camera"
 	head.add_child(camera)
 
-	var view := DotFpsView.new()
+	var view := GSFpsView.new()
 	view.name = "View"
 	player.add_child(view)
 
-	var controller := DotFpsController.new()
+	var controller := GSFpsController.new()
 	controller.name = "Controller"
 	controller.drive = drive
 	controller.register_default_actions = false
@@ -133,8 +133,8 @@ func _command(
 	strafe: float = 0.0,
 	yaw: float = 0.0,
 	buttons: int = 0
-) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	c.move = Vector2(strafe, forward)
 	c.yaw = yaw
 	c.buttons = buttons
@@ -143,7 +143,7 @@ func _command(
 
 
 
-## Stands in for GameSpice Net's DotNetClock: all `render_state` asks of a clock is `render_alpha`.
+## Stands in for GameSpice Net's GSNetClock: all `render_state` asks of a clock is `render_alpha`.
 class FakeClock extends RefCounted:
 	var alpha: float = 0.0
 
@@ -162,7 +162,7 @@ class LegSource extends Node:
 	signal legs_broken(seconds: float, speed_scale: float)
 
 
-func _test_external_push(controller: DotFpsController) -> void:
+func _test_external_push(controller: GSFpsController) -> void:
 	for i in range(120):
 		controller.apply_command(_command())
 		controller.simulate_tick(400 + i, STEP)

@@ -20,11 +20,11 @@ var _entered := 0
 var _completed := 0
 
 
-var _t: DotFpsTunables
+var _t: GSFpsTunables
 
 
-func _tunables() -> DotFpsTunables:
-	var t := DotFpsTunables.with_profile("legacy")
+func _tunables() -> GSFpsTunables:
+	var t := GSFpsTunables.with_profile("legacy")
 	t.auto_hop = true
 	t.bhop_speed_cap_scale = 0.0
 	t.max_speed = 7.0
@@ -109,18 +109,18 @@ func _settle() -> void:
 ## Positive means the capsule's surface is PAST the ramp face by this many metres.
 func _penetration(feet: Vector3, normal: Vector3) -> float:
 	var centre := feet + Vector3.UP * (_t.stand_height * 0.5)
-	return DotFpsBody.capsule_support(normal, _t.stand_height, _t.radius) - normal.dot(centre)
+	return GSFpsBody.capsule_support(normal, _t.stand_height, _t.radius) - normal.dot(centre)
 
 
 ## A state placed clear of the ramp face by [param above] metres.
-func _on_ramp(normal: Vector3, z: float, above: float) -> DotFpsState:
-	var s := DotFpsState.new()
-	var support := DotFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
+func _on_ramp(normal: Vector3, z: float, above: float) -> GSFpsState:
+	var s := GSFpsState.new()
+	var support := GSFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
 	# Solve for the feet height that puts the capsule `above` clear of the face.
 	var centre_y := (support + above + normal.z * z * -1.0 * 0.0) / normal.y
 	centre_y = (support + above - normal.z * z) / normal.y
 	s.position = Vector3(0.0, centre_y - _t.stand_height * 0.5, z)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	return s
 
 
@@ -151,15 +151,15 @@ func _ride_off_the_end(pitch: float, across: float, speed: float) -> Vector2:
 
 	var normal := basis * Vector3.UP
 	var far_z := (basis * Vector3(0.0, 0.0, -length)).z
-	var motor := DotFpsMotor.new(_tunables(), DotFpsPhysicsBody.for_node(self))
-	var s := DotFpsState.new()
-	var support := DotFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
+	var motor := GSFpsMotor.new(_tunables(), GSFpsPhysicsBody.for_node(self))
+	var s := GSFpsState.new()
+	var support := GSFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
 	var centre := basis * Vector3(across, 0.0, -5.0) + normal * (support + 0.03)
 	s.position = centre - Vector3.UP * (_t.stand_height * 0.5)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	s.velocity = (basis * Vector3.FORWARD) * speed
 
-	var hold := DotFpsCommand.new()
+	var hold := GSFpsCommand.new()
 	hold.move = Vector2(1.0, 0.0)
 
 	var worst := 0.0
@@ -230,8 +230,8 @@ func _add_crease(x0: float) -> void:
 		add_child(sb)
 
 
-func _crease_tunables() -> DotFpsTunables:
-	var t := DotFpsTunables.with_profile("legacy")
+func _crease_tunables() -> GSFpsTunables:
+	var t := GSFpsTunables.with_profile("legacy")
 	t.max_speed = 4.7625
 	t.air_accelerate = 1000.0
 	t.max_air_wish_speed = 0.5715
@@ -246,10 +246,10 @@ func _crease_tunables() -> DotFpsTunables:
 
 ## Rides the crease from [param start] for [param ticks] ticks and returns
 ## [distance along -Z, longest run of ticks frozen with speed, crease legs].
-func _ride_crease(start: DotFpsState, ticks: int) -> Array:
-	var motor := DotFpsMotor.new(_crease_tunables(), DotFpsPhysicsBody.for_node(self))
+func _ride_crease(start: GSFpsState, ticks: int) -> Array:
+	var motor := GSFpsMotor.new(_crease_tunables(), GSFpsPhysicsBody.for_node(self))
 	var s := start.duplicate_state()
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.move = Vector2(0.0, 1.0)
 	var frozen := 0
 	var longest := 0
@@ -265,23 +265,23 @@ func _ride_crease(start: DotFpsState, ticks: int) -> Array:
 
 
 ## Replays one recorded input log (walk, strafe, turn, jump, crouch) over a steep ramp beside a floor,
-## once as the motor always answers and once with [member DotFpsMotor.static_world] reusing probes.
+## once as the motor always answers and once with [member GSFpsMotor.static_world] reusing probes.
 ## The two must end on the same bits every tick, and the second must ask the physics server fewer questions.
 func _replay_log(static_world: bool) -> Array:
-	var body := DotFpsPhysicsBody.for_node(self)
-	var motor := DotFpsMotor.new(_tunables(), body)
+	var body := GSFpsPhysicsBody.for_node(self)
+	var motor := GSFpsMotor.new(_tunables(), body)
 	motor.static_world = static_world
 	var s := _on_ramp(_normal_for(60.0), 6.0, 0.05)
 	s.velocity = Vector3(6.0, 0.0, 0.0)
 	var seed := 12345
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	var digest := 0
 	for tick in range(1200):
 		seed = (seed * 1103515245 + 12345) & 0x7fffffff
 		if tick % 8 == 0:
 			command.move = Vector2(float((seed >> 3) % 3 - 1), float((seed >> 5) % 3 - 1))
 			command.yaw = float((seed >> 7) % 628) * 0.01 - 3.14
-		command.set_button(DotFpsCommand.BUTTON_JUMP, (seed >> 11) % 40 == 0)
+		command.set_button(GSFpsCommand.BUTTON_JUMP, (seed >> 11) % 40 == 0)
 		motor.simulate(s, command, STEP)
 		digest = hash([digest, s.position, s.velocity, s.mode, s.ground_normal])
 	return [s.position, s.velocity, s.mode, digest, body.query_count]

@@ -1,5 +1,5 @@
-class_name DotPlayerController
-extends DotPlayerComponent
+class_name GSPlayerController
+extends GSPlayerComponent
 
 ## The contract every player controller keeps, and the reason a game can swap one.
 ## Abstract: it moves nothing. It provides an id, an active flag, an intent queue, a teleport and the interface a switch uses to hand a player between controllers.
@@ -33,7 +33,7 @@ signal teleported(to: Transform3D)
 @export var controller_id: StringName = &""
 
 ## Whether this controller is the one driving the player.
-## Read-only from outside; use [method activate] and [method deactivate] or a [DotPlayerControllerSwitch] so exactly one is true.
+## Read-only from outside; use [method activate] and [method deactivate] or a [GSPlayerControllerSwitch] so exactly one is true.
 @export var active: bool = false:
 	set(value):
 		if value == active:
@@ -59,14 +59,14 @@ signal teleported(to: Transform3D)
 @export_range(0.0, 10.0, 0.01) var jump_scale: float = 1.0
 
 var _last_buttons: int = 0
-var _last_intent: DotPlayerIntent = null
+var _last_intent: GSPlayerIntent = null
 
 
 
 ## Feeds one tick of intent. The only way a controller is driven.
 ## Named [code]simulate[/code], not [code]drive[/code]: the first-person controller has an exported [code]drive[/code] property, and a property shadowing an inherited method is refused with the error reported against the file that uses it.
 ## Fills in the pressed/released edges, remembers the intent for [method describe_lines] and returns whether it was applied.
-func simulate(intent: DotPlayerIntent, delta: float) -> bool:
+func simulate(intent: GSPlayerIntent, delta: float) -> bool:
 	if intent == null or not active:
 		return false
 
@@ -76,7 +76,7 @@ func simulate(intent: DotPlayerIntent, delta: float) -> bool:
 
 	if not input_enabled:
 		# Still applied with everything released: a frozen player keeps falling and sliding; skipping the tick leaves them hanging in mid-air.
-		var idle := DotPlayerIntent.make(Vector2.ZERO, 0, intent.tick)
+		var idle := GSPlayerIntent.make(Vector2.ZERO, 0, intent.tick)
 		idle.view_yaw = intent.view_yaw
 		idle.view_pitch = intent.view_pitch
 		_apply_intent(idle, delta)
@@ -86,7 +86,7 @@ func simulate(intent: DotPlayerIntent, delta: float) -> bool:
 	return true
 
 
-## Takes over. Use a [DotPlayerControllerSwitch] when there is more than one.
+## Takes over. Use a [GSPlayerControllerSwitch] when there is more than one.
 func activate() -> void:
 	active = true
 
@@ -99,7 +99,7 @@ func is_active() -> bool:
 	return active
 
 
-func last_intent() -> DotPlayerIntent:
+func last_intent() -> GSPlayerIntent:
 	return _last_intent
 
 
@@ -166,7 +166,7 @@ func adopt_state(state: Dictionary) -> void:
 
 
 ## Move, this tick. The one method a controller must implement.
-func _apply_intent(_intent: DotPlayerIntent, _delta: float) -> void:
+func _apply_intent(_intent: GSPlayerIntent, _delta: float) -> void:
 	pass
 
 

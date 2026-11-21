@@ -16,23 +16,23 @@ You can delete `fp/` or `tp/` if you only need one. A vehicle, ladder or spectat
 1. Copy `addons/dot_player_controller/`, `addons/dot_player/` and `addons/dot_core/` into your project.
 2. Enable all three in *Project > Project Settings > Plugins*.
 
-`addons/dot_net/` is optional and only used by `DotFpsNetSync`.
+`addons/dot_net/` is optional and only used by `GSFpsNetSync`.
 
 Needs Godot 4.7 or newer.
 
 ## The shared base
 
-**Intent.** `DotPlayerIntent` says "forward, holding jump, looking here". It is not key presses and not movement, so a sampler, a replay or a server can all produce it.
+**Intent.** `GSPlayerIntent` says "forward, holding jump, looking here". It is not key presses and not movement, so a sampler, a replay or a server can all produce it.
 
 ```gdscript
-var intent := DotPlayerIntent.make(Vector2(0, 1), DotPlayerIntent.Btn.JUMP, tick)
+var intent := GSPlayerIntent.make(Vector2(0, 1), GSPlayerIntent.Btn.JUMP, tick)
 intent.view_yaw = look.yaw
 controller.simulate(intent, delta)
 ```
 
 `diff_from(previous_buttons)` fills in `pressed` and `released`. The look delta is not sent over the network; the client sends where it looks and the server clamps it.
 
-**Look.** `DotPlayerLook` handles mouse look: pitch clamps, yaw wraps, sensitivity scales the delta.
+**Look.** `GSPlayerLook` handles mouse look: pitch clamps, yaw wraps, sensitivity scales the delta.
 
 ```gdscript
 look.apply(mouse_delta)
@@ -41,13 +41,13 @@ body.basis   = look.body_basis()
 velocity     = look.move_direction(intent.move) * speed
 ```
 
-**Switch.** `DotPlayerControllerSwitch` makes exactly one controller active and hands over position, velocity, yaw and pitch, not controller state.
+**Switch.** `GSPlayerControllerSwitch` makes exactly one controller active and hands over position, velocity, yaw and pitch, not controller state.
 
 ```
-DotPlayer
-  DotPlayerControllerSwitch    default_controller = &"fp"
-  DotFpsController             controller_id = &"fp"
-  DotTpsController             controller_id = &"tp"
+GSPlayer
+  GSPlayerControllerSwitch    default_controller = &"fp"
+  GSFpsController             controller_id = &"fp"
+  GSTpsController             controller_id = &"tp"
 ```
 
 `set_input_enabled(false)` freezes every controller but still ticks with an empty intent, so a frozen player keeps falling.
@@ -58,24 +58,24 @@ The simulation is a pure function of (state, command, delta, world), so a client
 
 | Class | Purpose |
 | --- | --- |
-| `DotFpsCommand` | One tick of player intent, packed to 49 bits. |
-| `DotFpsState` | Everything carried between ticks. |
-| `DotFpsTunables` | Every movement number, layered: defaults, JSON, `DOT_FPS_*` environment, `--fps-*` command line. Also `jump_reach(rise)`, `jump_airtime(rise)`, `climb_limit()` for level designers. |
-| `DotFpsMotor` | The deterministic simulation. |
-| `DotFpsBody` | Collision queries: `DotFpsPhysicsBody` for real geometry, `DotFpsFlatBody` for tests. |
-| `DotFpsController` | The node. Drives the motor, writes to the scene, resizes the collider. |
-| `DotFpsView` | Camera, pitch, crouch height, speed FOV. Cosmetic, runs per frame. |
-| `DotFpsViewMotion` | Landing dip, strafe and slide roll, wall-run lean as plain numbers, for games with their own camera. |
-| `DotFpsSampler` | Keyboard, mouse and gamepad to commands. |
-| `DotFpsTouchSampler` | Touch to commands. |
-| `DotFpsNetSync` | What to replicate and how, without importing GameSpice Net. |
-| `DotFpsSurface` | Ground behaviour such as ice, mud or a conveyor. |
-| `DotFpsModifier` | A temporary change such as a speed pad, slow field, stun or launcher. |
-| `DotFpsMoveMode` | A movement mode your game adds, such as a ladder, water or grapple. |
+| `GSFpsCommand` | One tick of player intent, packed to 49 bits. |
+| `GSFpsState` | Everything carried between ticks. |
+| `GSFpsTunables` | Every movement number, layered: defaults, JSON, `DOT_FPS_*` environment, `--fps-*` command line. Also `jump_reach(rise)`, `jump_airtime(rise)`, `climb_limit()` for level designers. |
+| `GSFpsMotor` | The deterministic simulation. |
+| `GSFpsBody` | Collision queries: `GSFpsPhysicsBody` for real geometry, `GSFpsFlatBody` for tests. |
+| `GSFpsController` | The node. Drives the motor, writes to the scene, resizes the collider. |
+| `GSFpsView` | Camera, pitch, crouch height, speed FOV. Cosmetic, runs per frame. |
+| `GSFpsViewMotion` | Landing dip, strafe and slide roll, wall-run lean as plain numbers, for games with their own camera. |
+| `GSFpsSampler` | Keyboard, mouse and gamepad to commands. |
+| `GSFpsTouchSampler` | Touch to commands. |
+| `GSFpsNetSync` | What to replicate and how, without importing GameSpice Net. |
+| `GSFpsSurface` | Ground behaviour such as ice, mud or a conveyor. |
+| `GSFpsModifier` | A temporary change such as a speed pad, slow field, stun or launcher. |
+| `GSFpsMoveMode` | A movement mode your game adds, such as a ladder, water or grapple. |
 
 ### Movement features
 
-The defaults are a classic competitive-shooter profile (see [docs/motor.md](docs/motor.md)); `DotFpsTunables.with_profile("legacy")` gives the older set. Features marked "off" are enabled with tunables.
+The defaults are a classic competitive-shooter profile (see [docs/motor.md](docs/motor.md)); `GSFpsTunables.with_profile("legacy")` gives the older set. Features marked "off" are enabled with tunables.
 
 | Feature | Notes |
 | --- | --- |
@@ -91,27 +91,27 @@ The defaults are a classic competitive-shooter profile (see [docs/motor.md](docs
 
 ### Extending it
 
-- **Surfaces:** set `dot_fps_surface = "ice"` on a collider (or put it in a `surface_ice` group) and give the controller a `DotFpsSurfaceSet`.
-- **Modifiers:** `DotFpsModifier` scales speed, acceleration, gravity, friction and jumping, denies movement, or applies an impulse.
+- **Surfaces:** set `dot_fps_surface = "ice"` on a collider (or put it in a `surface_ice` group) and give the controller a `GSFpsSurfaceSet`.
+- **Modifiers:** `GSFpsModifier` scales speed, acceleration, gravity, friction and jumping, denies movement, or applies an impulse.
 - **Admin abilities:** `admin_abilities = true` registers noclip, freeze, and speed and gravity steps that the owning client predicts.
-- **Movement modes:** subclass `DotFpsMoveMode`.
-- **Sampling:** use a sampler, or build a `DotFpsCommand` yourself for a bot or demo.
+- **Movement modes:** subclass `GSFpsMoveMode`.
+- **Sampling:** use a sampler, or build a `GSFpsCommand` yourself for a bot or demo.
 
 These are part of the simulation, so they replicate and survive replays. See [docs/extending.md](docs/extending.md).
 
 ### Networking
 
-The controller does not import GameSpice Net. Wiring it up takes about 30 lines; see [docs/networking.md](docs/networking.md). Compare `DotFpsTunables.fingerprint()` between client and server, because a config mismatch looks like packet loss.
+The controller does not import GameSpice Net. Wiring it up takes about 30 lines; see [docs/networking.md](docs/networking.md). Compare `GSFpsTunables.fingerprint()` between client and server, because a config mismatch looks like packet loss.
 
 ## Third-person movement
 
-An orbit rig on a spring arm with a swappable shoulder offset, camera-relative movement, turn-to-face, strafe-lock, coyote time and a jump buffer. `DotTpsMotor.step` relies on `move_and_slide` for collisions, so it is repeatable on one machine but not bit-exact against a server. For that, drive the first-person motor and use `tp/` only for the camera.
+An orbit rig on a spring arm with a swappable shoulder offset, camera-relative movement, turn-to-face, strafe-lock, coyote time and a jump buffer. `GSTpsMotor.step` relies on `move_and_slide` for collisions, so it is repeatable on one machine but not bit-exact against a server. For that, drive the first-person motor and use `tp/` only for the camera.
 
 ## Writing a controller
 
 ```gdscript
-class MyController extends DotPlayerController:
-    func _apply_intent(intent: DotPlayerIntent, delta: float) -> void: ...
+class MyController extends GSPlayerController:
+    func _apply_intent(intent: GSPlayerIntent, delta: float) -> void: ...
     func _read_transform() -> Transform3D: ...
     func _write_transform(to: Transform3D) -> void: ...
     func _read_velocity() -> Vector3: ...

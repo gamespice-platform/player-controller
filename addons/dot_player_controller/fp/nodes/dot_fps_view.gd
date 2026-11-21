@@ -1,9 +1,9 @@
 @tool
-class_name DotFpsView
+class_name GSFpsView
 extends Node
 
 ## Everything the player sees, and nothing the simulation depends on.
-## Cosmetic state is driven from the sim state and never written back: anything cosmetic in [DotFpsMotor] would become netcode contract.
+## Cosmetic state is driven from the sim state and never written back: anything cosmetic in [GSFpsMotor] would become netcode contract.
 ## It runs in [method Node._process], not the physics tick, because interpolating the eye between ticks is its point.
 
 const CHANNEL := "fps.view"
@@ -12,13 +12,13 @@ const CHANNEL := "fps.view"
 
 ## The node yaw rotates. Usually the player body, so the avatar turns with the view.
 ## The body rotates rather than the camera, so a third-person view, a visible avatar and server-side facing are right.
-@export var body_ref: DotNodeRef = null
+@export var body_ref: GSNodeRef = null
 
 ## The node that carries the eye. Moved vertically for crouching.
-@export var head_ref: DotNodeRef = null
+@export var head_ref: GSNodeRef = null
 
 ## The camera. Pitch is applied here.
-@export var camera_ref: DotNodeRef = null
+@export var camera_ref: GSNodeRef = null
 
 @export_group("Camera")
 
@@ -77,14 +77,14 @@ const CHANNEL := "fps.view"
 @export_range(0.0, 0.15, 0.001) var bob_amount: float = 0.0
 
 ## Extra degrees of field of view while sliding, on top of the speed widening. 0 for none.
-## Read only while [method DotFpsState.is_sliding], so a game without sliding sees nothing.
+## Read only while [method GSFpsState.is_sliding], so a game without sliding sees nothing.
 @export_range(0.0, 40.0, 0.5) var slide_fov_gain: float = 8.0
 
 ## Degrees the camera rolls while sliding, eased in and out like the strafe roll. 0 for none.
 @export_range(-20.0, 20.0, 0.5) var slide_roll: float = 3.0
 
 ## Degrees the camera rolls while wall running: positive away from the wall (toward the open side),
-## negative tilts toward it. 0 for none. Read only while [method DotFpsState.is_wall_running].
+## negative tilts toward it. 0 for none. Read only while [method GSFpsState.is_wall_running].
 ## View only: the simulation never sees it.
 @export_range(-30.0, 30.0, 0.5) var wall_run_roll: float = 6.0
 
@@ -93,11 +93,11 @@ const CHANNEL := "fps.view"
 @export_range(0.5, 40.0, 0.5) var wall_run_roll_response: float = 6.0
 
 ## Metres a game's camera moves away from the wall while wall running (see
-## [method DotFpsViewMotion.eye_shift]); this node does not apply it itself.
+## [method GSFpsViewMotion.eye_shift]); this node does not apply it itself.
 @export_range(0.0, 0.5, 0.01) var wall_run_eye_shift: float = 0.0
 
 ## Degrees a drawn body rolls while wall running (feet toward the wall). A game that draws a
-## body applies [method DotFpsViewMotion.body_roll]; the view itself does not move a body.
+## body applies [method GSFpsViewMotion.body_roll]; the view itself does not move a body.
 @export_range(0.0, 60.0, 0.5) var wall_run_body_roll: float = 25.0
 
 ## Degrees a drawn body turns toward the wall while wall running.
@@ -155,9 +155,9 @@ var _step_offset: float = 0.0
 var _fov: float = 0.0
 var _ready_ok: bool = false
 
-## The roll, the landing dip and the widening: [DotFpsViewMotion], fed from the exports
+## The roll, the landing dip and the widening: [GSFpsViewMotion], fed from the exports
 ## above each frame, so a game that writes its camera itself uses the same arithmetic.
-var _motion: DotFpsViewMotion = DotFpsViewMotion.new()
+var _motion: GSFpsViewMotion = GSFpsViewMotion.new()
 var _bob_phase: float = 0.0
 var _bob_offset: Vector3 = Vector3.ZERO
 var _bob_pitch: float = 0.0
@@ -173,8 +173,8 @@ func _ready() -> void:
 
 func _resolve() -> void:
 	if body_ref == null:
-		body_ref = DotNodeRef.new()
-		body_ref.mode = DotNodeRef.Mode.PARENT
+		body_ref = GSNodeRef.new()
+		body_ref.mode = GSNodeRef.Mode.PARENT
 
 	_body = body_ref.resolve_or_null(self, CHANNEL) as Node3D
 
@@ -184,10 +184,10 @@ func _resolve() -> void:
 		# Unwired: find the one camera under the body. A first-person player has
 		# exactly one, and making the conventional layout work with no configuration
 		# costs nothing — an explicit ref still overrides it.
-		var found := DotNodeRef.new()
-		found.mode = DotNodeRef.Mode.DESCENDANT_OF_TYPE
+		var found := GSNodeRef.new()
+		found.mode = GSNodeRef.Mode.DESCENDANT_OF_TYPE
 		found.type_name = &"Camera3D"
-		found.on_missing = DotNodeRef.OnMissing.NULL
+		found.on_missing = GSNodeRef.OnMissing.NULL
 		_camera = found.resolve_or_null(_body, CHANNEL) as Camera3D
 
 	if head_ref != null:
@@ -204,7 +204,7 @@ func _resolve() -> void:
 	# camera there is nothing here to do, and saying so at boot beats a first-person
 	# game that renders from the origin.
 	if _camera == null:
-		DotLog.warn(CHANNEL, "no camera resolved; the view will do nothing")
+		GSLog.warn(CHANNEL, "no camera resolved; the view will do nothing")
 
 	_ready_ok = _camera != null
 
@@ -212,8 +212,8 @@ func _resolve() -> void:
 ## Applies a simulated state to the visible nodes.
 ## [param state] is the interpolated render state, not the raw tick state.
 func apply(
-	state: DotFpsState,
-	motor: DotFpsMotor,
+	state: GSFpsState,
+	motor: GSFpsMotor,
 	delta: float
 ) -> void:
 	if not _ready_ok or state == null or motor == null:
@@ -272,7 +272,7 @@ func apply(
 
 
 ## The exports above onto [member _motion], every frame because a game may change them any time.
-## Every [DotFpsViewMotion] field must be forwarded; one left out keeps the default with no way to change it.
+## Every [GSFpsViewMotion] field must be forwarded; one left out keeps the default with no way to change it.
 func _sync_motion() -> void:
 	_motion.strafe_roll = strafe_roll
 	_motion.strafe_roll_reference = strafe_roll_reference
@@ -305,7 +305,7 @@ func wall_roll() -> float:
 
 
 ## Advances the walk cycle by distance travelled and writes the bob offsets.
-func _advance_bob(state: DotFpsState, delta: float) -> void:
+func _advance_bob(state: GSFpsState, delta: float) -> void:
 	if bob_amount <= 0.0:
 		_bob_offset = Vector3.ZERO
 		_bob_pitch = 0.0
@@ -332,8 +332,8 @@ func _advance_bob(state: DotFpsState, delta: float) -> void:
 	_bob_pitch = sin(_bob_phase) * bob_amount * 8.0
 
 
-## Kicks the view down. Connect to [signal DotFpsController.landed].
-## A kick to the eye's velocity ([DotFpsViewMotion.note_landing]), so the eye dips and returns with no frame where it jumps.
+## Kicks the view down. Connect to [signal GSFpsController.landed].
+## A kick to the eye's velocity ([GSFpsViewMotion.note_landing]), so the eye dips and returns with no frame where it jumps.
 func note_landing(impact: float) -> void:
 	_sync_motion()
 	_motion.note_landing(impact)

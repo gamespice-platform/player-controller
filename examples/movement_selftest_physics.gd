@@ -2,7 +2,7 @@ extends "res://examples/movement_selftest_stamina.gd"
 
 ## The physics-server sections of the movement self-test.
 
-## The real [DotFpsBody], against the real physics server.
+## The real [GSFpsBody], against the real physics server.
 ## The walkable slope again with a ramp's crest (a wedge up to a plateau): the capsule's rounded
 ## bottom and Godot's sweep are what a game walks on; the flat body is a box and answers analytically.
 func _test_physics_slope() -> void:
@@ -42,18 +42,18 @@ func _test_physics_slope() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var body := DotFpsPhysicsBody.new()
+	var body := GSFpsPhysicsBody.new()
 	if not _check(body.bind(world).ok, "the physics body binds to the slope world"):
 		world.queue_free()
 		return
 
 	var t := _tunables()
-	var motor := DotFpsMotor.new(t, body)
-	var s := DotFpsState.new()
+	var motor := GSFpsMotor.new(t, body)
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, 0.0, 2.0)
-	s.mode = DotFpsState.Mode.GROUND
+	s.mode = GSFpsState.Mode.GROUND
 	for _i in range(4):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	var airborne := 0
 	var above_plateau := 0.0
@@ -116,7 +116,7 @@ func _test_crest_launch() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var body := DotFpsPhysicsBody.new()
+	var body := GSFpsPhysicsBody.new()
 	if not _check(body.bind(world).ok, "the physics body binds to the ramp"):
 		world.queue_free()
 		return
@@ -125,12 +125,12 @@ func _test_crest_launch() -> void:
 	for scale in [0.5, 0.0]:
 		var t := _tunables()
 		t.crest_launch_speed_scale = scale
-		var motor := DotFpsMotor.new(t, body)
-		var s := DotFpsState.new()
+		var motor := GSFpsMotor.new(t, body)
+		var s := GSFpsState.new()
 		s.position = Vector3(0.0, 0.0, 2.0)
-		s.mode = DotFpsState.Mode.GROUND
+		s.mode = GSFpsState.Mode.GROUND
 		for _i in range(4):
-			motor.simulate(s, DotFpsCommand.new(), STEP)
+			motor.simulate(s, GSFpsCommand.new(), STEP)
 		var above := 0.0
 		for _i in range(150):
 			motor.simulate(s, _command(1.0), STEP)
@@ -141,7 +141,7 @@ func _test_crest_launch() -> void:
 	_check(float(thrown[0.5]) > 0.1, "with the threshold under their speed, the crest throws them",
 		"%.3f m above the plateau" % float(thrown[0.5]))
 	_check(float(thrown[0.0]) < 0.05, "and at 0, never", "%.3f m above the plateau" % float(thrown[0.0]))
-	_check(is_equal_approx(DotFpsTunables.with_profile("legacy").crest_launch_speed_scale, 1.25), "the default launches only past running speed")
+	_check(is_equal_approx(GSFpsTunables.with_profile("legacy").crest_launch_speed_scale, 1.25), "the default launches only past running speed")
 
 	world.queue_free()
 	_done()
@@ -162,7 +162,7 @@ func _test_physics_kerb_press() -> void:
 		add_child(climb)
 		await get_tree().physics_frame
 		await get_tree().physics_frame
-		var body := DotFpsPhysicsBody.new()
+		var body := GSFpsPhysicsBody.new()
 		if body.bind(climb).ok:
 			bound += 1
 			for speed in [2.7, 3.0, 5.0, 7.0]:
@@ -182,7 +182,7 @@ func _test_physics_kerb_press() -> void:
 		add_child(wall)
 		await get_tree().physics_frame
 		await get_tree().physics_frame
-		var wall_body := DotFpsPhysicsBody.new()
+		var wall_body := GSFpsPhysicsBody.new()
 		if not wall_body.bind(wall).ok:
 			wall.queue_free()
 			continue
@@ -191,12 +191,12 @@ func _test_physics_kerb_press() -> void:
 			var t := _tunables()
 			t.step_height = 0.45
 			t.max_speed = speed
-			var motor := DotFpsMotor.new(t, wall_body)
-			var s := DotFpsState.new()
+			var motor := GSFpsMotor.new(t, wall_body)
+			var s := GSFpsState.new()
 			s.position = Vector3(0.0, 0.0, 1.0)
-			s.mode = DotFpsState.Mode.GROUND
+			s.mode = GSFpsState.Mode.GROUND
 			for _i in range(4):
-				motor.simulate(s, DotFpsCommand.new(), STEP)
+				motor.simulate(s, GSFpsCommand.new(), STEP)
 			var air := 0
 			var peak := 0.0
 			for i in range(360):
@@ -204,7 +204,7 @@ func _test_physics_kerb_press() -> void:
 				# Counted once the walker has had two seconds to reach the face.
 				if i >= 120:
 					peak = maxf(peak, s.position.y)
-					if s.mode != DotFpsState.Mode.GROUND:
+					if s.mode != GSFpsState.Mode.GROUND:
 						air += 1
 			if air > 0 or peak > 0.05:
 				bounced.append("%.2f m at %.1f m/s: %d of 240 ticks in the air, peak y %.3f, at z %.2f" % [
@@ -235,7 +235,7 @@ func _test_physics_graze_normal() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var body := DotFpsPhysicsBody.new()
+	var body := GSFpsPhysicsBody.new()
 	var bank := slab.transform.basis * Vector3.UP
 	if _check(body.bind(world).ok, "the physics body binds to the bank"):
 		var motion := Vector3(0.004581437, 0.0040886872, -0.038811497)
@@ -276,7 +276,7 @@ func _test_physics_crate_side() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var body := DotFpsPhysicsBody.new()
+	var body := GSFpsPhysicsBody.new()
 	if _check(body.bind(world).ok, "the physics body binds to the crates"):
 		var hit := body.sweep(
 			Vector3(-2.9410343, 1.8324537, 19.915457), Vector3(0.0, -0.023, 0.0), 1.8, 0.35)
@@ -309,7 +309,7 @@ func _test_physics_wall_sweep() -> void:
 		add_child(world)
 		await get_tree().physics_frame
 		await get_tree().physics_frame
-		var body := DotFpsPhysicsBody.new()
+		var body := GSFpsPhysicsBody.new()
 		if body.bind(world).ok:
 			walls += 1
 			var radius := 0.4
@@ -369,22 +369,22 @@ func _test_physics_steep_face_walk() -> void:
 		add_child(world)
 		await get_tree().physics_frame
 		await get_tree().physics_frame
-		var body := DotFpsPhysicsBody.new()
+		var body := GSFpsPhysicsBody.new()
 		if body.bind(world).ok:
 			worlds += 1
 			for jump in [false, true]:
-				var motor := DotFpsMotor.new(_tunables(), body)
-				var s := DotFpsState.new()
-				s.mode = DotFpsState.Mode.GROUND
+				var motor := GSFpsMotor.new(_tunables(), body)
+				var s := GSFpsState.new()
+				s.mode = GSFpsState.Mode.GROUND
 				for _i in range(4):
-					motor.simulate(s, DotFpsCommand.new(), STEP)
+					motor.simulate(s, GSFpsCommand.new(), STEP)
 				var peak := 0.0
 				var airborne := 0
 				for i in range(300):
 					motor.simulate(s, _command(1.0, 0.0, 0.0,
-						DotFpsCommand.BUTTON_JUMP if jump else 0), STEP)
+						GSFpsCommand.BUTTON_JUMP if jump else 0), STEP)
 					peak = maxf(peak, s.position.y)
-					if not jump and i >= 120 and s.mode != DotFpsState.Mode.GROUND:
+					if not jump and i >= 120 and s.mode != GSFpsState.Mode.GROUND:
 						airborne += 1
 				var limit := 1.1 if jump else 0.05
 				if peak > limit or airborne > 0:
@@ -419,16 +419,16 @@ func _kerb_world(heights: Array[float], width: float = 2.5) -> Node3D:
 ## Walks a standing player at [param speed] from [param z] toward -z along x = [param x], step_height 0.45.
 ## [code]on_top[/code] is the highest y over the kerb's footprint (-1.0 if never there), [code]peak[/code]
 ## the highest y anywhere, [code]end_z[/code] where they got to.
-func _walk_kerb(body: DotFpsBody, x: float, speed: float, z: float = 1.0) -> Dictionary:
+func _walk_kerb(body: GSFpsBody, x: float, speed: float, z: float = 1.0) -> Dictionary:
 	var t := _tunables()
 	t.step_height = 0.45
 	t.max_speed = speed
-	var motor := DotFpsMotor.new(t, body)
-	var s := DotFpsState.new()
+	var motor := GSFpsMotor.new(t, body)
+	var s := GSFpsState.new()
 	s.position = Vector3(x, 0.0, z)
-	s.mode = DotFpsState.Mode.GROUND
+	s.mode = GSFpsState.Mode.GROUND
 	for _i in range(4):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	var on_top := -1.0
 	var peak := 0.0
@@ -471,7 +471,7 @@ func _test_physics_displacement_crease() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var body := DotFpsPhysicsBody.new()
+	var body := GSFpsPhysicsBody.new()
 	if not _check(body.bind(world).ok, "the physics body binds to the displacement"):
 		world.queue_free()
 		return
@@ -490,7 +490,7 @@ func _test_physics_displacement_crease() -> void:
 	t.radius = 0.3048
 	t.max_slope_angle = 45.57
 	t.step_height = 0.3429
-	var motor := DotFpsMotor.new(t, body)
+	var motor := GSFpsMotor.new(t, body)
 
 	# The tick before the grazing leg that ends touching, and the tick after it.
 	var delta := 1.0 / 128.0
@@ -500,10 +500,10 @@ func _test_physics_displacement_crease() -> void:
 		Vector3(33.773784637, -15.460395813, -5.714473248),
 		Vector3(33.774005890, -15.460265160, -5.714899540),
 	]:
-		var s := DotFpsState.new()
+		var s := GSFpsState.new()
 		s.position = start
 		s.velocity = Vector3(0.538090825, 0.520951033, -1.327067018)
-		s.mode = DotFpsState.Mode.AIR
+		s.mode = GSFpsState.Mode.AIR
 		var last := s.position
 		for _i in range(64):
 			motor.simulate(s, _command(0.0, 1.0, -4.771088958), delta)
@@ -552,7 +552,7 @@ func _test_physics_body() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var body := DotFpsPhysicsBody.new()
+	var body := GSFpsPhysicsBody.new()
 	var bound := body.bind(world)
 
 	if not _check(bound.ok, "the physics body binds to a world"):
@@ -560,14 +560,14 @@ func _test_physics_body() -> void:
 		return
 
 	var t := _tunables()
-	var motor := DotFpsMotor.new(t, body)
+	var motor := GSFpsMotor.new(t, body)
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, 3.0, 0.0)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 
 	for _i in range(180):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	_check(s.is_grounded(), "a player falls onto real collision geometry")
 	_check_near(s.position.y, 0.0, 0.05, "and rests on its surface")
@@ -609,7 +609,7 @@ func _test_physics_wall_hug_speed() -> void:
 	var worst_case := ""
 	var cases := 0
 	for profile: String in ["legacy", "default"]:
-		var t := DotFpsTunables.with_profile(profile) if profile != "default" else DotFpsTunables.new()
+		var t := GSFpsTunables.with_profile(profile) if profile != "default" else GSFpsTunables.new()
 		for wall_angle: float in [0.0, 10.0, 30.0, 60.0]:
 			for strafe: float in [-1.0, 1.0]:
 				var world := Node3D.new()
@@ -634,16 +634,16 @@ func _test_physics_wall_hug_speed() -> void:
 				world.add_child(wall)
 				await get_tree().physics_frame
 				await get_tree().physics_frame
-				var body := DotFpsPhysicsBody.new()
+				var body := GSFpsPhysicsBody.new()
 				if not body.bind(world).ok:
 					world.queue_free()
 					continue
-				var motor := DotFpsMotor.new(t, body)
-				var s := DotFpsState.new()
+				var motor := GSFpsMotor.new(t, body)
+				var s := GSFpsState.new()
 				s.position = Vector3(0.0, 0.0, 20.0)
-				s.mode = DotFpsState.Mode.GROUND
+				s.mode = GSFpsState.Mode.GROUND
 				for _i in range(4):
-					motor.simulate(s, DotFpsCommand.new(), STEP)
+					motor.simulate(s, GSFpsCommand.new(), STEP)
 				var top := 0.0
 				for _i in range(240):
 					motor.simulate(s, _command(1.0, strafe), STEP)
@@ -664,7 +664,7 @@ func _test_physics_wall_hug_speed() -> void:
 func _test_hull_rewind() -> void:
 	_section("hull rewind: a mover meets another player's capsule where its view drew it, physics body")
 	var world := Node3D.new()
-	var rules := DotPlayerBodyRules.new()
+	var rules := GSPlayerBodyRules.new()
 	var other := StaticBody3D.new()
 	world.add_child(other)
 	rules.apply_hull(other, 1.8, 0.35)
@@ -675,13 +675,13 @@ func _test_hull_rewind() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var body := DotFpsPhysicsBody.new()
+	var body := GSFpsPhysicsBody.new()
 	if not _check(body.bind(world).ok, "the physics body binds to the world"):
 		world.queue_free()
 		_done()
 		return
 	var bodies := {1: mine, 2: other}
-	var rewind := DotPlayerHullRewind.new()
+	var rewind := GSPlayerHullRewind.new()
 	var asked: Array = []
 	rewind.feet_fn = func(mover: Variant, key: Variant, tick: int) -> Variant:
 		asked.append([mover, key, tick])
@@ -722,7 +722,7 @@ func _test_hull_rewind() -> void:
 
 	var link := ControllerLink.new()
 	link.held["mp_solidplayers_unlag"] = "1"
-	var client := DotPlayerBodyRules.new()
+	var client := GSPlayerBodyRules.new()
 	_check(client.follow_cvars(link) and client.unlag and client.solid, "a client follows the server's mp_solidplayers_unlag")
 	link.replicated_cvar_changed.emit("mp_solidplayers_unlag", "0")
 	_check(not client.unlag and not client.set_cvar("mp_solidplayers_unlag", "x"), "and its changes; a non-number is refused")

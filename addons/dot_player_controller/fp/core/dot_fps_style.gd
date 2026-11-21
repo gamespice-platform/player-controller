@@ -1,10 +1,10 @@
 @tool
-class_name DotFpsStyle
+class_name GSFpsStyle
 extends Resource
 
 ## A named variation on the movement ("sideways", "low gravity"): same map and records table, different rules.
 ## A transform, not a second system: [method apply_to] derives tunables without mutating the base and [method filter_command] clears forbidden buttons, identically on client and server.
-## A style must not change mid-run ([DotTimerRun]); the ranking half is [code]DotTimerStyle[/code] in GameSpice Timer.
+## A style must not change mid-run ([GSTimerRun]); the ranking half is [code]GSTimerStyle[/code] in GameSpice Timer.
 
 ## A three-state switch so a style can say "leave it alone" without a second override bool per field.
 enum Toggle {
@@ -64,11 +64,11 @@ enum KeyPreset {
 ## Multiplier on ground speed.
 @export_range(0.01, 5.0, 0.01) var speed_scale: float = 1.0
 
-## Absolute [member DotFpsTunables.air_accelerate]. Non-positive inherits.
+## Absolute [member GSFpsTunables.air_accelerate]. Non-positive inherits.
 ## Absolute because with [member max_air_wish_speed] it fixes how much one strafe adds, and styles are defined by that pair.
 @export var air_accelerate: float = 0.0
 
-## Absolute [member DotFpsTunables.max_air_wish_speed]. Non-positive inherits.
+## Absolute [member GSFpsTunables.max_air_wish_speed]. Non-positive inherits.
 @export var max_air_wish_speed: float = 0.0
 
 ## How fast the clock runs relative to real time; 0.5 is "half time".
@@ -95,22 +95,22 @@ enum KeyPreset {
 @export_group("Limits")
 
 ## Horizontal speed a player may leave the start zone with, in m/s. 0 = no limit.
-## Enforced by the timer (the motor knows no zones); defined here so a record says which limit it was set under. See [code]DotTimerRules.clamp_prespeed[/code].
+## Enforced by the timer (the motor knows no zones); defined here so a record says which limit it was set under. See [code]GSTimerRules.clamp_prespeed[/code].
 @export_range(0.0, 200.0, 0.1) var prespeed_limit: float = 0.0
 
-## Absolute speed cap while the style is in force, in m/s. 0 = the base cap; applied to [member DotFpsTunables.max_velocity], a real ceiling in the simulation.
+## Absolute speed cap while the style is in force, in m/s. 0 = the base cap; applied to [member GSFpsTunables.max_velocity], a real ceiling in the simulation.
 @export_range(0.0, 10000.0, 1.0) var velocity_limit: float = 0.0
 
 
 
 ## The tunables for a player on this style. [param base] is never modified.
 ## Returns a fresh resource each call; hold the result. The motor keeps the tunables it was built with, so
-## [method DotFpsController.set_style] swaps both in the right order.
-func apply_to(base: DotFpsTunables) -> DotFpsTunables:
+## [method GSFpsController.set_style] swaps both in the right order.
+func apply_to(base: GSFpsTunables) -> GSFpsTunables:
 	if base == null:
-		base = DotFpsTunables.new()
+		base = GSFpsTunables.new()
 
-	var out := base.duplicate(true) as DotFpsTunables
+	var out := base.duplicate(true) as GSFpsTunables
 
 	match auto_hop:
 		Toggle.ON:
@@ -197,7 +197,7 @@ func apply_key_preset() -> void:
 ## Removes the input this style forbids, in place.
 ## [b]Call on client and server, on the same command, before the motor.[/b] Server-only filtering makes the client predict movement the server then corrects.
 ## Idempotent, because a rewind replays stored commands through it again.
-func filter_command(command: DotFpsCommand) -> void:
+func filter_command(command: GSFpsCommand) -> void:
 	if command == null:
 		return
 
@@ -223,7 +223,7 @@ func filter_command(command: DotFpsCommand) -> void:
 		command.move.y = 0.0
 
 	if block_crouch:
-		command.set_button(DotFpsCommand.BUTTON_CROUCH, false)
+		command.set_button(GSFpsCommand.BUTTON_CROUCH, false)
 
 
 
@@ -255,8 +255,8 @@ func to_dictionary() -> Dictionary:
 	}
 
 
-static func from_dictionary(data: Dictionary) -> DotFpsStyle:
-	var style := DotFpsStyle.new()
+static func from_dictionary(data: Dictionary) -> GSFpsStyle:
+	var style := GSFpsStyle.new()
 
 	style.id = StringName(str(data.get("id", "normal")))
 	style.display_name = str(data.get("display_name", String(style.id)))
@@ -318,12 +318,12 @@ static func _to_key_preset(value: Variant) -> KeyPreset:
 			return KeyPreset.FREE
 
 
-## A short hash of everything that changes the simulation, like [method DotFpsTunables.fingerprint].
+## A short hash of everything that changes the simulation, like [method GSFpsTunables.fingerprint].
 ## Presentation fields are excluded.
 func fingerprint() -> String:
 	apply_key_preset()
 
-	return DotHash.sha256_text("|".join(PackedStringArray([
+	return GSHash.sha256_text("|".join(PackedStringArray([
 		String(id),
 		str(auto_hop), str(easy_bhop),
 		"%.4f" % jump_scale, "%.4f" % gravity_scale, "%.4f" % speed_scale,
@@ -338,10 +338,10 @@ func fingerprint() -> String:
 
 ## The six styles a bhop or surf server is expected to have on day one.
 ## Not used by the addon: it is what a game copies and edits.
-static func defaults() -> Array[DotFpsStyle]:
-	var out: Array[DotFpsStyle] = []
+static func defaults() -> Array[GSFpsStyle]:
+	var out: Array[GSFpsStyle] = []
 
-	var normal := DotFpsStyle.new()
+	var normal := GSFpsStyle.new()
 	normal.id = &"normal"
 	normal.display_name = "Normal"
 	normal.short_name = "N"
@@ -350,7 +350,7 @@ static func defaults() -> Array[DotFpsStyle]:
 	normal.easy_bhop = Toggle.ON
 	out.append(normal)
 
-	var sideways := DotFpsStyle.new()
+	var sideways := GSFpsStyle.new()
 	sideways.id = &"sideways"
 	sideways.display_name = "Sideways"
 	sideways.short_name = "SW"
@@ -360,7 +360,7 @@ static func defaults() -> Array[DotFpsStyle]:
 	sideways.key_preset = KeyPreset.SIDEWAYS
 	out.append(sideways)
 
-	var half := DotFpsStyle.new()
+	var half := GSFpsStyle.new()
 	half.id = &"half_sideways"
 	half.display_name = "Half-Sideways"
 	half.short_name = "HSW"
@@ -371,7 +371,7 @@ static func defaults() -> Array[DotFpsStyle]:
 	half.one_strafe_key_only = true
 	out.append(half)
 
-	var backwards := DotFpsStyle.new()
+	var backwards := GSFpsStyle.new()
 	backwards.id = &"backwards"
 	backwards.display_name = "Backwards"
 	backwards.short_name = "BW"
@@ -381,7 +381,7 @@ static func defaults() -> Array[DotFpsStyle]:
 	backwards.key_preset = KeyPreset.BACKWARDS
 	out.append(backwards)
 
-	var low_gravity := DotFpsStyle.new()
+	var low_gravity := GSFpsStyle.new()
 	low_gravity.id = &"low_gravity"
 	low_gravity.display_name = "Low Gravity"
 	low_gravity.short_name = "LG"
@@ -391,7 +391,7 @@ static func defaults() -> Array[DotFpsStyle]:
 	low_gravity.gravity_scale = 0.5
 	out.append(low_gravity)
 
-	var hard := DotFpsStyle.new()
+	var hard := GSFpsStyle.new()
 	hard.id = &"prebhop"
 	hard.display_name = "Prebhop"
 	hard.short_name = "PB"
@@ -419,4 +419,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotFpsStyle(%s)" % display_name
+	return "GSFpsStyle(%s)" % display_name

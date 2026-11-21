@@ -9,8 +9,8 @@ func _test_registry_and_describe() -> void:
 	var world := _make_world()
 	var controller := _make_player(
 		world,
-		DotFpsController.Drive.EXTERNAL,
-		func(c: DotFpsController) -> void:
+		GSFpsController.Drive.EXTERNAL,
+		func(c: GSFpsController) -> void:
 			c.register_service = true
 			c.service_scope = &"p1"
 	)
@@ -18,9 +18,9 @@ func _test_registry_and_describe() -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
-	var scoped := DotRegistry.scoped_name(DotFpsController.SERVICE, &"p1")
+	var scoped := GSRegistry.scoped_name(GSFpsController.SERVICE, &"p1")
 
-	_check( DotRegistry.get_service(scoped) == controller, "a scoped controller registers under its scope" )
+	_check( GSRegistry.get_service(scoped) == controller, "a scoped controller registers under its scope" )
 
 	# Scoped rather than global by default: two players in one scene would otherwise
 	# overwrite each other's registration, which is the configuration split-screen
@@ -34,7 +34,7 @@ func _test_registry_and_describe() -> void:
 	world.queue_free()
 	await get_tree().process_frame
 
-	_check( not DotRegistry.has(scoped), "and unregisters when it leaves the tree" )
+	_check( not GSRegistry.has(scoped), "and unregisters when it leaves the tree" )
 	_done()
 
 
@@ -44,8 +44,8 @@ func _test_local_drive_accumulator() -> void:
 	var world := _make_world()
 	var controller := _make_player(
 		world,
-		DotFpsController.Drive.LOCAL,
-		func(c: DotFpsController) -> void: c.tick_rate = 60
+		GSFpsController.Drive.LOCAL,
+		func(c: GSFpsController) -> void: c.tick_rate = 60
 	)
 
 	await get_tree().physics_frame
@@ -55,7 +55,7 @@ func _test_local_drive_accumulator() -> void:
 
 	var ticks: Array[int] = []
 	controller.simulated.connect(
-		func(_t: int, _s: DotFpsState) -> void: ticks.append(1)
+		func(_t: int, _s: GSFpsState) -> void: ticks.append(1)
 	)
 
 	# A frame's worth of time at exactly the tick rate is one tick.
@@ -89,10 +89,10 @@ func _test_local_drive_accumulator() -> void:
 
 
 ## render_state under EXTERNAL drive, on a render_clock and under REMOTE drive; the controller is left on LOCAL.
-func _render_blend_checks(controller: DotFpsController) -> void:
+func _render_blend_checks(controller: GSFpsController) -> void:
 	# It has to blend under EXTERNAL drive, the only one a networked game uses: it refused anything but LOCAL and returned the raw tick state, so every client drew its player quantised to the tick rate (74 mm and 112 mm steps at 60 fps against a 128-tick server).
 	# Asserted with an explicit alpha rather than a frame-timed one: the fraction's source is the host's business, the blend is this class's, and only the blend can be checked without a clock.
-	controller.drive = DotFpsController.Drive.EXTERNAL
+	controller.drive = GSFpsController.Drive.EXTERNAL
 	controller._previous_state.copy_from(controller.state)
 	controller._previous_state.position = Vector3(0.0, 0.0, 0.0)
 	controller.state.position = Vector3(0.0, 0.0, 10.0)
@@ -156,19 +156,19 @@ func _render_blend_checks(controller: DotFpsController) -> void:
 
 	# A remote player is written by the interpolator every frame and has no second
 	# tick to blend from; blending would drag it back toward a state nothing updates.
-	controller.drive = DotFpsController.Drive.REMOTE
+	controller.drive = GSFpsController.Drive.REMOTE
 	_check(
 		controller.render_state(0.5).position.is_equal_approx(Vector3(0.0, 0.0, 10.0)),
 		"but a REMOTE player is left exactly where the network put it"
 	)
 	_check(controller.render_position(0.5) == controller.state.position, "and so is its render_position")
-	controller.drive = DotFpsController.Drive.LOCAL
+	controller.drive = GSFpsController.Drive.LOCAL
 
 
 ## The view is drawn from the sampler once a frame, and a zoom narrows mouse look.
 func _look_now_checks() -> void:
 	# `look_now` folds the pending mouse motion in; the next command carries the same view.
-	var looker := DotFpsSampler.new(DotFpsTunables.with_profile("legacy"))
+	var looker := GSFpsSampler.new(GSFpsTunables.with_profile("legacy"))
 	looker.tunables.mouse_sensitivity = 0.1
 	var motion := InputEventMouseMotion.new()
 	motion.relative = Vector2(-50.0, 0.0)
@@ -185,7 +185,7 @@ func _look_now_checks() -> void:
 	)
 
 	# Zoomed, a mouse count turns the view by the lens's scale: a x0.3 scope turns 0.3 as far.
-	var zoomed := DotFpsSampler.new(DotFpsTunables.with_profile("legacy"))
+	var zoomed := GSFpsSampler.new(GSFpsTunables.with_profile("legacy"))
 	zoomed.tunables.mouse_sensitivity = 0.1
 	zoomed.look_scale = 0.3
 	zoomed.handle_event(motion)
@@ -200,9 +200,9 @@ func _look_now_checks() -> void:
 ## movement_selftest.
 func _test_wall_run_roll() -> void:
 	_section("wall-run body pose")
-	var bm := DotFpsViewMotion.new()
-	var bs := DotFpsState.new()
-	bs.mode = DotFpsState.Mode.AIR
+	var bm := GSFpsViewMotion.new()
+	var bs := GSFpsState.new()
+	bs.mode = GSFpsState.Mode.AIR
 	bs.velocity = Vector3(0.0, 0.0, -9.0)
 	bs.wall_run_time = 0.1
 	bs.wall_normal = Vector3.LEFT
@@ -229,7 +229,7 @@ func _test_wall_run_roll() -> void:
 	_done()
 
 
-## The wall-run camera roll through DotFpsView.
+## The wall-run camera roll through GSFpsView.
 func _test_wall_run_camera_roll() -> void:
 	_section("wall-run camera roll")
 
@@ -239,16 +239,16 @@ func _test_wall_run_camera_roll() -> void:
 	body.add_child(head)
 	var camera := Camera3D.new()
 	head.add_child(camera)
-	var view := DotFpsView.new()
+	var view := GSFpsView.new()
 	view.strafe_roll = 0.0
 	view.slide_roll = 0.0
 	body.add_child(view)
 
-	var motor := DotFpsMotor.new(DotFpsTunables.with_profile("legacy"), DotFpsFlatBody.with_floor(0.0))
+	var motor := GSFpsMotor.new(GSFpsTunables.with_profile("legacy"), GSFpsFlatBody.with_floor(0.0))
 	var frame := 1.0 / 144.0
 
-	var state := DotFpsState.new()
-	state.mode = DotFpsState.Mode.AIR
+	var state := GSFpsState.new()
+	state.mode = GSFpsState.Mode.AIR
 	state.velocity = Vector3(0.0, 0.0, -9.0)
 
 	var rolls: Array[float] = []
@@ -302,27 +302,27 @@ func _test_wall_run_camera_roll() -> void:
 	_done()
 
 
-## The landing dip, the strafe roll and the widening ([DotFpsViewMotion], shared by [DotFpsView] and a game's own camera): each eases, none moves the view in one frame.
+## The landing dip, the strafe roll and the widening ([GSFpsViewMotion], shared by [GSFpsView] and a game's own camera): each eases, none moves the view in one frame.
 ## Armed: the landing set the full dip before the spring (first check fails at 89 mm), and a one-stage roll starts at its full rate (fourth and fifth fail).
 func _test_view_motion() -> void:
 	_section("camera motion: landing dip, strafe roll, widening")
 	var frame := 1.0 / 144.0
 
 	var landed := _landing_dip_checks(frame)
-	var motor: DotFpsMotor = landed[0]
-	var state: DotFpsState = landed[1]
+	var motor: GSFpsMotor = landed[0]
+	var state: GSFpsState = landed[1]
 
 	# The strafe roll, eased in and out.
-	var motion := DotFpsViewMotion.new()
+	var motion := GSFpsViewMotion.new()
 	motion.slide_roll = 0.0
 	motion.fov_speed_gain = 0.0
-	var strafing := DotFpsState.new()
-	strafing.mode = DotFpsState.Mode.GROUND
+	var strafing := GSFpsState.new()
+	strafing.mode = GSFpsState.Mode.GROUND
 	var rolls: Array[float] = []
 	for i in range(288):
 		# A second strafing right at the reference speed, then still.
 		strafing.velocity = (
-			DotFpsMotor.forward_for(0.0).cross(Vector3.UP) * motion.strafe_roll_reference
+			GSFpsMotor.forward_for(0.0).cross(Vector3.UP) * motion.strafe_roll_reference
 			if i < 144 else Vector3.ZERO
 		)
 		motion.advance(strafing, frame)
@@ -341,7 +341,7 @@ func _test_view_motion() -> void:
 	# Bounded, with the wall-run lean on top.
 	motion.snap()
 	motion.roll_limit = 7.0
-	strafing.velocity = DotFpsMotor.forward_for(0.0).cross(Vector3.UP) * -40.0
+	strafing.velocity = GSFpsMotor.forward_for(0.0).cross(Vector3.UP) * -40.0
 	strafing.wall_run_time = 0.1
 	strafing.wall_normal = Vector3.LEFT
 	var widest := 0.0
@@ -362,7 +362,7 @@ func _test_view_motion() -> void:
 	var floor_head := Node3D.new()
 	floor_body.add_child(floor_head)
 	floor_head.add_child(Camera3D.new())
-	var floored := DotFpsView.new()
+	var floored := GSFpsView.new()
 	floored.strafe_roll = 0.0
 	floored.fov_speed_gain = 0.0
 	floored.landing_min_speed = 12.0
@@ -375,14 +375,14 @@ func _test_view_motion() -> void:
 	for _i in range(72):
 		floored.apply(state, motor, frame)
 		floor_deepest = minf(floor_deepest, floor_head.position.y - floor_rest)
-	_check(absf(floor_deepest) < 1e-5, "a landing under DotFpsView.landing_min_speed dips nothing", "%.2f mm" % (-floor_deepest * 1000.0))
+	_check(absf(floor_deepest) < 1e-5, "a landing under GSFpsView.landing_min_speed dips nothing", "%.2f mm" % (-floor_deepest * 1000.0))
 	floor_body.queue_free()
 	_done()
 
 
 ## Each amount at 0 is off.
-func _off_checks(strafing: DotFpsState, frame: float) -> void:
-	var off := DotFpsViewMotion.new()
+func _off_checks(strafing: GSFpsState, frame: float) -> void:
+	var off := GSFpsViewMotion.new()
 	off.strafe_roll = 0.0
 	off.slide_roll = 0.0
 	off.wall_run_roll = 0.0
@@ -399,13 +399,13 @@ func _off_checks(strafing: DotFpsState, frame: float) -> void:
 
 ## The widening: none under the floor, the gain at the reference, eased.
 func _widening_checks(frame: float) -> void:
-	var widening := DotFpsViewMotion.new()
+	var widening := GSFpsViewMotion.new()
 	widening.strafe_roll = 0.0
 	widening.fov_speed_gain = 5.0
 	widening.fov_speed_floor = 9.0
 	widening.fov_speed_reference = 15.0
-	var running := DotFpsState.new()
-	running.mode = DotFpsState.Mode.GROUND
+	var running := GSFpsState.new()
+	running.mode = GSFpsState.Mode.GROUND
 	running.velocity = Vector3(0.0, 0.0, -9.0)
 	for _i in range(144):
 		widening.advance(running, frame)
@@ -420,14 +420,14 @@ func _widening_checks(frame: float) -> void:
 		"first frame %.3f, after two seconds %.2f degrees" % [first, widening.fov_added()])
 
 
-## DotFpsView forwards every field of the motion object, read by reflection.
+## GSFpsView forwards every field of the motion object, read by reflection.
 func _forwarding_checks() -> void:
-	# So a field added to DotFpsViewMotion and not to the view fails here instead of leaving a game stuck at the default.
+	# So a field added to GSFpsViewMotion and not to the view fails here instead of leaving a game stuck at the default.
 	# Armed: without the five forwards left out, this names landing_min_speed, landing_pitch, roll_limit, fov_speed_floor and wall_run_fov_gain.
-	var forwarding := DotFpsView.new()
+	var forwarding := GSFpsView.new()
 	var unforwarded := PackedStringArray()
 	var fields := 0
-	for property in DotFpsViewMotion.new().get_property_list():
+	for property in GSFpsViewMotion.new().get_property_list():
 		var field := String(property.name)
 		if not (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) or field.begins_with("_"):
 			continue
@@ -442,28 +442,28 @@ func _forwarding_checks() -> void:
 		if (property.usage & PROPERTY_USAGE_SCRIPT_VARIABLE) and not field.begins_with("_") \
 				and field in forwarding and forwarding._motion.get(field) != forwarding.get(field):
 			unforwarded.append(field)
-	_check(fields >= 18 and unforwarded.is_empty(), "DotFpsView exports and forwards every DotFpsViewMotion field",
+	_check(fields >= 18 and unforwarded.is_empty(), "GSFpsView exports and forwards every GSFpsViewMotion field",
 		"%d fields, not reaching the motion: %s" % [fields, ", ".join(unforwarded)])
 	forwarding.free()
 
 
-## A landing through the view, as DotFpsController wires it.
+## A landing through the view, as GSFpsController wires it.
 func _landing_dip_checks(frame: float) -> Array:
-	# A landing through the view, as DotFpsController wires it.
+	# A landing through the view, as GSFpsController wires it.
 	var body := Node3D.new()
 	add_child(body)
 	var head := Node3D.new()
 	body.add_child(head)
 	var camera := Camera3D.new()
 	head.add_child(camera)
-	var view := DotFpsView.new()
+	var view := GSFpsView.new()
 	view.strafe_roll = 0.0
 	view.slide_roll = 0.0
 	view.fov_speed_gain = 0.0
 	body.add_child(view)
-	var motor := DotFpsMotor.new(DotFpsTunables.with_profile("legacy"), DotFpsFlatBody.with_floor(0.0))
-	var state := DotFpsState.new()
-	state.mode = DotFpsState.Mode.GROUND
+	var motor := GSFpsMotor.new(GSFpsTunables.with_profile("legacy"), GSFpsFlatBody.with_floor(0.0))
+	var state := GSFpsState.new()
+	state.mode = GSFpsState.Mode.GROUND
 	for _i in range(30):
 		view.apply(state, motor, frame)
 	var rest := head.position.y
@@ -489,7 +489,7 @@ func _landing_dip_checks(frame: float) -> Array:
 
 ## A wheel tick on jump is one press of jump in the sampled command. The wheel arrives as a
 ## press and a release in one pair of events, so it is never "held" when a tick polls: armed
-## by taking the latch and the poll out of DotFpsSampler.sample, four of the six fail.
+## by taking the latch and the poll out of GSFpsSampler.sample, four of the six fail.
 func _test_wheel_jump() -> void:
 	_section("a wheel tick is one jump")
 
@@ -500,13 +500,13 @@ func _test_wheel_jump() -> void:
 	InputMap.action_erase_events(&"dot_fps_jump")
 	InputMap.action_add_event(&"dot_fps_jump", _wheel_event(false))
 
-	var s := DotFpsSampler.new(DotFpsTunables.with_profile("legacy"))
+	var s := GSFpsSampler.new(GSFpsTunables.with_profile("legacy"))
 	s.handle_event(_wheel_event(true))
 	s.handle_event(_wheel_event(false))
 	var first := s.sample(STEP)
 	var second := s.sample(STEP)
-	_check(first.is_pressed(DotFpsCommand.BUTTON_JUMP), "a wheel tick forwarded to handle_event is jump in the next command")
-	_check(not second.is_pressed(DotFpsCommand.BUTTON_JUMP), "and in that command only: a tick is a press, not a hold")
+	_check(first.is_pressed(GSFpsCommand.BUTTON_JUMP), "a wheel tick forwarded to handle_event is jump in the next command")
+	_check(not second.is_pressed(GSFpsCommand.BUTTON_JUMP), "and in that command only: a tick is a press, not a hold")
 
 	# Two ticks between samples are one press; a tick, a gap and a tick are two press edges,
 	# as the motor counts them (buttons & ~previous).
@@ -515,7 +515,7 @@ func _test_wheel_jump() -> void:
 		for _i in range(n):
 			s.handle_event(_wheel_event(true))
 			s.handle_event(_wheel_event(false))
-		seq.append(s.sample(STEP).buttons & DotFpsCommand.BUTTON_JUMP)
+		seq.append(s.sample(STEP).buttons & GSFpsCommand.BUTTON_JUMP)
 	var edges := 0
 	var prev := 0
 	for b in seq:
@@ -527,29 +527,29 @@ func _test_wheel_jump() -> void:
 	s.suspended = true
 	var _quiet := s.sample(STEP)
 	s.suspended = false
-	_check(not s.sample(STEP).is_pressed(DotFpsCommand.BUTTON_JUMP), "a press while suspended (a menu open) is dropped, not kept for later")
+	_check(not s.sample(STEP).is_pressed(GSFpsCommand.BUTTON_JUMP), "a press while suspended (a menu open) is dropped, not kept for later")
 
 	# A client that forwards only mouse motion: the frame's just_pressed reaches the first
 	# command of that physics frame, and only that one.
-	var polled := DotFpsSampler.new(DotFpsTunables.with_profile("legacy"))
+	var polled := GSFpsSampler.new(GSFpsTunables.with_profile("legacy"))
 	Input.parse_input_event(_wheel_event(true))
 	Input.parse_input_event(_wheel_event(false))
 	await get_tree().physics_frame
 	var p1 := polled.sample(STEP)
 	var p2 := polled.sample(STEP)
-	_check(p1.is_pressed(DotFpsCommand.BUTTON_JUMP) and not p2.is_pressed(DotFpsCommand.BUTTON_JUMP),
+	_check(p1.is_pressed(GSFpsCommand.BUTTON_JUMP) and not p2.is_pressed(GSFpsCommand.BUTTON_JUMP),
 		"without the event, the first command of the frame still gets the press, the second does not",
 		"%d %d" % [p1.buttons, p2.buttons])
 
 	# The whole way: a LOCAL controller standing on the floor jumps on a wheel tick sent
 	# through the engine's input, as a player's mouse would send it.
 	var world := _make_world()
-	var controller := _make_player(world, DotFpsController.Drive.LOCAL, func(c: DotFpsController) -> void: c.tick_rate = 60)
+	var controller := _make_player(world, GSFpsController.Drive.LOCAL, func(c: GSFpsController) -> void: c.tick_rate = 60)
 	await get_tree().physics_frame
 	controller.teleport(Vector3(0.0, 0.05, 0.0))
 	for _i in range(20):
 		await get_tree().physics_frame
-	var grounded := controller.state.mode == DotFpsState.Mode.GROUND and controller.state.velocity.y <= 0.001
+	var grounded := controller.state.mode == GSFpsState.Mode.GROUND and controller.state.velocity.y <= 0.001
 	Input.parse_input_event(_wheel_event(true))
 	Input.parse_input_event(_wheel_event(false))
 	var rose := false
@@ -572,17 +572,17 @@ func _test_wheel_jump() -> void:
 func _test_pair_exceptions() -> void:
 	_section("players pass through the pairs the rules let through")
 
-	var rules := DotPlayerBodyRules.new()
+	var rules := GSPlayerBodyRules.new()
 	var world := _make_world()
-	var a := _make_player(world, DotFpsController.Drive.EXTERNAL)
-	var b := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var a := _make_player(world, GSFpsController.Drive.EXTERNAL)
+	var b := _make_player(world, GSFpsController.Drive.EXTERNAL)
 	var node_a := a.get_parent() as CharacterBody3D
 	var node_b := b.get_parent() as CharacterBody3D
-	var c := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var c := _make_player(world, GSFpsController.Drive.EXTERNAL)
 	var node_c := c.get_parent() as CharacterBody3D
 	await get_tree().physics_frame
 	for pair in [[a, node_a, 1], [b, node_b, 2], [c, node_c, 3]]:
-		var ctrl := pair[0] as DotFpsController
+		var ctrl := pair[0] as GSFpsController
 		var node := pair[1] as CharacterBody3D
 		node.collision_layer = 1 << 4
 		rules.apply_hull(node, ctrl.tunables.stand_height, ctrl.tunables.radius)
@@ -638,15 +638,15 @@ func _test_landing_kick_and_legs() -> void:
 		body.add_child(head)
 		var camera := Camera3D.new()
 		head.add_child(camera)
-		var view := DotFpsView.new()
+		var view := GSFpsView.new()
 		view.strafe_roll = 0.0
 		view.slide_roll = 0.0
 		view.fov_speed_gain = 0.0
 		view.landing_strength = strength
 		body.add_child(view)
-		var motor := DotFpsMotor.new(DotFpsTunables.with_profile("legacy"), DotFpsFlatBody.with_floor(0.0))
-		var state := DotFpsState.new()
-		state.mode = DotFpsState.Mode.GROUND
+		var motor := GSFpsMotor.new(GSFpsTunables.with_profile("legacy"), GSFpsFlatBody.with_floor(0.0))
+		var state := GSFpsState.new()
+		state.mode = GSFpsState.Mode.GROUND
 		for _i in range(30):
 			view.apply(state, motor, frame)
 		var rest := head.position.y
@@ -661,7 +661,7 @@ func _test_landing_kick_and_legs() -> void:
 	_check(deepest[1] > 0.01, "strength 1 is the tuned dip", str(deepest))
 	_check_near(deepest[2], deepest[1] * 2.0, deepest[1] * 0.1, "strength 2 doubles it")
 
-	var rules := DotPlayerViewRules.new()
+	var rules := GSPlayerViewRules.new()
 	_check(rules.landing_kick == 1.0, "cl_landing_kick defaults to 1")
 	_check(rules.set_cvar("cl_landing_kick", "0.5") and rules.landing_kick == 0.5, "the cvar applies")
 	_check(not rules.set_cvar("cl_landing_kick", "lots") and rules.landing_kick == 0.5, "a non-number is refused")
@@ -669,20 +669,20 @@ func _test_landing_kick_and_legs() -> void:
 	_check(rules.landing_kick == 2.0, "and is clamped to 2")
 
 	var world := _make_world()
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 	await get_tree().physics_frame
 	var src := LegSource.new()
 	world.add_child(src)
-	var legs := DotFpsLegSlow.new()
-	legs.controller = DotNodeRef.of_path(controller.get_path())
-	legs.source = DotNodeRef.of_path(src.get_path())
-	legs.controller.mode = DotNodeRef.Mode.ABSOLUTE
-	legs.source.mode = DotNodeRef.Mode.ABSOLUTE
+	var legs := GSFpsLegSlow.new()
+	legs.controller = GSNodeRef.of_path(controller.get_path())
+	legs.source = GSNodeRef.of_path(src.get_path())
+	legs.controller.mode = GSNodeRef.Mode.ABSOLUTE
+	legs.source.mode = GSNodeRef.Mode.ABSOLUTE
 	world.add_child(legs)
 	_check(legs.attach() and not controller.has_modifier(&"legs_broken"), "attached, and nothing is slowed until the legs break")
 	src.legs_broken.emit(3.0, 0.5)
 	_check(controller.has_modifier(&"legs_broken") and legs.breaks == 1, "the signal adds the modifier")
-	var def: DotFpsModifier = controller.motor.modifier_defs[&"legs_broken"]
+	var def: GSFpsModifier = controller.motor.modifier_defs[&"legs_broken"]
 	_check(def.duration_sec == 3.0 and is_equal_approx(def.max_speed_scale, 0.5), "with the signal's seconds and scale")
 	_check(not legs.on_legs_broken(0.0, 0.5), "zero seconds does nothing")
 	world.queue_free()
@@ -692,15 +692,15 @@ func _test_landing_kick_and_legs() -> void:
 func _test_touch_sampler_pick() -> void:
 	_section("touch device picks the touch sampler")
 
-	DotPlatform.touch_override = 1
+	GSPlatform.touch_override = 1
 	var world := _make_world()
-	var touch_player := _make_player(world, DotFpsController.Drive.LOCAL)
-	_check(touch_player.sampler is DotFpsTouchSampler, "a local controller on a touch device samples touch")
+	var touch_player := _make_player(world, GSFpsController.Drive.LOCAL)
+	_check(touch_player.sampler is GSFpsTouchSampler, "a local controller on a touch device samples touch")
 
-	DotPlatform.touch_override = 0
+	GSPlatform.touch_override = 0
 	var desk_world := _make_world()
-	var desk_player := _make_player(desk_world, DotFpsController.Drive.LOCAL)
-	_check(desk_player.sampler != null and not desk_player.sampler is DotFpsTouchSampler, "and a desktop keeps the keyboard sampler")
-	DotPlatform.touch_override = -1
+	var desk_player := _make_player(desk_world, GSFpsController.Drive.LOCAL)
+	_check(desk_player.sampler != null and not desk_player.sampler is GSFpsTouchSampler, "and a desktop keeps the keyboard sampler")
+	GSPlatform.touch_override = -1
 	await get_tree().physics_frame
 	_done()

@@ -1,4 +1,4 @@
-class_name DotTpsMotor
+class_name GSTpsMotor
 extends RefCounted
 
 ## The third-person simulation: a pure function of (state, intent, delta, tunables); [method step] reads no node, clock, device or random stream.
@@ -7,9 +7,9 @@ extends RefCounted
 
 ## One tick. Mutates [param state] and returns the velocity to move with.
 static func step(
-	state: DotTpsState,
-	intent: DotPlayerIntent,
-	tunables: DotTpsTunables,
+	state: GSTpsState,
+	intent: GSPlayerIntent,
+	tunables: GSTpsTunables,
 	delta: float,
 	on_floor: bool
 ) -> Vector3:
@@ -19,9 +19,9 @@ static func step(
 	var move := intent.move if intent != null else Vector2.ZERO
 	var buttons := intent.buttons if intent != null else 0
 
-	state.running = (buttons & DotPlayerIntent.Btn.SPRINT) != 0
-	state.crouched = (buttons & DotPlayerIntent.Btn.CROUCH) != 0
-	state.aiming = (buttons & DotPlayerIntent.Btn.ZOOM) != 0
+	state.running = (buttons & GSPlayerIntent.Btn.SPRINT) != 0
+	state.crouched = (buttons & GSPlayerIntent.Btn.CROUCH) != 0
+	state.aiming = (buttons & GSPlayerIntent.Btn.ZOOM) != 0
 
 	_update_ground(state, tunables, delta, on_floor)
 	_update_jump_buffer(state, intent, tunables, delta)
@@ -46,7 +46,7 @@ static func step(
 
 ## Where the character wants to go, in world terms.
 ## Camera-relative always: steering by the character's own facing turns in circles once the camera moves.
-static func _wish_direction(state: DotTpsState, move: Vector2) -> Vector3:
+static func _wish_direction(state: GSTpsState, move: Vector2) -> Vector3:
 	if move.is_zero_approx():
 		return Vector3.ZERO
 
@@ -57,8 +57,8 @@ static func _wish_direction(state: DotTpsState, move: Vector2) -> Vector3:
 
 
 static func _accelerate(
-	state: DotTpsState,
-	tunables: DotTpsTunables,
+	state: GSTpsState,
+	tunables: GSTpsTunables,
 	direction: Vector3,
 	target_speed: float,
 	delta: float
@@ -83,8 +83,8 @@ static func _accelerate(
 
 
 static func _update_ground(
-	state: DotTpsState,
-	tunables: DotTpsTunables,
+	state: GSTpsState,
+	tunables: GSTpsTunables,
 	delta: float,
 	on_floor: bool
 ) -> void:
@@ -101,12 +101,12 @@ static func _update_ground(
 
 
 static func _update_jump_buffer(
-	state: DotTpsState,
-	intent: DotPlayerIntent,
-	tunables: DotTpsTunables,
+	state: GSTpsState,
+	intent: GSPlayerIntent,
+	tunables: GSTpsTunables,
 	delta: float
 ) -> void:
-	var pressed := intent != null and intent.just_pressed(DotPlayerIntent.Btn.JUMP)
+	var pressed := intent != null and intent.just_pressed(GSPlayerIntent.Btn.JUMP)
 
 	if pressed:
 		state.jump_buffered = 0.0
@@ -121,7 +121,7 @@ static func _update_jump_buffer(
 		state.jump_buffered = -1.0
 
 
-static func _apply_jump(state: DotTpsState, tunables: DotTpsTunables) -> void:
+static func _apply_jump(state: GSTpsState, tunables: GSTpsTunables) -> void:
 	if state.jump_buffered < 0.0:
 		return
 
@@ -142,8 +142,8 @@ static func _apply_jump(state: DotTpsState, tunables: DotTpsTunables) -> void:
 
 
 static func _turn(
-	state: DotTpsState,
-	tunables: DotTpsTunables,
+	state: GSTpsState,
+	tunables: GSTpsTunables,
 	wish: Vector3,
 	delta: float
 ) -> void:
@@ -169,9 +169,9 @@ static func _turn(
 ## Applies a look delta to the state's camera angles, clamped by the tunables.
 ## Here, not on the rig, so a rewind restores the camera along with the body.
 static func look(
-	state: DotTpsState,
+	state: GSTpsState,
 	delta_look: Vector2,
-	tunables: DotTpsTunables,
+	tunables: GSTpsTunables,
 	sensitivity: float = 1.0
 ) -> void:
 	if state == null:

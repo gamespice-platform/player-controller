@@ -1,15 +1,15 @@
 @tool
 extends "dot_fps_tunables_base.gd"
 
-## The first exported groups of [DotFpsTunables] (look, profile, speeds, ground and air movement, jumping, surf, crouching).
+## The first exported groups of [GSFpsTunables] (look, profile, speeds, ground and air movement, jumping, surf, crouching).
 ## Split out of dot_fps_tunables_base.gd for file size and layered above it so the property order is unchanged
-## (a derived script lists its properties first). Never instantiate this directly; use [DotFpsTunables].
+## (a derived script lists its properties first). Never instantiate this directly; use [GSFpsTunables].
 
 
 @export_group("Look")
 
 ## Degrees of view rotation per unit of mouse motion.
-## Only [DotFpsSampler] reads these; the motor is given absolute angles.
+## Only [GSFpsSampler] reads these; the motor is given absolute angles.
 @export_range(0.01, 5.0, 0.01) var mouse_sensitivity: float = 0.25:
 	set(value):
 		if mouse_sensitivity != value:
@@ -147,7 +147,7 @@ extends "dot_fps_tunables_base.gd"
 
 ## Acceleration while airborne. The familiar [code]sv_airaccelerate[/code].
 ## Large on purpose: it is bounded by [member max_air_wish_speed], which is what makes
-## air-strafing work (see [method DotFpsMotor.accelerate]).
+## air-strafing work (see [method GSFpsMotor.accelerate]).
 @export_range(0.0, 1000.0, 1.0) var air_accelerate: float = 10.0:
 	set(value):
 		if air_accelerate != value:

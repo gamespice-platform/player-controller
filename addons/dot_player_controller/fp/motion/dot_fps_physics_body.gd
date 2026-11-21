@@ -1,11 +1,11 @@
-class_name DotFpsPhysicsBody
+class_name GSFpsPhysicsBody
 extends "dot_fps_physics_body_native.gd"
 
-## [DotFpsBody] backed by Godot's 3D physics server. The implementation a game uses.
+## [GSFpsBody] backed by Godot's 3D physics server. The implementation a game uses.
 ## Queries use a capsule shape the motor sizes per call instead of the player's own [CollisionShape3D], so asking "would I fit standing" never mutates the thing measured.
 ## The shape is allocated once and reused; rebuilding one per query was the largest single cost on a 32-slot server.
 
-static func for_node(node: Node3D) -> DotFpsPhysicsBody:
+static func for_node(node: Node3D) -> GSFpsPhysicsBody:
 	# Not this class's own name. A script that names itself in an expression, loaded after
 	# its base, cuts Godot 4.7.2's exit teardown short and leaks every script loaded before
 	# it. See docs/gdscript-hazards.md, "A script that names itself".
@@ -36,7 +36,7 @@ func sweep(
 
 	var nat := _nat()
 	if nat != null:
-		var t := DotFrameCost.now()
+		var t := GSFrameCost.now()
 		var before: int = nat.query_count() if t > 0 else 0
 		var h := _hit_of(nat.sweep(from, motion, height, radius, collision_mask, pass_out_mask))
 		_charge_native(&"native_sweep", t, before)
@@ -145,7 +145,7 @@ func sweep(
 	# INTO the face it met. The depth is borrowed only for the check: a sweep reports none.
 	var at_contact := from + motion * unsafe
 	result.depth = maxf(result.normal.dot(result.point - (at_contact - result.normal
-		* DotFpsBody.capsule_support(result.normal, height, radius))), 0.0)
+		* GSFpsBody.capsule_support(result.normal, height, radius))), 0.0)
 	_turn_round_flipped(result, at_contact, height, radius)
 	result.depth = 0.0
 
@@ -154,7 +154,7 @@ func sweep(
 	var approach := -motion.dot(result.normal)
 	if approach > 1e-9:
 		var at_unsafe := from + motion * unsafe
-		var deepest := at_unsafe - result.normal * DotFpsBody.capsule_support(
+		var deepest := at_unsafe - result.normal * GSFpsBody.capsule_support(
 			result.normal, height, radius)
 		var depth := result.normal.dot(result.point - deepest)
 		if depth > LATE_CONTACT_DEPTH:
@@ -265,7 +265,7 @@ func rest_contact(at: Vector3, height: float, radius: float) -> Hit:
 		return Hit.miss()
 	var nat := _nat()
 	if nat != null:
-		var t := DotFrameCost.now()
+		var t := GSFrameCost.now()
 		var before: int = nat.query_count() if t > 0 else 0
 		var h := _hit_of(nat.rest_contact(at, height, radius, collision_mask, pass_out_mask))
 		_charge_native(&"native_rest", t, before)
@@ -285,9 +285,9 @@ func rest_contact(at: Vector3, height: float, radius: float) -> Hit:
 func _turn_round_flipped(result: Hit, at: Vector3, height: float, radius: float) -> void:
 
 	# A contact normal can point INTO the surface the capsule rests on (`[ramp-pop-1]`), reading it as embedded and making
-	# [method DotFpsMotor._depenetrate] push riders a full step into the ramp.
+	# [method GSFpsMotor._depenetrate] push riders a full step into the ramp.
 	# A genuinely buried capsule shows the same tell, so the reversed answer is TRIED and kept only if the capsule moved out along it is clear; its depth floors at zero.
-	var support := DotFpsBody.capsule_support(result.normal, height, radius)
+	var support := GSFpsBody.capsule_support(result.normal, height, radius)
 
 	if result.depth <= support:
 		return
@@ -428,7 +428,7 @@ func _raw_rest_query(at: Vector3, height: float, radius: float) -> Hit:
 	# How far the capsule's deepest point along -normal lies past the contact point.
 	# Measured against get_rest_info's own point rather than against a shape query,
 	# and checked to 4 decimal places at depths from 0 to 1 m on 4.7.2.
-	var deepest := at - normal * DotFpsBody.capsule_support(normal, height, radius)
+	var deepest := at - normal * GSFpsBody.capsule_support(normal, height, radius)
 
 	var result := Hit.new()
 	result.hit = true
@@ -461,10 +461,10 @@ func overlaps(at: Vector3, height: float, radius: float) -> bool:
 
 ## A body over the same physics space (bound to the node this one is), with its masks and
 ## exclusions: the player's own collider stays excluded. Null while this one is unbound.
-func copy_for_simulation() -> DotFpsBody:
+func copy_for_simulation() -> GSFpsBody:
 	if _owner == null or not _owner.is_inside_tree():
 		return null
-	var copy: DotFpsPhysicsBody = (get_script() as GDScript).new()
+	var copy: GSFpsPhysicsBody = (get_script() as GDScript).new()
 	if not copy.bind(_owner).ok:
 		return null
 	return copy_filters_to(copy)

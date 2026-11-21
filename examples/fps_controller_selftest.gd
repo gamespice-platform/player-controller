@@ -1,6 +1,6 @@
 extends "res://examples/fps_controller_selftest_sections.gd"
 
-## Exercises [DotFpsController] as a node in a real scene tree. Run: [code]godot --headless --path . res://examples/fps_controller_selftest.tscn[/code]
+## Exercises [GSFpsController] as a node in a real scene tree. Run: [code]godot --headless --path . res://examples/fps_controller_selftest.tscn[/code]
 ## [method movement_selftest] tests the simulation; this tests the wiring around it (reference resolution, collider following the crouch, fixed-step accumulator, drive modes, registry, the noclip safety gate), which a host game touches first.
 ## Scenes are built in code so a failure names a line and an editor change cannot silently pass.
 
@@ -12,7 +12,7 @@ const SECTIONS := 20
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run.call_deferred()
 
 
@@ -76,17 +76,17 @@ func _test_surfaces_from_scene() -> void:
 	var ground := world.get_child(0)
 	ground.set_meta(&"dot_fps_surface", "ice")
 
-	var ice := DotFpsSurface.make(&"ice")
+	var ice := GSFpsSurface.make(&"ice")
 	ice.friction_scale = 0.02
 	ice.accelerate_scale = 0.1
 
-	var set := DotFpsSurfaceSet.new()
+	var set := GSFpsSurfaceSet.new()
 	set.add(ice)
 
 	var controller := _make_player(
 		world,
-		DotFpsController.Drive.EXTERNAL,
-		func(c: DotFpsController) -> void: c.surfaces = set
+		GSFpsController.Drive.EXTERNAL,
+		func(c: GSFpsController) -> void: c.surfaces = set
 	)
 
 	await get_tree().physics_frame
@@ -137,11 +137,11 @@ func _test_change_signals() -> void:
 	step.position = Vector3(0.0, 0.15, -6.0)
 	world.add_child(step)
 
-	var boost := DotFpsModifier.make(&"boost")
+	var boost := GSFpsModifier.make(&"boost")
 	boost.max_speed_scale = 1.5
 	boost.duration_sec = 0.25
 
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -173,7 +173,7 @@ func _test_change_signals() -> void:
 	# Crouch, then release. One edge each, not one per tick held.
 	for i in range(60):
 		controller.apply_command(
-			_command(0.0, 0.0, 0.0, DotFpsCommand.BUTTON_CROUCH))
+			_command(0.0, 0.0, 0.0, GSFpsCommand.BUTTON_CROUCH))
 		controller.simulate_tick(100 + i, STEP)
 
 	for i in range(60):
@@ -219,7 +219,7 @@ func _test_command_veto() -> void:
 	player.add_child(collision)
 
 	var controller := FrozenController.new()
-	controller.drive = DotFpsController.Drive.EXTERNAL
+	controller.drive = GSFpsController.Drive.EXTERNAL
 	controller.register_default_actions = false
 	player.add_child(controller)
 
@@ -266,13 +266,13 @@ func _test_zero_configuration() -> void:
 	_section("zero-configuration wiring")
 
 	var world := _make_world()
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
 	_check(controller.motor != null, "the motor is built")
-	_check(controller.body is DotFpsPhysicsBody, "against the physics body")
+	_check(controller.body is GSFpsPhysicsBody, "against the physics body")
 	_check( controller.view != null, "the view is found without a view_ref being set" )
 	_check( controller.tunables != null and controller.tunables.validate().ok, "default tunables are created and valid" )
 
@@ -301,8 +301,8 @@ func _test_threaded_bind() -> void:
 	await get_tree().process_frame
 
 	var world := _make_world()
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
-	var body := controller.body as DotFpsPhysicsBody
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
+	var body := controller.body as GSFpsPhysicsBody
 	_check(body != null and not body.is_bound(), "made between ticks, the body holds no space handle")
 
 	await get_tree().physics_frame
@@ -324,7 +324,7 @@ func _test_external_drive() -> void:
 	_section("external drive")
 
 	var world := _make_world()
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -340,7 +340,7 @@ func _test_external_drive() -> void:
 		controller.state.is_grounded(),
 		"the player lands under external drive",
 		"mode %s at %s" % [
-			DotFpsState.Mode.keys()[controller.state.mode],
+			GSFpsState.Mode.keys()[controller.state.mode],
 			controller.state.position,
 		]
 	)
@@ -400,7 +400,7 @@ func _test_mask_set_after_setup() -> void:
 	floor.position = Vector3(0.0, -0.5, 0.0)
 	world.add_child(floor)
 
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 
@@ -418,21 +418,21 @@ func _test_mask_set_after_setup() -> void:
 	# A style rebuilds the tunables from the base: set_collision_mask is the way that survives.
 	# The order the bug needs: a style first (the base is taken, the live tunables become a
 	# copy), then the mask, then another style (rebuilt from the base).
-	var _first := controller.set_style(DotFpsStyle.new())
+	var _first := controller.set_style(GSFpsStyle.new())
 	controller.set_collision_mask(1 | 4)
-	var _styled := controller.set_style(DotFpsStyle.new())
+	var _styled := controller.set_style(GSFpsStyle.new())
 	controller.simulate_tick(91, STEP)
 	_check(controller.tunables.collision_mask == 5 and controller.body.collision_mask == 5,
 		"and set_collision_mask survives a style", "tunables %d body %d" % [controller.tunables.collision_mask, controller.body.collision_mask])
 
 	# A host's own mode, without subclassing: registered on every setup, so a style's rebuilt
 	# motor still has it, under the same id.
-	var swim := DotFpsSwimMode.new()
+	var swim := GSFpsSwimMode.new()
 	controller.extra_modes = [swim]
-	var _with := controller.set_style(DotFpsStyle.new())
+	var _with := controller.set_style(GSFpsStyle.new())
 	var first_id := controller.motor.mode_id_of(&"swim")
-	var _again := controller.set_style(DotFpsStyle.new())
-	_check(first_id >= DotFpsState.FIRST_CUSTOM_MODE, "a host's extra mode is registered by setup", str(first_id))
+	var _again := controller.set_style(GSFpsStyle.new())
+	_check(first_id >= GSFpsState.FIRST_CUSTOM_MODE, "a host's extra mode is registered by setup", str(first_id))
 	_check(controller.motor.mode_id_of(&"swim") == first_id and controller.motor.mode_for(first_id) == swim,
 		"and survives the motor a style rebuilds, under the same id")
 
@@ -445,7 +445,7 @@ func _test_collider_follows_crouch() -> void:
 	_section("collider follows the crouch")
 
 	var world := _make_world()
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -469,7 +469,7 @@ func _test_collider_follows_crouch() -> void:
 	_check_near( capsule.height, controller.tunables.stand_height, 0.01, "standing height matches the tunables" )
 
 	for i in range(120):
-		controller.apply_command(_command(0.0, 0.0, 0.0, DotFpsCommand.BUTTON_CROUCH))
+		controller.apply_command(_command(0.0, 0.0, 0.0, GSFpsCommand.BUTTON_CROUCH))
 		controller.simulate_tick(200 + i, STEP)
 
 	_check_near( capsule.height, controller.tunables.crouch_height, 0.01, "and the collider shrinks with the crouch" )
@@ -489,9 +489,9 @@ func _test_noclip_gate() -> void:
 	var world := _make_world()
 	var controller := _make_player(
 		world,
-		DotFpsController.Drive.EXTERNAL,
-		func(c: DotFpsController) -> void:
-			c.tunables = DotFpsTunables.with_profile("legacy")
+		GSFpsController.Drive.EXTERNAL,
+		func(c: GSFpsController) -> void:
+			c.tunables = GSFpsTunables.with_profile("legacy")
 			c.tunables.can_noclip = true
 			c.allow_noclip = false
 	)
@@ -507,10 +507,10 @@ func _test_noclip_gate() -> void:
 	controller.teleport(Vector3(0.0, 1.0, 0.0))
 
 	for i in range(60):
-		controller.apply_command(_command(0.0, 0.0, 0.0, DotFpsCommand.BUTTON_NOCLIP))
+		controller.apply_command(_command(0.0, 0.0, 0.0, GSFpsCommand.BUTTON_NOCLIP))
 		controller.simulate_tick(i + 1, STEP)
 
-	_check( controller.state.mode != DotFpsState.Mode.NOCLIP, "and a client asking for noclip does not get it" )
+	_check( controller.state.mode != GSFpsState.Mode.NOCLIP, "and a client asking for noclip does not get it" )
 
 	world.queue_free()
 	await get_tree().process_frame
@@ -518,9 +518,9 @@ func _test_noclip_gate() -> void:
 	var allowed_world := _make_world()
 	var allowed := _make_player(
 		allowed_world,
-		DotFpsController.Drive.EXTERNAL,
-		func(c: DotFpsController) -> void:
-			c.tunables = DotFpsTunables.with_profile("legacy")
+		GSFpsController.Drive.EXTERNAL,
+		func(c: GSFpsController) -> void:
+			c.tunables = GSFpsTunables.with_profile("legacy")
 			c.tunables.can_noclip = true
 			c.allow_noclip = true
 	)
@@ -529,28 +529,28 @@ func _test_noclip_gate() -> void:
 	await get_tree().physics_frame
 
 	allowed.teleport(Vector3(0.0, 1.0, 0.0))
-	allowed.apply_command(_command(0.0, 0.0, 0.0, DotFpsCommand.BUTTON_NOCLIP))
+	allowed.apply_command(_command(0.0, 0.0, 0.0, GSFpsCommand.BUTTON_NOCLIP))
 	allowed.simulate_tick(1, STEP)
 
-	_check( allowed.state.mode == DotFpsState.Mode.NOCLIP, "and does get it when the server allows it" )
+	_check( allowed.state.mode == GSFpsState.Mode.NOCLIP, "and does get it when the server allows it" )
 
 	allowed_world.queue_free()
 	await get_tree().process_frame
 	_done()
 
 
-## The controller half of DotFpsAdminModifiers: refused without the switch, and "off"
+## The controller half of GSFpsAdminModifiers: refused without the switch, and "off"
 ## lands a player even when their own tunables would have let them keep flying.
 func _test_admin_abilities() -> void:
 	_section("admin abilities")
 
 	var plain_world := _make_world()
-	var plain := _make_player(plain_world, DotFpsController.Drive.EXTERNAL)
+	var plain := _make_player(plain_world, GSFpsController.Drive.EXTERNAL)
 	await get_tree().physics_frame
 
-	var refused := DotFpsAdminModifiers.set_noclip(plain, true)
+	var refused := GSFpsAdminModifiers.set_noclip(plain, true)
 	_check(
-		not refused.ok and refused.error.code == DotError.CODE_UNSUPPORTED,
+		not refused.ok and refused.error.code == GSError.CODE_UNSUPPORTED,
 		"a controller built without admin_abilities refuses them rather than improvising"
 	)
 
@@ -560,9 +560,9 @@ func _test_admin_abilities() -> void:
 	var world := _make_world()
 	var controller := _make_player(
 		world,
-		DotFpsController.Drive.EXTERNAL,
-		func(c: DotFpsController) -> void:
-			c.tunables = DotFpsTunables.with_profile("legacy")
+		GSFpsController.Drive.EXTERNAL,
+		func(c: GSFpsController) -> void:
+			c.tunables = GSFpsTunables.with_profile("legacy")
 			c.tunables.can_noclip = true
 			c.allow_noclip = true
 			c.admin_abilities = true
@@ -570,34 +570,34 @@ func _test_admin_abilities() -> void:
 	await get_tree().physics_frame
 
 	controller.teleport(Vector3(0.0, 1.0, 0.0))
-	var on := DotFpsAdminModifiers.set_noclip(controller, true)
-	controller.apply_command(DotFpsCommand.new())
+	var on := GSFpsAdminModifiers.set_noclip(controller, true)
+	controller.apply_command(GSFpsCommand.new())
 	controller.simulate_tick(1, STEP)
 
 	_check(
-		on.ok and controller.state.mode == DotFpsState.Mode.NOCLIP
-		and DotFpsAdminModifiers.is_noclipped(controller),
+		on.ok and controller.state.mode == GSFpsState.Mode.NOCLIP
+		and GSFpsAdminModifiers.is_noclipped(controller),
 		"with it, an admin noclip takes effect on the next tick"
 	)
 
-	var _off := DotFpsAdminModifiers.set_noclip(controller, false)
-	controller.apply_command(DotFpsCommand.new())
+	var _off := GSFpsAdminModifiers.set_noclip(controller, false)
+	controller.apply_command(GSFpsCommand.new())
 	controller.simulate_tick(2, STEP)
 
-	_check( controller.state.mode != DotFpsState.Mode.NOCLIP, "and turning it off lands a player whose own tunables allow noclip" )
+	_check( controller.state.mode != GSFpsState.Mode.NOCLIP, "and turning it off lands a player whose own tunables allow noclip" )
 
-	var applied := DotFpsAdminModifiers.set_speed(controller, 2.4)
+	var applied := GSFpsAdminModifiers.set_speed(controller, 2.4)
 	_check(
 		applied.ok and is_equal_approx(float(applied.value), 2.0)
-		and is_equal_approx(DotFpsAdminModifiers.speed_of(controller), 2.0),
+		and is_equal_approx(GSFpsAdminModifiers.speed_of(controller), 2.0),
 		"a speed is applied as the nearest step and reported as that step",
 		str(applied.value)
 	)
 
-	DotFpsAdminModifiers.clear(controller)
+	GSFpsAdminModifiers.clear(controller)
 	_check(
-		is_equal_approx(DotFpsAdminModifiers.speed_of(controller), 1.0)
-		and not DotFpsAdminModifiers.is_frozen(controller),
+		is_equal_approx(GSFpsAdminModifiers.speed_of(controller), 1.0)
+		and not GSFpsAdminModifiers.is_frozen(controller),
 		"and clear takes every admin modifier off"
 	)
 
@@ -610,7 +610,7 @@ func _test_teleport_and_signals() -> void:
 	_section("teleport and signals")
 
 	var world := _make_world()
-	var controller := _make_player(world, DotFpsController.Drive.EXTERNAL)
+	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 
 	await get_tree().physics_frame
 	await get_tree().physics_frame
@@ -625,7 +625,7 @@ func _test_teleport_and_signals() -> void:
 	controller.landed.connect(func(impact: float) -> void: landings.append(impact))
 	controller.jumped.connect(func() -> void: jumps.append(1))
 	controller.mode_changed.connect(
-		func(_a: DotFpsState.Mode, _b: DotFpsState.Mode) -> void: modes.append(1)
+		func(_a: GSFpsState.Mode, _b: GSFpsState.Mode) -> void: modes.append(1)
 	)
 
 	controller.teleport(Vector3(0.0, 4.0, 0.0), 45.0, -10.0)
@@ -660,7 +660,7 @@ func _test_teleport_and_signals() -> void:
 
 	for i in range(60):
 		controller.apply_command(
-			_command(0.0, 0.0, 0.0, DotFpsCommand.BUTTON_JUMP if i == 0 else 0)
+			_command(0.0, 0.0, 0.0, GSFpsCommand.BUTTON_JUMP if i == 0 else 0)
 		)
 		controller.simulate_tick(300 + i, STEP)
 

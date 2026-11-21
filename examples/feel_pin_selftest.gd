@@ -20,7 +20,7 @@ var _got := {}
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_record = "--record" in OS.get_cmdline_user_args()
 	_run.call_deferred()
 
@@ -36,26 +36,26 @@ func _box(size: Vector3, at: Vector3) -> void:
 	add_child(sb)
 
 
-func _motor() -> DotFpsMotor:
-	return DotFpsMotor.new(DotFpsTunables.new(), DotFpsPhysicsBody.for_node(self))
+func _motor() -> GSFpsMotor:
+	return GSFpsMotor.new(GSFpsTunables.new(), GSFpsPhysicsBody.for_node(self))
 
 
-func _state(at: Vector3) -> DotFpsState:
-	var s := DotFpsState.new()
+func _state(at: Vector3) -> GSFpsState:
+	var s := GSFpsState.new()
 	s.position = at
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	return s
 
 
-func _cmd(forward: float, buttons: int, yaw: float = 0.0) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+func _cmd(forward: float, buttons: int, yaw: float = 0.0) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	c.move = Vector2(0.0, -forward)
 	c.buttons = buttons
 	c.yaw = yaw
 	return c
 
 
-func _settle(m: DotFpsMotor, s: DotFpsState) -> void:
+func _settle(m: GSFpsMotor, s: GSFpsState) -> void:
 	for i in range(256):
 		m.simulate(s, _cmd(0.0, 0), STEP)
 
@@ -80,7 +80,7 @@ func _jump() -> Array:
 	var peak := 0.0
 	var t_peak := 0.0
 	for i in range(384):
-		m.simulate(s, _cmd(0.0, DotFpsCommand.BUTTON_JUMP if i == 0 else 0), STEP)
+		m.simulate(s, _cmd(0.0, GSFpsCommand.BUTTON_JUMP if i == 0 else 0), STEP)
 		if s.position.y - y0 > peak:
 			peak = s.position.y - y0
 			t_peak = float(i + 1) * STEP
@@ -92,7 +92,7 @@ func _air_gain() -> float:
 	var m := _motor()
 	var s := _state(Vector3(0, 0.05, 0))
 	_settle(m, s)
-	m.simulate(s, _cmd(0.0, DotFpsCommand.BUTTON_JUMP), STEP)
+	m.simulate(s, _cmd(0.0, GSFpsCommand.BUTTON_JUMP), STEP)
 	for i in range(64):
 		m.simulate(s, _cmd(1.0, 0), STEP)
 	return Vector2(s.velocity.x, s.velocity.z).length()
@@ -128,15 +128,15 @@ func _run() -> void:
 		_box(Vector3(8, heights[i], 8), Vector3(0, heights[i] * 0.5, 40.0 * (i + 1) + 4.0))
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	print("body: stand %.4f crouch %.4f radius %.4f step %.4f" % [t.stand_height, t.crouch_height, t.radius, t.step_height])
 	if _record:
 		print("MEASURE stand_height %.4f" % t.stand_height)
 		print("MEASURE crouch_height %.4f" % t.crouch_height)
 		print("MEASURE radius %.4f" % t.radius)
 	_pin("walk_speed", _top_speed(0))
-	_pin("run_speed", _top_speed(DotFpsCommand.BUTTON_SPRINT))
-	_pin("crouch_speed", _top_speed(DotFpsCommand.BUTTON_CROUCH))
+	_pin("run_speed", _top_speed(GSFpsCommand.BUTTON_SPRINT))
+	_pin("crouch_speed", _top_speed(GSFpsCommand.BUTTON_CROUCH))
 	_completed += 1
 	var j := _jump()
 	_pin("jump_apex", j[0])

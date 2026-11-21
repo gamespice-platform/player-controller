@@ -1,14 +1,14 @@
-class_name DotTpsCameraRig
+class_name GSTpsCameraRig
 extends Node3D
 
 ## The orbit camera: a boom that stays out of the level, a shoulder it can swap, and an aim blend.
 ## Built in code, not a scene (a scene is something a game must merge). The arm is a GameSpice Core
-## [DotCameraBoom], not a SpringArm3D, and the shoulder is part of its swept line. Tree: docs/rationale.md.
+## [GSCameraBoom], not a SpringArm3D, and the shoulder is part of its swept line. Tree: docs/rationale.md.
 
 # No log channel: a camera following a state it is handed every frame. It has nothing
 # outside the process to fail against, and a line from it would be a line per frame.
 
-@export var tunables: DotTpsTunables = null
+@export var tunables: GSTpsTunables = null
 
 ## Whether the camera becomes current when this rig is for the local player.
 @export var make_current: bool = true
@@ -20,8 +20,8 @@ extends Node3D
 ## players, NPCs). Zero fades nothing.
 @export_flags_3d_physics var fade_mask: int = 0
 
-var arm: DotCameraBoom = null
-var fade: DotCameraFade = null
+var arm: GSCameraBoom = null
+var fade: GSCameraFade = null
 var pivot: Marker3D = null
 var camera: Camera3D = null
 
@@ -31,7 +31,7 @@ var _base_fov: float = 75.0
 
 func _ready() -> void:
 	if tunables == null:
-		tunables = DotTpsTunables.new()
+		tunables = GSTpsTunables.new()
 
 	_build()
 
@@ -40,7 +40,7 @@ func _build() -> void:
 	if arm != null:
 		return
 
-	arm = DotCameraBoom.new()
+	arm = GSCameraBoom.new()
 	arm.name = "Arm"
 	arm.spring_length = tunables.camera_distance
 	arm.collision_mask = collision_mask
@@ -63,7 +63,7 @@ func _build() -> void:
 	pivot.add_child(camera)
 	_base_fov = camera.fov
 
-	fade = DotCameraFade.new()
+	fade = GSCameraFade.new()
 	fade.name = "Fade"
 	fade.collision_mask = fade_mask
 	fade.focus = self
@@ -79,12 +79,12 @@ func set_fade_mask(mask: int) -> void:
 
 ## Places the rig from a state. Called once a frame, not once a tick: the camera is
 ## presentation and a camera moved only on ticks judders.
-func follow(state: DotTpsState, feet: Vector3, delta: float) -> void:
+func follow(state: GSTpsState, feet: Vector3, delta: float) -> void:
 	if state == null or arm == null:
 		return
 
 	var wanted := feet + Vector3.UP * tunables.camera_height
-	var factor := DotTpsTunables.smoothing(tunables.camera_lag, delta)
+	var factor := GSTpsTunables.smoothing(tunables.camera_lag, delta)
 
 	global_position = global_position.lerp(wanted, factor) if tunables.camera_lag > 0.0 else wanted
 
@@ -97,9 +97,9 @@ func follow(state: DotTpsState, feet: Vector3, delta: float) -> void:
 	_blend_aim(state, delta)
 
 
-func _blend_aim(state: DotTpsState, delta: float) -> void:
+func _blend_aim(state: GSTpsState, delta: float) -> void:
 	var target := 1.0 if state.aiming else 0.0
-	_aim = lerpf(_aim, target, DotTpsTunables.smoothing(tunables.aim_blend, delta))
+	_aim = lerpf(_aim, target, GSTpsTunables.smoothing(tunables.aim_blend, delta))
 
 	arm.spring_length = lerpf(tunables.camera_distance, tunables.aim_distance, _aim)
 
@@ -137,7 +137,7 @@ func exclude_own_body() -> void:
 
 ## Swaps the shoulder the camera sits over.
 ## On the state so a rewind does not undo a player's choice and a spectator sees the same side.
-func swap_shoulder(state: DotTpsState) -> void:
+func swap_shoulder(state: GSTpsState) -> void:
 	if state != null:
 		state.shoulder = -state.shoulder
 

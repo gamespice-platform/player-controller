@@ -12,7 +12,7 @@ const ALIGN_EASE_RATE := 22.0
 ## One auto run, approached [param deg] off the wall with the view held there, the view turn eased in as FC does.
 ## Returns the worst angle between the view and the wall's tangent in the first tenth of a second and after the first
 ## third, the velocity's sideways speed after that, the spread of the distance from the wall, and the run's ticks.
-func _align_trial(t: DotFpsTunables, deg: float) -> Dictionary:
+func _align_trial(t: GSFpsTunables, deg: float) -> Dictionary:
 	var step := 1.0 / ALIGN_HZ
 	var motor := _motor(t, _wall_world())
 	var s := _beside_wall(8.0, 0.5, 9.0)
@@ -54,7 +54,7 @@ func _align_cap_trial(cap: float, every: int) -> Vector2i:
 	var t := _wall_tunables()
 	t.wall_run_auto = true
 	t.wall_run_max_time = cap
-	var world := DotFpsFlatBody.with_floor(0.0)
+	var world := GSFpsFlatBody.with_floor(0.0)
 	world.add_box(AABB(Vector3(1.0, 0.0, -400.0), Vector3(0.5, 12.0, 400.0)))
 	var server := _motor(t, world)
 	var client := _motor(t, world)
@@ -66,7 +66,7 @@ func _align_cap_trial(cap: float, every: int) -> Vector2i:
 		server.simulate(s, _command(1.0), step)
 		client.simulate(c, _command(1.0), step)
 		if i % every == 0:
-			DotFpsNetSync.unpack_flags(c, DotFpsNetSync.pack_flags(s))
+			GSFpsNetSync.unpack_flags(c, GSFpsNetSync.pack_flags(s))
 		started = started or s.is_wall_running()
 		if started and ends.x < 0 and not s.is_wall_running():
 			ends.x = i
@@ -78,8 +78,8 @@ func _align_cap_trial(cap: float, every: int) -> Vector2i:
 func _test_wall_run_alignment() -> void:
 	_section("wall run alignment at 66 Hz: the view, the velocity and the wall, and a rewound client")
 
-	var was := DotFpsNetSync.timer_scale
-	DotFpsNetSync.set_tick_rate(ALIGN_HZ)
+	var was := GSFpsNetSync.timer_scale
+	GSFpsNetSync.set_tick_rate(ALIGN_HZ)
 
 	# The FC's wall run: touch a wall in the air, the view turned along it from any angle.
 	var t := _wall_tunables()
@@ -105,7 +105,7 @@ func _test_wall_run_alignment() -> void:
 				"a %.1f s run ends on the server's tick on a client rewound every %d tick(s)" % [cap, n],
 				"server tick %d, client tick %d, cap tick %d" % [ends.x, ends.y, roundi(cap * ALIGN_HZ)])
 
-	DotFpsNetSync.timer_scale = was
+	GSFpsNetSync.timer_scale = was
 	_done()
 
 
@@ -113,8 +113,8 @@ func _test_wall_run_alignment() -> void:
 func _test_wall_jump_land_slide() -> void:
 	_section("landing from a wall jump with crouch held slides")
 	var t := _wall_tunables()
-	DotFpsSlidePreset.apply_run(t)
-	var crouch := DotFpsCommand.BUTTON_CROUCH
+	GSFpsSlidePreset.apply_run(t)
+	var crouch := GSFpsCommand.BUTTON_CROUCH
 
 	var landed := _land_from_wall_jump(t, -1)
 	_check(landed.slid_on == 0, "the slide starts on touchdown",
@@ -131,12 +131,12 @@ func _test_wall_jump_land_slide() -> void:
 	var plain := _land_from_wall_jump(t, -1, 0)
 	_check(plain.slid_on < 0, "landing without crouch does not slide")
 	var slow := _wall_tunables()
-	DotFpsSlidePreset.apply_run(slow)
+	GSFpsSlidePreset.apply_run(slow)
 	slow.slide_min_speed = 40.0
 	_check(_land_from_wall_jump(slow, -1).slid_on < 0, "nor does a landing under slide_min_speed")
 	var dash := _wall_tunables()
-	DotFpsSlidePreset.apply_run(dash)
-	dash.dash_button = DotFpsCommand.BUTTON_CROUCH
+	GSFpsSlidePreset.apply_run(dash)
+	dash.dash_button = GSFpsCommand.BUTTON_CROUCH
 	dash.dash_enabled = false
 	_check(_land_from_wall_jump(dash, -1).slid_on < 0, "nor one whose crouch is also the dash button, which a landing must not press")
 
@@ -152,11 +152,11 @@ func _test_wall_jump_land_slide() -> void:
 
 
 ## Runs along the right-hand wall, jumps off it and holds [param buttons] until landing and after, letting go [param release] ticks after the slide starts (never when negative).
-func _land_from_wall_jump(t: DotFpsTunables, release: int, buttons: int = DotFpsCommand.BUTTON_CROUCH) -> Dictionary:
+func _land_from_wall_jump(t: GSFpsTunables, release: int, buttons: int = GSFpsCommand.BUTTON_CROUCH) -> Dictionary:
 	var motor := _motor(t, _wall_world())
 	var s := _beside_wall(9.0)
 	_run_along(motor, s, 10)
-	motor.simulate(s, _command(1.0, 0.0, 0.0, DotFpsCommand.BUTTON_JUMP), STEP)
+	motor.simulate(s, _command(1.0, 0.0, 0.0, GSFpsCommand.BUTTON_JUMP), STEP)
 	var result := {"slid_on": -1, "slid_for": 0, "landing_speed": 0.0, "boosted": 0.0}
 	if not _check(motor.wall_jumps == 1, "the run ends in a wall jump"):
 		return result
@@ -210,13 +210,13 @@ func _test_wall_jump_corridor_speed() -> void:
 
 
 ## Starts beside the right-hand wall at [param speed] down -Z, presses jump every [param every] ticks with the view [param look] degrees off the run's, and returns the fastest speed along the corridor, the wall jumps and the runs.
-func _corridor_bounce(t: DotFpsTunables, speed: float, look: float, every: int) -> Dictionary:
+func _corridor_bounce(t: GSFpsTunables, speed: float, look: float, every: int) -> Dictionary:
 	var motor := _motor(t, _wall_world())
 	var s := _beside_wall(speed, 3.0)
 	var yaw := 0.0
 	var along := 0.0
 	for i in range(120):
-		var buttons := DotFpsCommand.BUTTON_JUMP if i % every == 2 else 0
+		var buttons := GSFpsCommand.BUTTON_JUMP if i % every == 2 else 0
 		motor.simulate(s, _command(1.0, 0.0, yaw + look, buttons), STEP)
 		yaw += motor.view_turn
 		if motor.wall_jumps > 0:

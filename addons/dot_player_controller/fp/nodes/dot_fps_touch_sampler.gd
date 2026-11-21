@@ -1,18 +1,18 @@
-class_name DotFpsTouchSampler
-extends DotFpsSampler
+class_name GSFpsTouchSampler
+extends GSFpsSampler
 
 ## Produces commands from touch, for phones and tablets.
 ## A sampler, not a control scheme: no textures or layout. A game draws its own buttons and calls [method hold] for them.
 ##
 ## [codeblock]
-## var sampler := DotFpsTouchSampler.new(tunables)
+## var sampler := GSFpsTouchSampler.new(tunables)
 ## controller.sampler = sampler
 ##
 ## # A jump button the game drew itself.
 ## $JumpButton.button_down.connect(
-##     func(): sampler.hold(DotFpsCommand.BUTTON_JUMP, true))
+##     func(): sampler.hold(GSFpsCommand.BUTTON_JUMP, true))
 ## $JumpButton.button_up.connect(
-##     func(): sampler.hold(DotFpsCommand.BUTTON_JUMP, false))
+##     func(): sampler.hold(GSFpsCommand.BUTTON_JUMP, false))
 ## [/codeblock]
 ##
 ## The screen is split: a finger on the movement side plants a stick where it landed, one on the look side drags the view.
@@ -44,7 +44,7 @@ var tap_slop: float = 18.0
 var tap_button: int = 0
 
 ## Asked with a screen position when a finger lands; true leaves that touch to the game's own on-screen button.
-## Assign [code]DotTouchButtons.contains_point[/code] so pressing Fire does not also drag the view.
+## Assign [code]GSTouchButtons.contains_point[/code] so pressing Fire does not also drag the view.
 var ignore_fn: Callable = Callable()
 
 ## Buttons held by the game's own on-screen controls. See [method hold].
@@ -68,7 +68,7 @@ var _look_elapsed: float = 0.0
 var _screen_width: float = 1152.0
 
 
-func _init(p_tunables: DotFpsTunables) -> void:
+func _init(p_tunables: GSFpsTunables) -> void:
 	super(p_tunables)
 
 
@@ -154,7 +154,7 @@ func _handle_drag(event: InputEventScreenDrag) -> void:
 	_mouse_delta += moved * (look_sensitivity / maxf(0.0001, tunables.mouse_sensitivity))
 
 
-func sample(delta: float = 0.0) -> DotFpsCommand:
+func sample(delta: float = 0.0) -> GSFpsCommand:
 	# Advances the tap timer on the sampling tick rather than in _process, so a
 	# sampler that is not being driven does not accumulate time.
 	if _look_finger != -1:
@@ -200,5 +200,5 @@ func describe() -> Dictionary:
 	out["move_finger"] = _move_finger
 	out["look_finger"] = _look_finger
 	out["stick"] = "(%.2f, %.2f)" % [_stick().x, _stick().y]
-	out["held"] = ", ".join(DotFpsCommand.button_names(_held))
+	out["held"] = ", ".join(GSFpsCommand.button_names(_held))
 	return out

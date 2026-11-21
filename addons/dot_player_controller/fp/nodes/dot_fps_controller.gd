@@ -1,5 +1,5 @@
 @tool
-class_name DotFpsController
+class_name GSFpsController
 extends "dot_fps_controller_render.gd"
 
 ## The player controller. Add it under a [Node3D] and it moves.
@@ -9,14 +9,14 @@ extends "dot_fps_controller_render.gd"
 ##  ├── Collision   (CollisionShape3D)   sized by the controller
 ##  ├── Head        (Node3D)
 ##  │    └── Camera (Camera3D)
-##  ├── FpsView     (DotFpsView)
-##  └── FpsControl  (DotFpsController)   body_ref -> parent
+##  ├── FpsView     (GSFpsView)
+##  └── FpsControl  (GSFpsController)   body_ref -> parent
 ## [/codeblock]
 ##
-## A component, not a base class: a host's player already extends what it needs. Everything it touches goes through a [DotNodeRef], so the layout above is a suggestion.
+## A component, not a base class: a host's player already extends what it needs. Everything it touches goes through a [GSNodeRef], so the layout above is a suggestion.
 ## [constant Drive.LOCAL] samples the keyboard and ticks itself; [constant Drive.EXTERNAL] is fed by a net behaviour, replay or bot through [method apply_command] and [method simulate_tick]. The simulation is identical.
-## GameSpice Net is not required; see [DotFpsNetSync] and docs/networking.md.
-## It extends [DotPlayerController] for an identity and handover by a [DotPlayerControllerSwitch]; all of it is inert without a [DotPlayer] ancestor.
+## GameSpice Net is not required; see [GSFpsNetSync] and docs/networking.md.
+## It extends [GSPlayerController] for an identity and handover by a [GSPlayerControllerSwitch]; all of it is inert without a [GSPlayer] ancestor.
 
 
 func _ready() -> void:
@@ -26,7 +26,7 @@ func _ready() -> void:
 	if controller_id == &"":
 		controller_id = &"fp"
 
-	# Binds this node to its DotPlayer, when there is one. Harmless and inert when
+	# Binds this node to its GSPlayer, when there is one. Harmless and inert when
 	# there is not, which is the case in three of the four games that use this addon.
 	super()
 
@@ -35,7 +35,7 @@ func _ready() -> void:
 	set_process(view != null)
 
 	if not res.ok:
-		DotLog.result(CHANNEL, "controller setup", res)
+		GSLog.result(CHANNEL, "controller setup", res)
 		set_physics_process(false)
 		return
 
@@ -44,7 +44,7 @@ func _ready() -> void:
 
 ## Builds everything. Called by [method Node._ready]; safe to call again after
 ## changing the tunables.
-func setup() -> DotResult:
+func setup() -> GSResult:
 	var usable := _resolve_tunables()
 	if not usable.ok:
 		return usable
@@ -58,10 +58,10 @@ func setup() -> DotResult:
 		return wired
 
 	body = _make_body()
-	motor = DotFpsMotor.new(tunables, body)
+	motor = GSFpsMotor.new(tunables, body)
 	motor.set_tick_rate(tick_rate)
 	motor.static_world = static_world
-	DotFpsNetSync.set_tick_rate(tick_rate)
+	GSFpsNetSync.set_tick_rate(tick_rate)
 
 	if surfaces != null:
 		motor.surfaces = surfaces
@@ -72,12 +72,12 @@ func setup() -> DotResult:
 	# A host's own modes, after a subclass's, in list order: the same order on every machine
 	# and on every rebuild (a style rebuilds the motor, which would otherwise drop them).
 	for extra: Variant in extra_modes:
-		if extra is DotFpsMoveMode:
+		if extra is GSFpsMoveMode:
 			var _id := motor.register_mode(extra)
 
 	# After the game's own, so turning this on does not renumber a game's modifiers.
 	if admin_abilities:
-		# DotFpsAdminModifiers, loaded so it and this file do not keep each other's parsers alive.
+		# GSFpsAdminModifiers, loaded so it and this file do not keep each other's parsers alive.
 		var _count: int = (load("uid://debq1g843c2uy") as GDScript).register(motor)
 
 	_setup_sampler()
@@ -91,15 +91,15 @@ func setup() -> DotResult:
 
 	if register_service:
 		_registered_name = (
-			DotRegistry.scoped_name(SERVICE, service_scope)
+			GSRegistry.scoped_name(SERVICE, service_scope)
 			if service_scope != &""
 			else SERVICE
 		)
-		DotRegistry.register(_registered_name, self)
+		GSRegistry.register(_registered_name, self)
 
 	_started = true
 
-	DotLog.info(
+	GSLog.info(
 		CHANNEL,
 		"controller ready",
 		{
@@ -109,13 +109,13 @@ func setup() -> DotResult:
 		}
 	)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## The tunables this setup runs with: the style applied to the base, then loaded or validated.
-func _resolve_tunables() -> DotResult:
+func _resolve_tunables() -> GSResult:
 	if tunables == null:
-		tunables = DotFpsTunables.new()
+		tunables = GSFpsTunables.new()
 
 	if _base_tunables == null:
 		_base_tunables = tunables
@@ -136,28 +136,28 @@ func _resolve_tunables() -> DotResult:
 		if not valid.ok:
 			return valid.wrap("Movement configuration is not usable.")
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## A local controller samples its own input; warns when the actions it reads are not bound.
 func _setup_sampler() -> void:
 	if drive == Drive.LOCAL:
-		if use_touch_sampler and DotPlatform.has_touch():
-			var touch := DotFpsTouchSampler.new(tunables)
+		if use_touch_sampler and GSPlatform.has_touch():
+			var touch := GSFpsTouchSampler.new(tunables)
 			touch.set_screen_width(get_viewport().get_visible_rect().size.x if is_inside_tree() else 1152.0)
 			sampler = touch
 		else:
-			sampler = DotFpsSampler.new(tunables)
+			sampler = GSFpsSampler.new(tunables)
 
 		if register_default_actions:
-			DotFpsSampler.register_default_actions(sampler)
+			GSFpsSampler.register_default_actions(sampler)
 
 		var missing := sampler.missing_actions()
 		if not missing.is_empty():
 			# Not an error — a game may drive this without a keyboard at all — but a
 			# missing action in Godot is silence, and the symptom is a controller
 			# that runs flawlessly and does not move.
-			DotLog.warn(
+			GSLog.warn(
 				CHANNEL,
 				"input actions are not bound; the player will not move",
 				{"actions": ", ".join(missing)}
@@ -166,10 +166,10 @@ func _setup_sampler() -> void:
 		sampler.look_at_angles(state.yaw, state.pitch)
 
 
-func _resolve_nodes() -> DotResult:
+func _resolve_nodes() -> GSResult:
 	if body_ref == null:
-		body_ref = DotNodeRef.new()
-		body_ref.mode = DotNodeRef.Mode.PARENT
+		body_ref = GSNodeRef.new()
+		body_ref.mode = GSNodeRef.Mode.PARENT
 
 	var resolved := body_ref.resolve(self)
 	if not resolved.ok:
@@ -178,8 +178,8 @@ func _resolve_nodes() -> DotResult:
 	_body_node = resolved.value as Node3D
 
 	if _body_node == null:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"The player body must be a Node3D.",
 			body_ref.describe()
 		)
@@ -189,7 +189,7 @@ func _resolve_nodes() -> DotResult:
 		collider_ref = _descendant_ref(&"CollisionShape3D")
 
 	if view_ref == null:
-		view_ref = _descendant_ref(&"DotFpsView")
+		view_ref = _descendant_ref(&"GSFpsView")
 
 	if collider_ref != null:
 		# Resolved against the body, not against this node: the collider is a sibling
@@ -206,7 +206,7 @@ func _resolve_nodes() -> DotResult:
 			_capsule.height = tunables.stand_height
 			_collider.shape = _capsule
 		elif collider != null:
-			DotLog.warn(
+			GSLog.warn(
 				CHANNEL,
 				"collider_ref resolved a %s, not a CollisionShape3D; "
 				% collider.get_class()
@@ -215,7 +215,7 @@ func _resolve_nodes() -> DotResult:
 			)
 
 	if view_ref != null:
-		view = view_ref.resolve_or_null(_body_node, CHANNEL) as DotFpsView
+		view = view_ref.resolve_or_null(_body_node, CHANNEL) as GSFpsView
 
 	if view != null:
 		# The landing kick is the one view effect that needs an event rather than a
@@ -224,16 +224,16 @@ func _resolve_nodes() -> DotResult:
 		if not landed.is_connected(view.note_landing):
 			landed.connect(view.note_landing)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## A ref that finds the nearest descendant of a type, or nothing.
-## [constant DotNodeRef.OnMissing.NULL], not FAIL: "no view" is a headless server, not an error.
-static func _descendant_ref(type: StringName) -> DotNodeRef:
-	var ref := DotNodeRef.new()
-	ref.mode = DotNodeRef.Mode.DESCENDANT_OF_TYPE
+## [constant GSNodeRef.OnMissing.NULL], not FAIL: "no view" is a headless server, not an error.
+static func _descendant_ref(type: StringName) -> GSNodeRef:
+	var ref := GSNodeRef.new()
+	ref.mode = GSNodeRef.Mode.DESCENDANT_OF_TYPE
 	ref.type_name = type
-	ref.on_missing = DotNodeRef.OnMissing.NULL
+	ref.on_missing = GSNodeRef.OnMissing.NULL
 	return ref
 
 
@@ -252,7 +252,7 @@ func _register_extensions() -> void:
 ## Movement modes a host adds without subclassing (water, a ladder), registered on every
 ## [method setup] straight after [method _register_extensions], in this order. Every
 ## machine must list the same modes in the same order: the mode id is on the wire.
-var extra_modes: Array[DotFpsMoveMode] = []
+var extra_modes: Array[GSFpsMoveMode] = []
 
 
 ## Maps a collider to a surface id, for the motor.
@@ -265,7 +265,7 @@ func _resolve_surface_id(collider_id: int) -> StringName:
 	var node := instance_from_id(collider_id)
 
 	if node is Node:
-		resolved = DotFpsSurfaceSet.resolve_from_node(
+		resolved = GSFpsSurfaceSet.resolve_from_node(
 			node as Node, surfaces.metadata_key, surfaces.group_prefix
 		)
 
@@ -280,7 +280,7 @@ func _resolve_surface_id(collider_id: int) -> StringName:
 
 
 ## Called before the motor runs, on the tick about to be simulated.
-## Override for anything inside the simulation. It runs during replays too, so it is bound by the determinism rule of [method DotFpsMotor.simulate]: no wall clock, no unseeded random.
+## Override for anything inside the simulation. It runs during replays too, so it is bound by the determinism rule of [method GSFpsMotor.simulate]: no wall clock, no unseeded random.
 func _on_pre_simulate(_tick: int, _delta: float) -> void:
 	pass
 
@@ -308,7 +308,7 @@ func end_replay() -> void:
 
 ## Whether a command should be simulated at all. Override to veto input.
 ## Returning false substitutes a neutral command, because skipping a tick desynchronises the tick counter.
-func _accept_command(_command: DotFpsCommand) -> bool:
+func _accept_command(_command: GSFpsCommand) -> bool:
 	return true
 
 
@@ -329,7 +329,7 @@ func has_modifier(id: StringName) -> bool:
 ## Puts this player on a movement style, rebuilding everything that depends on it. Pass null to go back to the unstyled tunables.
 ## Rebuilds the motor: it holds the tunables, so assigning [member style] alone changes nothing.
 ## Not safe mid-run in a timed game: it changes what every later tick produces, so the timer treats it as stopping the run.
-func set_style(new_style: DotFpsStyle) -> DotResult:
+func set_style(new_style: GSFpsStyle) -> GSResult:
 	if _base_tunables == null:
 		_base_tunables = tunables
 
@@ -338,7 +338,7 @@ func set_style(new_style: DotFpsStyle) -> DotResult:
 	if not _started:
 		# setup() has not run yet, so it will pick the style up itself and rebuilding
 		# now would build against unresolved node references.
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	var rebuilt := setup()
 
@@ -348,7 +348,7 @@ func set_style(new_style: DotFpsStyle) -> DotResult:
 	stats.reset()
 	_stats_previous = null
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## The collision layers this player's movement sweeps, set so it survives a style.
@@ -364,7 +364,7 @@ func set_collision_mask(mask: int) -> void:
 
 
 ## Layers this player may walk out of when it starts inside them (other players' hulls; see
-## [member DotFpsBody.pass_out_mask]). Kept across a rebuilt body.
+## [member GSFpsBody.pass_out_mask]). Kept across a rebuilt body.
 func set_pass_out_layers(mask: int) -> void:
 	_pass_out_mask = mask
 	if body != null:
@@ -372,7 +372,7 @@ func set_pass_out_layers(mask: int) -> void:
 
 
 ## Bodies this player passes through although their hulls are solid: a pair the game's rules let
-## through (`DotPlayerBodyRules.apply_exceptions`). Kept across a rebuilt body, and excluded from
+## through (`GSPlayerBodyRules.apply_exceptions`). Kept across a rebuilt body, and excluded from
 ## every query the body makes, so a rest or ground question ignores them as the sweep does.
 func set_extra_excludes(rids: Array[RID]) -> void:
 	_extra_exclude = rids.duplicate()
@@ -394,18 +394,18 @@ func set_mode(mode: int) -> void:
 		motor.set_mode(state, mode)
 
 
-## A [DotFpsSimulator] of this player's movement: a second motor with copies of its tunables, body, modifiers and modes, which a bot runs ahead on copies of [member state].
+## A [GSFpsSimulator] of this player's movement: a second motor with copies of its tunables, body, modifiers and modes, which a bot runs ahead on copies of [member state].
 ## [param p_body] replaces the copy of [member body]. Null before [method setup] or when the body cannot be copied.
 ## Build a new one after a style or map changes the tunables or body; it does not follow them.
-func simulator(p_body: DotFpsBody = null) -> DotFpsSimulator:
+func simulator(p_body: GSFpsBody = null) -> GSFpsSimulator:
 	if motor == null:
 		return null
-	return DotFpsSimulator.new().setup(tunables, motor, body, tick_rate, p_body)
+	return GSFpsSimulator.new().setup(tunables, motor, body, tick_rate, p_body)
 
 
 ## Builds the collision adapter. Override to simulate against your own geometry.
-func _make_body() -> DotFpsBody:
-	var physics := DotFpsPhysicsBody.new()
+func _make_body() -> GSFpsBody:
+	var physics := GSFpsPhysicsBody.new()
 	physics.collision_mask = tunables.collision_mask
 	physics.pass_out_mask = _pass_out_mask
 
@@ -415,22 +415,22 @@ func _make_body() -> DotFpsBody:
 
 	var bound := physics.bind(_body_node)
 	if not bound.ok:
-		DotLog.result(CHANNEL, "physics body", bound)
+		GSLog.result(CHANNEL, "physics body", bound)
 
 	return physics
 
 
 func _exit_tree() -> void:
 	if _registered_name != &"":
-		DotRegistry.unregister_instance(_registered_name, self)
+		GSRegistry.unregister_instance(_registered_name, self)
 		_registered_name = &""
 
 
 
 func _input(event: InputEvent) -> void:
 	if drive == Drive.LOCAL and sampler != null:
-		if sampler is DotFpsTouchSampler:
-			(sampler as DotFpsTouchSampler).set_screen_width(get_viewport().get_visible_rect().size.x)
+		if sampler is GSFpsTouchSampler:
+			(sampler as GSFpsTouchSampler).set_screen_width(get_viewport().get_visible_rect().size.x)
 		sampler.handle_event(event)
 
 
@@ -454,7 +454,7 @@ func _physics_process(delta: float) -> void:
 		simulate_tick(_tick + 1, step)
 
 	if _accumulator >= step:
-		DotLog.debug(
+		GSLog.debug(
 			CHANNEL,
 			"tick budget exhausted; dropping simulation time",
 			{"dropped": "%.3f s" % _accumulator}
@@ -469,7 +469,7 @@ func _process(delta: float) -> void:
 	if view != null:
 		var drawn := render_state()
 		# The view as of this frame's mouse, not the last tick's: a frame that ran no tick
-		# would otherwise not turn. See [method DotFpsSampler.look_now].
+		# would otherwise not turn. See [method GSFpsSampler.look_now].
 		if drive == Drive.LOCAL and sampler != null:
 			var look := sampler.look_now()
 			drawn.yaw = look.x
@@ -480,7 +480,7 @@ func _process(delta: float) -> void:
 
 ## Sets the command the next [method simulate_tick] will use.
 ## Sanitised here so a driver cannot forget: on a server every field arrived from a client.
-func apply_command(command: DotFpsCommand) -> void:
+func apply_command(command: GSFpsCommand) -> void:
 	if command == null:
 		return
 
@@ -500,18 +500,18 @@ func simulate_tick(tick: int, delta: float) -> void:
 	if not begin_tick(tick, delta):
 		return
 	motor.simulate(state, current_command, delta)
-	if DotFpsMotor.profile or phase_timers:
+	if GSFpsMotor.profile or phase_timers:
 		_lap_ctrl(2, 0)
 	end_tick(tick, delta)
 
 
-## [method simulate_tick] up to the motor, for a game that runs the motor itself ([DotFpsMotorBatch]); false when the tick does not run.
+## [method simulate_tick] up to the motor, for a game that runs the motor itself ([GSFpsMotorBatch]); false when the tick does not run.
 ## After the motor's tick the game calls [method end_tick].
 func begin_tick(tick: int, delta: float) -> bool:
 	if not _started or drive == Drive.REMOTE:
 		return false
 
-	var prof_t := Time.get_ticks_usec() if (DotFpsMotor.profile or phase_timers) else 0
+	var prof_t := Time.get_ticks_usec() if (GSFpsMotor.profile or phase_timers) else 0
 
 	# Re-applied every tick so it cannot be undone by anything that touches the
 	# tunables between ticks.
@@ -525,7 +525,7 @@ func begin_tick(tick: int, delta: float) -> bool:
 
 	if not _accept_command(current_command):
 		# Substituted, not skipped: skipping leaves the tick counter behind the server's.
-		current_command = DotFpsCommand.new()
+		current_command = GSFpsCommand.new()
 		current_command.yaw = state.yaw
 		current_command.pitch = state.pitch
 
@@ -562,7 +562,7 @@ func begin_tick(tick: int, delta: float) -> bool:
 	return true
 
 
-var _before_mode: DotFpsState.Mode = DotFpsState.Mode.GROUND
+var _before_mode: GSFpsState.Mode = GSFpsState.Mode.GROUND
 var _before_y: float = 0.0
 var _before_fall: float = 0.0
 var _before_crouched: bool = false
@@ -576,7 +576,7 @@ var _before_wall_jumps: int = 0
 
 ## [method simulate_tick] after the motor: publishes the tick and emits what changed.
 func end_tick(tick: int, delta: float) -> void:
-	var prof_t := Time.get_ticks_usec() if (DotFpsMotor.profile or phase_timers) else 0
+	var prof_t := Time.get_ticks_usec() if (GSFpsMotor.profile or phase_timers) else 0
 	if prof_t != 0:
 		_lap_ctrl_at = prof_t
 
@@ -611,7 +611,7 @@ func end_tick(tick: int, delta: float) -> void:
 
 	# Not during a replay: the statistics have seen that tick, and a lossy client would double-count.
 	if not _replaying:
-		state.airborne_time = (state.airborne_time + delta) if state.mode == DotFpsState.Mode.AIR else 0.0
+		state.airborne_time = (state.airborne_time + delta) if state.mode == GSFpsState.Mode.AIR else 0.0
 	if not _replaying and observe_stats:
 		stats.observe(state, current_command, _stats_previous, delta)
 		if motor.perf_caches:
@@ -630,9 +630,9 @@ func end_tick(tick: int, delta: float) -> void:
 		_lap_ctrl(6, prof_t)
 
 
-## Per-phase microseconds of [method simulate_tick] outside the motor, filled only while [member DotFpsMotor.profile] is on: pre (copy, gates), consume+mask, motor, publish, report, signals+stats, post.
+## Per-phase microseconds of [method simulate_tick] outside the motor, filled only while [member GSFpsMotor.profile] is on: pre (copy, gates), consume+mask, motor, publish, report, signals+stats, post.
 static var phase_us := PackedInt64Array([0, 0, 0, 0, 0, 0, 0, 0])
-## Fills [member phase_us] without [member DotFpsMotor.profile], which also turns the native motor off: the phases of the path players really run.
+## Fills [member phase_us] without [member GSFpsMotor.profile], which also turns the native motor off: the phases of the path players really run.
 static var phase_timers := false
 var _lap_ctrl_at: int = 0
 
@@ -687,14 +687,14 @@ static func _contains_modifier(entries: Array[Vector2i], index: int) -> bool:
 
 
 ## Closes off anything this instance is not permitted to do.
-## Two gates: [member DotFpsTunables.can_noclip] is shared config the client holds and sets the command bit for; [member allow_noclip] is one controller's property a server grants per player.
+## Two gates: [member GSFpsTunables.can_noclip] is shared config the client holds and sets the command bit for; [member allow_noclip] is one controller's property a server grants per player.
 func _gate_abilities() -> void:
 	if tunables != null and not allow_noclip and tunables.can_noclip:
 		tunables.can_noclip = false
 
 
-func _repeat_command() -> DotFpsCommand:
-	var repeated := DotFpsCommand.new()
+func _repeat_command() -> GSFpsCommand:
+	var repeated := GSFpsCommand.new()
 	repeated.buttons = state.previous_buttons
 	repeated.yaw = state.yaw
 	repeated.pitch = state.pitch
@@ -706,11 +706,11 @@ func _repeat_command() -> DotFpsCommand:
 
 ## Writes the simulated state out to the scene, and reports what changed.
 func _publish(
-	before_mode: DotFpsState.Mode,
+	before_mode: GSFpsState.Mode,
 	before_y: float,
 	before_fall: float
 ) -> void:
-	var pt := Time.get_ticks_usec() if (DotFpsMotor.profile or phase_timers) else 0
+	var pt := Time.get_ticks_usec() if (GSFpsMotor.profile or phase_timers) else 0
 	# Written only when the node is elsewhere: a write, even of the same place, walks the whole body subtree (hitboxes, figure)
 	# marking transforms dirty, several microseconds a player a tick, and a player standing still did that every tick.
 	if _body_node != null and _body_node.global_position != state.position:
@@ -724,20 +724,20 @@ func _publish(
 		mode_changed.emit(before_mode, state.mode)
 
 		if (
-			state.mode == DotFpsState.Mode.GROUND
-			and before_mode == DotFpsState.Mode.AIR
+			state.mode == GSFpsState.Mode.GROUND
+			and before_mode == GSFpsState.Mode.AIR
 		):
 			landed.emit(absf(before_fall))
 		elif (
-			state.mode == DotFpsState.Mode.AIR
-			and before_mode == DotFpsState.Mode.GROUND
+			state.mode == GSFpsState.Mode.AIR
+			and before_mode == GSFpsState.Mode.GROUND
 			and state.velocity.y > 0.0
 		):
 			jumped.emit()
 
 	# A grounded tick that gained height is a stair step, not a jump — the view
 	# absorbs it so the camera does not jolt once per tread.
-	if state.mode == DotFpsState.Mode.GROUND:
+	if state.mode == GSFpsState.Mode.GROUND:
 		var gained := state.position.y - before_y
 		if gained > 0.001 and gained <= tunables.step_height + 0.01:
 			if view != null:
@@ -745,14 +745,14 @@ func _publish(
 			stepped_up.emit(gained)
 
 
-func _apply_collider(from: DotFpsState) -> void:
+func _apply_collider(from: GSFpsState) -> void:
 	if _capsule == null:
 		return
 
 	var height := tunables.height_at(from.crouch_fraction)
 	var shape_height := maxf(height, tunables.radius * 2.0)
 
-	# Written only when it differs from the shape: assigning a size, even the same one, makes the shape emit `changed` and re-send itself to the physics server (the physics body does the same in `DotFpsPhysicsBody._configure`). Compared against the shape itself, so a size changed from outside is still put back. The shape and the node hold 32-bit floats, so a value such as 1.8 never reads back equal to the one written: a value that is the one last written and reads back as it read back then is already there (without this every player re-sent its shape and moved its collider every tick).
+	# Written only when it differs from the shape: assigning a size, even the same one, makes the shape emit `changed` and re-send itself to the physics server (the physics body does the same in `GSFpsPhysicsBody._configure`). Compared against the shape itself, so a size changed from outside is still put back. The shape and the node hold 32-bit floats, so a value such as 1.8 never reads back equal to the one written: a value that is the one last written and reads back as it read back then is already there (without this every player re-sent its shape and moved its collider every tick).
 	var shape_now := _capsule.height
 	if shape_now != shape_height and not (shape_height == _sent_height and shape_now == _held_height):
 		_capsule.height = shape_height
@@ -795,7 +795,7 @@ func teleport(
 ) -> void:
 	state.position = position
 	state.velocity = Vector3.ZERO
-	state.mode = DotFpsState.Mode.AIR
+	state.mode = GSFpsState.Mode.AIR
 	state.time_since_grounded = 0.0
 	state.airborne_time = 0.0
 
@@ -822,7 +822,7 @@ func teleport(
 ## Facts a statistics rule can read about this player right now: airborne, airborne_seconds, wall_running, sliding and speed. GameSpice Combat reads it duck-typed from a victim's controller; only a simulating (server) controller has true values.
 func get_stats_facts() -> Dictionary:
 	return {
-		"airborne": state.mode == DotFpsState.Mode.AIR,
+		"airborne": state.mode == GSFpsState.Mode.AIR,
 		"airborne_seconds": state.airborne_time,
 		"wall_running": state.is_wall_running(),
 		"sliding": state.is_sliding(),
@@ -850,7 +850,7 @@ func describe_lines() -> PackedStringArray:
 		Drive.keys()[drive], _tick, tick_rate
 	])
 	out.append("movement     %s" % tunables.describe_summary())
-	out.append("mode         %s" % DotFpsState.mode_name(state.mode, motor))
+	out.append("mode         %s" % GSFpsState.mode_name(state.mode, motor))
 
 	if state.surface != &"":
 		out.append("surface      %s" % state.surface)
@@ -869,24 +869,24 @@ func describe_lines() -> PackedStringArray:
 	return out
 
 
-# The DotPlayerController contract: five small methods and one translation, unused unless a DotPlayerControllerSwitch hands this controller a player.
+# The GSPlayerController contract: five small methods and one translation, unused unless a GSPlayerControllerSwitch hands this controller a player.
 
 
 ## Translates a generic intent into this controller's own command, and ticks once.
-## [DotPlayerIntent] is what every controller agrees on (move, look, buttons); the extras of this movement model keep their defaults.
+## [GSPlayerIntent] is what every controller agrees on (move, look, buttons); the extras of this movement model keep their defaults.
 ## A game that only uses this controller should keep calling [method apply_command] and [method simulate_tick].
-func _apply_intent(intent: DotPlayerIntent, delta: float) -> void:
+func _apply_intent(intent: GSPlayerIntent, delta: float) -> void:
 	if intent == null:
 		return
 
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.move = intent.move
 	command.yaw = intent.view_yaw
 	command.pitch = intent.view_pitch
-	command.set_button(DotFpsCommand.BUTTON_JUMP, intent.holding(DotPlayerIntent.Btn.JUMP))
-	command.set_button(DotFpsCommand.BUTTON_CROUCH, intent.holding(DotPlayerIntent.Btn.CROUCH))
-	command.set_button(DotFpsCommand.BUTTON_SPRINT, intent.holding(DotPlayerIntent.Btn.SPRINT))
-	command.set_button(DotFpsCommand.BUTTON_WALK, intent.holding(DotPlayerIntent.Btn.WALK))
+	command.set_button(GSFpsCommand.BUTTON_JUMP, intent.holding(GSPlayerIntent.Btn.JUMP))
+	command.set_button(GSFpsCommand.BUTTON_CROUCH, intent.holding(GSPlayerIntent.Btn.CROUCH))
+	command.set_button(GSFpsCommand.BUTTON_SPRINT, intent.holding(GSPlayerIntent.Btn.SPRINT))
+	command.set_button(GSFpsCommand.BUTTON_WALK, intent.holding(GSPlayerIntent.Btn.WALK))
 
 	apply_command(command)
 	simulate_tick(_tick, delta)
@@ -944,7 +944,7 @@ func motion() -> Dictionary:
 	return {
 		"speed": Vector2(state.velocity.x, state.velocity.z).length(),
 		"vertical": state.velocity.y,
-		"on_floor": state.mode == DotFpsState.Mode.GROUND,
+		"on_floor": state.mode == GSFpsState.Mode.GROUND,
 		# `crouch_fraction`, not the held flag: a player who released crouch under a low
 		# ceiling is no longer holding it and is still crouched, and an animation driver
 		# reading the flag would stand them up inside the ceiling.

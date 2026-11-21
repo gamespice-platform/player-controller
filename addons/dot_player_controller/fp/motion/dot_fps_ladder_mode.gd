@@ -1,5 +1,5 @@
-class_name DotFpsLadderMode
-extends DotFpsMoveMode
+class_name GSFpsLadderMode
+extends GSFpsMoveMode
 
 ## Climbing a ladder: a player whose hull touches a ladder box and pushes into it, or falls past it, is on it.
 ## Ladders are data, not areas, so a client replaying prediction gets the server's answer; the game calls [method update]
@@ -62,10 +62,10 @@ func touching(feet: Vector3, radius: float, height: float) -> AABB:
 ## Once a tick, after the move: a player touching a ladder who is off the ground, or
 ## walking into it, is put on it. Read from the state rather than the command, so it
 ## needs nothing a replayed tick does not have. Noclip, and somebody already on, are left.
-func update(motor: DotFpsMotor, state: DotFpsState) -> void:
+func update(motor: GSFpsMotor, state: GSFpsState) -> void:
 	var intent := wish
 	wish = Vector3.ZERO    # spent: a tick with no command must not reuse the last one
-	if mode_id < 0 or volumes.is_empty() or state.mode == mode_id or state.mode == DotFpsState.Mode.NOCLIP:
+	if mode_id < 0 or volumes.is_empty() or state.mode == mode_id or state.mode == GSFpsState.Mode.NOCLIP:
 		return
 	var t := motor.tunables
 	var box := touching(state.position, t.radius, t.height_at(state.crouch_fraction))
@@ -85,25 +85,25 @@ func update(motor: DotFpsMotor, state: DotFpsState) -> void:
 		state.velocity = Vector3.ZERO
 
 
-func _simulate(state: DotFpsState, command: DotFpsCommand, delta: float, motor: DotFpsMotor) -> void:
+func _simulate(state: GSFpsState, command: GSFpsCommand, delta: float, motor: GSFpsMotor) -> void:
 	var t := motor.tunables
 	var box := touching(state.position, t.radius, t.height_at(state.crouch_fraction))
 	if box.size == Vector3.ZERO:
-		motor.set_mode(state, DotFpsState.Mode.AIR)
+		motor.set_mode(state, GSFpsState.Mode.AIR)
 		motor.move_and_slide(state, delta)
 		return
 
 	var away := _away(box, state.position)
-	if command.is_pressed(DotFpsCommand.BUTTON_JUMP):
+	if command.is_pressed(GSFpsCommand.BUTTON_JUMP):
 		state.velocity = away * jump_off_speed
 		_jumped_off_tick = state.tick
-		motor.set_mode(state, DotFpsState.Mode.AIR)
+		motor.set_mode(state, GSFpsState.Mode.AIR)
 		motor.move_and_slide(state, delta)
 		return
 
 	# The wish along the view, split into what goes into the ladder's face (turned into motion up it)
 	# and the rest, which is kept: forward climbs, looking up climbs faster, strafe slides across.
-	var basis := DotFpsMotor._view_basis(state.yaw, state.pitch)
+	var basis := GSFpsMotor._view_basis(state.yaw, state.pitch)
 	var wish := (basis.forward * clampf(command.move.y, -1.0, 1.0)
 		+ basis.right * clampf(command.move.x, -1.0, 1.0)) * climb_speed
 	var into := wish.dot(away)

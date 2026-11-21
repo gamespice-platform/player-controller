@@ -1,8 +1,8 @@
-class_name DotFpsViewMotion
+class_name GSFpsViewMotion
 extends RefCounted
 
 ## The camera's motion cues as numbers: landing dip, strafe and slide roll, wall-run lean, speed FOV. No nodes.
-## Split from [DotFpsView] so a game that writes its own camera uses this arithmetic, not a drifting copy.
+## Split from [GSFpsView] so a game that writes its own camera uses this arithmetic, not a drifting copy.
 ## View only, never read by the simulation, so it may differ per player. Cues ease in and out, frame-rate independent.
 
 
@@ -107,11 +107,11 @@ var _fov: float = 0.0
 
 ## Moves every cue on by [param delta] seconds toward what [param state] asks for. Once a
 ## rendered frame, with the state as drawn (interpolated), never once a tick.
-func advance(state: DotFpsState, delta: float) -> void:
+func advance(state: GSFpsState, delta: float) -> void:
 	if state == null or not (delta > 0.0):
 		return
 
-	var right := DotFpsMotor.forward_for(state.yaw).cross(Vector3.UP)
+	var right := GSFpsMotor.forward_for(state.yaw).cross(Vector3.UP)
 
 	# Strafe and slide roll: two stages, so it starts and stops gently.
 	var target := 0.0
@@ -188,7 +188,7 @@ func _advance_dip(delta: float) -> void:
 		_dip_velocity = 0.0
 
 
-## A landing at [param impact] m/s downward. Connect to [signal DotFpsController.landed].
+## A landing at [param impact] m/s downward. Connect to [signal GSFpsController.landed].
 ## Kicks the eye's velocity so the dip peaks at [member landing_dip] times the impact's weight.
 func note_landing(impact: float) -> void:
 	if landing_dip <= 0.0 or landing_recovery <= 0.0 or landing_strength <= 0.0:

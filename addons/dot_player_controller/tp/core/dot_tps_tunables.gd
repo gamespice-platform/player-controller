@@ -1,6 +1,6 @@
 @tool
-class_name DotTpsTunables
-extends DotConfig
+class_name GSTpsTunables
+extends GSConfig
 
 ## Every number a third-person controller has, layered.
 
@@ -94,22 +94,22 @@ func cli_prefix() -> String:
 	return "--tps-"
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if run_speed < walk_speed:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Running (%.1f) is slower than walking (%.1f)." % [run_speed, walk_speed]
 		)
 
 	if pitch_min >= pitch_max:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"The camera's pitch range is inverted (%.1f to %.1f)." % [pitch_min, pitch_max]
 		)
 
 	if aim_distance > camera_distance:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Aiming pulls the camera to %.1f m and it sits at %.1f m."
 			% [aim_distance, camera_distance],
 			"Aiming would push the camera away from the character, which is the "
@@ -117,9 +117,9 @@ func validate() -> DotResult:
 		)
 
 	if deceleration <= 0.0 or acceleration <= 0.0:
-		return DotResult.fail(DotError.CODE_INVALID, "Acceleration must be positive.")
+		return GSResult.fail(GSError.CODE_INVALID, "Acceleration must be positive.")
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## Launch speed for the configured jump height under the configured gravity.
@@ -155,7 +155,7 @@ static func smoothing(rate: float, delta: float) -> float:
 # Presets
 
 ## Over-the-shoulder, camera-locked, tight. A third-person shooter.
-static func shooter() -> DotTpsTunables:
+static func shooter() -> GSTpsTunables:
 	# Not this class's own name. A script that names itself in an expression, loaded after
 	# its base, cuts Godot 4.7.2's exit teardown short and leaks every script loaded before
 	# it. See docs/gdscript-hazards.md, "A script that names itself".
@@ -173,7 +173,7 @@ static func shooter() -> DotTpsTunables:
 
 
 ## Behind and above, turning to face movement. An adventure game.
-static func adventure() -> DotTpsTunables:
+static func adventure() -> GSTpsTunables:
 	var t := new()
 	t.turn_mode = 0
 	t.walk_speed = 3.0
@@ -187,7 +187,7 @@ static func adventure() -> DotTpsTunables:
 
 
 ## Fast, forgiving, and jumping a lot. A platformer.
-static func platformer() -> DotTpsTunables:
+static func platformer() -> GSTpsTunables:
 	var t := new()
 	t.turn_mode = 0
 	t.walk_speed = 5.0
@@ -211,7 +211,7 @@ static func presets() -> Dictionary:
 	}
 
 
-static func preset(p_id: StringName) -> DotTpsTunables:
+static func preset(p_id: StringName) -> GSTpsTunables:
 	var table := presets()
 
 	if not table.has(p_id):

@@ -1,4 +1,4 @@
-class_name DotPlayerBodyRules
+class_name GSPlayerBodyRules
 extends RefCounted
 
 ## Whether players (people and bots alike) are solid to each other: the `mp_solidplayers` cvar, 1 by default.
@@ -8,7 +8,7 @@ extends RefCounted
 signal changed
 
 const CVAR_SOLID := "mp_solidplayers"
-## `mp_solidplayers_unlag`: 1 lets [DotPlayerHullRewind] move the other players' hulls back to where the mover's screen
+## `mp_solidplayers_unlag`: 1 lets [GSPlayerHullRewind] move the other players' hulls back to where the mover's screen
 ## drew them while it steps; 0 (default) collides with the present. Read on every machine, replicated.
 const CVAR_UNLAG := "mp_solidplayers_unlag"
 
@@ -21,11 +21,11 @@ var solid: bool = true:
 
 
 ## Whether two players stop at each other once players are solid: `(a, b) -> bool` over the keys
-## [method apply_exceptions] is given; unset, every pair stops. GameSpice Team's `DotTeamBlockRules.blocks`
+## [method apply_exceptions] is given; unset, every pair stops. GameSpice Team's `GSTeamBlockRules.blocks`
 ## is the family's answer. `mp_solidplayers` 0 overrules it: nobody blocks.
 var pair_fn: Callable = Callable()
 
-## Whether a mover's step meets the others' hulls where its view had them ([DotPlayerHullRewind]); only matters
+## Whether a mover's step meets the others' hulls where its view had them ([GSPlayerHullRewind]); only matters
 ## while [member solid]. Off by default: it costs two transform writes per other hull per mover per tick.
 var unlag: bool = false:
 	set(value):
@@ -114,7 +114,7 @@ func cvar_specs() -> Array[Dictionary]:
 	]
 
 
-## Registers `mp_solidplayers` (see [method DotPlayerViewRules.bind_cvars] for the shape of
+## Registers `mp_solidplayers` (see [method GSPlayerViewRules.bind_cvars] for the shape of
 ## [param add]). Pass GameSpice Server's FLAG_REPLICATED: a client predicts its own player under it.
 func bind_cvars(add: Callable, flags: int = 0) -> Array:
 	var made: Array = []

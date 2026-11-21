@@ -62,7 +62,7 @@ jobs:
             - name: Require the native motor when dot-sim has it
               run: |
                   cd project/.deps/dot-sim
-                  if grep -q DotSimFpsBody addons/dot_sim/dot_sim.gd; then echo "DOT_SIM_REQUIRE_NATIVE=1" >> "$GITHUB_ENV"; fi
+                  if grep -q GSSimFpsBody addons/dot_sim/dot_sim.gd; then echo "DOT_SIM_REQUIRE_NATIVE=1" >> "$GITHUB_ENV"; fi
                   git log --oneline -1
             - uses: dtolnay/rust-toolchain@stable
             - uses: Swatinem/rust-cache@v2

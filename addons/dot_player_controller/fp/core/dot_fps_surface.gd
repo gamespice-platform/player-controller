@@ -1,20 +1,20 @@
 @tool
-class_name DotFpsSurface
+class_name GSFpsSurface
 extends Resource
 
 ## How one kind of ground behaves under the player. Ice, mud, metal, a conveyor.
-## Multipliers on [DotFpsTunables], so retuning the base feel moves every surface. Simulation, not decoration:
-## resolved from something both machines see ([method DotFpsSurfaceSet.resolve_from_node]), never an instance id.
+## Multipliers on [GSFpsTunables], so retuning the base feel moves every surface. Simulation, not decoration:
+## resolved from something both machines see ([method GSFpsSurfaceSet.resolve_from_node]), never an instance id.
 
 ## Name this surface is looked up by. Must match on every machine.
 @export var id: StringName = &"default"
 
 @export_group("Movement")
 
-## Scales [member DotFpsTunables.friction]. Low is ice; high is glue.
+## Scales [member GSFpsTunables.friction]. Low is ice; high is glue.
 @export_range(0.0, 5.0, 0.01) var friction_scale: float = 1.0
 
-## Scales [member DotFpsTunables.accelerate]. Low means slow to get going.
+## Scales [member GSFpsTunables.accelerate]. Low means slow to get going.
 @export_range(0.0, 5.0, 0.01) var accelerate_scale: float = 1.0
 
 ## Scales the ground speed cap.
@@ -34,7 +34,7 @@ extends Resource
 @export var push: Vector3 = Vector3.ZERO
 
 ## How much of a hard landing this surface takes away: 0 none, 1 all (snow, a mattress, a
-## hay bale). Read by GameSpice Combat's DotFallDamage; the controller itself ignores it.
+## hay bale). Read by GameSpice Combat's GSFallDamage; the controller itself ignores it.
 @export_range(0.0, 1.0, 0.01) var fall_damping: float = 0.0
 
 @export_group("Presentation")
@@ -43,17 +43,17 @@ extends Resource
 @export var material_tag: StringName = &""
 
 
-static func make(p_id: StringName) -> DotFpsSurface:
-	var s := DotFpsSurface.new()
+static func make(p_id: StringName) -> GSFpsSurface:
+	var s := GSFpsSurface.new()
 	s.id = p_id
 	return s
 
 
-## A movement surface read off a GameSpice Physics `DotPhysicsSurface` (duck-typed: no dependency).
+## A movement surface read off a GameSpice Physics `GSPhysicsSurface` (duck-typed: no dependency).
 ## `traction` is the friction scale, `move_scale` the acceleration scale, `dampening` lowers top speed
 ## (1 - 0.15 per unit, floor 0.4), `jump_scale` carries over; a `liquid` or non-`solid` is not stood on.
-static func from_physics(surface: Object) -> DotFpsSurface:
-	var s := DotFpsSurface.new()
+static func from_physics(surface: Object) -> GSFpsSurface:
+	var s := GSFpsSurface.new()
 	if surface == null:
 		return s
 	s.id = surface.get("id")
@@ -82,4 +82,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotFpsSurface(%s)" % id
+	return "GSFpsSurface(%s)" % id

@@ -6,9 +6,9 @@ func _test_touch_sampler() -> void:
 	_section("touch sampling")
 
 	var t := _tunables()
-	var sampler := DotFpsTouchSampler.new(t)
+	var sampler := GSFpsTouchSampler.new(t)
 	sampler.set_screen_width(1000.0)
-	sampler.tap_button = DotFpsCommand.BUTTON_JUMP
+	sampler.tap_button = GSFpsCommand.BUTTON_JUMP
 
 	# A finger on the left half plants the stick where it landed.
 	sampler.handle_event(_touch(0, Vector2(200.0, 500.0), true))
@@ -47,17 +47,17 @@ func _test_touch_sampler() -> void:
 	sampler.handle_event(_touch(2, Vector2(822.0, 401.0), false))
 
 	var tapped := sampler.sample(STEP)
-	_check( tapped.is_pressed(DotFpsCommand.BUTTON_JUMP), "a tap presses the configured button" )
+	_check( tapped.is_pressed(GSFpsCommand.BUTTON_JUMP), "a tap presses the configured button" )
 
 	var after_tap := sampler.sample(STEP)
-	_check( not after_tap.is_pressed(DotFpsCommand.BUTTON_JUMP), "for exactly one command, so a tap and a hold stay distinguishable" )
+	_check( not after_tap.is_pressed(GSFpsCommand.BUTTON_JUMP), "for exactly one command, so a tap and a hold stay distinguishable" )
 
 	# The game's own on-screen buttons.
-	sampler.hold(DotFpsCommand.BUTTON_CROUCH, true)
-	_check( sampler.sample(STEP).is_pressed(DotFpsCommand.BUTTON_CROUCH), "a held on-screen button reaches the command" )
+	sampler.hold(GSFpsCommand.BUTTON_CROUCH, true)
+	_check( sampler.sample(STEP).is_pressed(GSFpsCommand.BUTTON_CROUCH), "a held on-screen button reaches the command" )
 
-	sampler.hold(DotFpsCommand.BUTTON_CROUCH, false)
-	_check( not sampler.sample(STEP).is_pressed(DotFpsCommand.BUTTON_CROUCH), "and releasing it stops" )
+	sampler.hold(GSFpsCommand.BUTTON_CROUCH, false)
+	_check( not sampler.sample(STEP).is_pressed(GSFpsCommand.BUTTON_CROUCH), "and releasing it stops" )
 
 	_touch_sampler_claimed(sampler)
 
@@ -66,7 +66,7 @@ func _test_touch_sampler() -> void:
 
 
 ## A non-finite drag is dropped, so the view keeps its last good angles.
-func _touch_sampler_bad_drags(sampler: DotFpsTouchSampler) -> void:
+func _touch_sampler_bad_drags(sampler: GSFpsTouchSampler) -> void:
 	sampler.handle_event(_touch(1, Vector2(900.0, 500.0), false))
 	sampler.handle_event(_touch(7, Vector2(800.0, 500.0), true))
 	sampler.handle_event(_drag(7, Vector2(850.0, 540.0)))
@@ -90,7 +90,7 @@ func _touch_sampler_bad_drags(sampler: DotFpsTouchSampler) -> void:
 
 
 ## A finger on the game's own button must not also steer: the button is checked first.
-func _touch_sampler_claimed(sampler: DotFpsTouchSampler) -> void:
+func _touch_sampler_claimed(sampler: GSFpsTouchSampler) -> void:
 	sampler.ignore_fn = func(pos: Vector2) -> bool: return pos.x > 900.0
 	var yaw_before := sampler.yaw
 	sampler.handle_event(_touch(5, Vector2(950.0, 500.0), true))
@@ -105,7 +105,7 @@ func _touch_sampler_claimed(sampler: DotFpsTouchSampler) -> void:
 
 
 ## Suspending stops everything, and touch drives the simulation like any other input.
-func _touch_sampler_drives(sampler: DotFpsTouchSampler, t: DotFpsTunables) -> void:
+func _touch_sampler_drives(sampler: GSFpsTouchSampler, t: GSFpsTunables) -> void:
 	# Suspending has to stop everything, or an open chat box leaves the player
 	# running because a finger was down when it opened.
 	sampler.handle_event(_touch(3, Vector2(200.0, 500.0), true))
@@ -178,27 +178,27 @@ func _test_idle_parity() -> void:
 	await get_tree().physics_frame
 
 	var t := _tunables()
-	var fast_body := DotFpsPhysicsBody.new()
-	var full_body := DotFpsPhysicsBody.new()
+	var fast_body := GSFpsPhysicsBody.new()
+	var full_body := GSFpsPhysicsBody.new()
 	if not (fast_body.bind(world).ok and full_body.bind(world).ok):
 		_check(false, "both physics bodies bind to the parity world")
 		world.queue_free()
 		return
-	var fast := DotFpsMotor.new(t, fast_body)
-	var full := DotFpsMotor.new(t, full_body)
+	var fast := GSFpsMotor.new(t, fast_body)
+	var full := GSFpsMotor.new(t, full_body)
 	fast.idle_fast_path = true
 	full.idle_fast_path = false
 	full.reuse_settled_ground = false
-	var fs := DotFpsState.new()
-	var rs := DotFpsState.new()
-	fs.mode = DotFpsState.Mode.GROUND
-	rs.mode = DotFpsState.Mode.GROUND
+	var fs := GSFpsState.new()
+	var rs := GSFpsState.new()
+	fs.mode = GSFpsState.Mode.GROUND
+	rs.mode = GSFpsState.Mode.GROUND
 
 	var diverged := {}
 	var ticks := 0
 	for tick in range(900):
 		var phase := "idle"
-		var cmd := DotFpsCommand.new()
+		var cmd := GSFpsCommand.new()
 		if tick >= 120 and tick < 200:
 			phase = "walk"
 			cmd = _command(1.0)
@@ -207,14 +207,14 @@ func _test_idle_parity() -> void:
 		elif tick >= 380 and tick < 440:
 			phase = "jump"
 			if tick == 380:
-				cmd.set_button(DotFpsCommand.BUTTON_JUMP, true)
+				cmd.set_button(GSFpsCommand.BUTTON_JUMP, true)
 		elif tick >= 440 and tick < 740:
 			phase = "platform"
 			if tick == 440:
 				for st in [fs, rs]:
 					st.position = Vector3(20.0, 0.0, 0.0)
 					st.velocity = Vector3.ZERO
-					st.mode = DotFpsState.Mode.GROUND
+					st.mode = GSFpsState.Mode.GROUND
 			if tick < 640:
 				platform.position.x += 0.01
 			await get_tree().physics_frame
@@ -224,7 +224,7 @@ func _test_idle_parity() -> void:
 				for st in [fs, rs]:
 					st.position = Vector3.ZERO
 					st.velocity = Vector3.ZERO
-					st.mode = DotFpsState.Mode.GROUND
+					st.mode = GSFpsState.Mode.GROUND
 			if tick == 840:
 				pad_shape.disabled = true
 				await get_tree().physics_frame
@@ -255,21 +255,21 @@ func _test_settled_floor_removed() -> void:
 				var parts := _build_parity_world()
 				var world: Node3D = parts[0]
 				var pad_shape: CollisionShape3D = parts[1]
-				var body := DotFpsPhysicsBody.new()
+				var body := GSFpsPhysicsBody.new()
 				if not body.bind(world).ok:
 					_check(false, "the body binds")
 					world.queue_free()
 					continue
 				await get_tree().physics_frame
 				await get_tree().physics_frame
-				var motor := DotFpsMotor.new(_tunables(), body)
+				var motor := GSFpsMotor.new(_tunables(), body)
 				motor.idle_fast_path = idle_fast
-				var st := DotFpsState.new()
-				st.mode = DotFpsState.Mode.GROUND
+				var st := GSFpsState.new()
+				st.mode = GSFpsState.Mode.GROUND
 				for i in range(120):
 					motor.simulate(st, _command(1.0 if walked and i < 30 else 0.0), STEP)
 				var label := "%s, %s, idle fast path %s" % [removal, "stopped walking" if walked else "standing", idle_fast]
-				_check(st.mode == DotFpsState.Mode.GROUND, "%s: settled before the floor goes" % label)
+				_check(st.mode == GSFpsState.Mode.GROUND, "%s: settled before the floor goes" % label)
 				var pad: Node = pad_shape.get_parent()
 				match removal:
 					"shape disabled":
@@ -283,7 +283,7 @@ func _test_settled_floor_removed() -> void:
 				var left_at := -1
 				for i in range(60):
 					motor.simulate(st, _command(), STEP)
-					if left_at < 0 and st.mode != DotFpsState.Mode.GROUND:
+					if left_at < 0 and st.mode != GSFpsState.Mode.GROUND:
 						left_at = i
 				_check(left_at >= 0 and left_at <= 2, "%s: leaves the ground within 3 ticks of the floor going" % label, "tick %d, y %.2f" % [left_at, st.position.y])
 				world.queue_free()
@@ -297,11 +297,11 @@ func _test_wall_hop_rewind() -> void:
 
 	# A deathmatch's movement: classic air control, auto-hop, coyote time and a jump buffer.
 	var t := _hop_rewind_tunables()
-	var world := DotFpsFlatBody.with_floor(0.0)
+	var world := GSFpsFlatBody.with_floor(0.0)
 	world.add_box(AABB(Vector3(1.0, 0.0, -200.0), Vector3(0.5, 12.0, 400.0)))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	var commands: Array[DotFpsCommand] = []
+	var commands: Array[GSFpsCommand] = []
 	var jump := false
 	var strafe := 0.0
 	var next := 0
@@ -312,12 +312,12 @@ func _test_wall_hop_rewind() -> void:
 			jump = pick == 2
 			strafe = -1.0 if pick == 0 else (1.0 if pick == 1 else 0.0)
 		commands.append(_command(1.0, strafe, -90.0 + sin(i * 0.01) * 30.0,
-			DotFpsCommand.BUTTON_JUMP if jump else 0))
+			GSFpsCommand.BUTTON_JUMP if jump else 0))
 
-	var motor := DotFpsMotor.new(t, world)
-	var s := DotFpsState.new()
-	s.mode = DotFpsState.Mode.GROUND
-	var full: Array[DotFpsState] = []
+	var motor := GSFpsMotor.new(t, world)
+	var s := GSFpsState.new()
+	s.mode = GSFpsState.Mode.GROUND
+	var full: Array[GSFpsState] = []
 	for c in commands:
 		motor.simulate(s, c, STEP)
 		full.append(s.duplicate_state())
@@ -333,9 +333,9 @@ func _test_wall_hop_rewind() -> void:
 			var lead: int = [4, 8, 12][n % 3]
 			var k := 60 + floori(n / 3.0)
 			var replay := full[k + lead].duplicate_state()
-			DotFpsNetSync.pull(full[k], carrier)
-			DotFpsNetSync.push(carrier, replay)
-			var replay_motor := DotFpsMotor.new(t, world)
+			GSFpsNetSync.pull(full[k], carrier)
+			GSFpsNetSync.push(carrier, replay)
+			var replay_motor := GSFpsMotor.new(t, world)
 			for j in range(k + 1, k + lead + 1):
 				replay_motor.simulate(replay, commands[j], STEP)
 			var e := replay.position.distance_to(full[k + lead].position)
@@ -347,13 +347,13 @@ func _test_wall_hop_rewind() -> void:
 	timed.free()
 	_check(counts[0][0] == 0, "every rewind through net_timers lands where the server did", "%d diverged, worst %.3f m" % counts[0])
 	_check(counts[1][0] > 0, "negative control: a rewind without net_timers diverges", "%d diverged, worst %.3f m" % counts[1])
-	var back := DotFpsState.new()
-	DotFpsNetSync.unpack_timers(back, DotFpsNetSync.pack_timers(DotFpsState.new()))
-	var spent := DotFpsState.new()
+	var back := GSFpsState.new()
+	GSFpsNetSync.unpack_timers(back, GSFpsNetSync.pack_timers(GSFpsState.new()))
+	var spent := GSFpsState.new()
 	spent.time_since_grounded = 1000.5
-	DotFpsNetSync.unpack_timers(spent, DotFpsNetSync.pack_timers(spent))
-	var zero := DotFpsState.new()
-	DotFpsNetSync.unpack_timers(zero, 0)
+	GSFpsNetSync.unpack_timers(spent, GSFpsNetSync.pack_timers(spent))
+	var zero := GSFpsState.new()
+	GSFpsNetSync.unpack_timers(zero, 0)
 	_check(back.time_since_grounded == 0.0 and back.time_since_jump == 1000.0
 		and spent.time_since_grounded == 1000.0 and zero.time_since_grounded == 1000.0,
 		"timers round-trip; long ago and an unsent 0 read as long ago")
@@ -361,8 +361,8 @@ func _test_wall_hop_rewind() -> void:
 
 
 ## A deathmatch's movement with the wall features on.
-func _hop_rewind_tunables() -> DotFpsTunables:
-	var t := DotFpsTunables.new()
+func _hop_rewind_tunables() -> GSFpsTunables:
+	var t := GSFpsTunables.new()
 	t.max_speed = 9.0
 	t.accelerate = 12.0
 	t.friction = 5.5
@@ -389,7 +389,7 @@ func _hop_rewind_tunables() -> DotFpsTunables:
 func _test_walls_off_identical() -> void:
 	_section("wall movement off is byte-identical to before it")
 
-	var world := DotFpsFlatBody.with_floor(0.0)
+	var world := GSFpsFlatBody.with_floor(0.0)
 	world.add_box(AABB(Vector3(2.0, 0.0, -12.0), Vector3(2.0, 0.3, 6.0)))
 	world.add_box(AABB(Vector3(-6.0, 0.0, -20.0), Vector3(12.0, 3.0, 1.0)))
 	world.add_box(AABB(Vector3(3.0, 0.0, -30.0), Vector3(0.5, 4.0, 30.0)))
@@ -399,17 +399,17 @@ func _test_walls_off_identical() -> void:
 	old_body.crouch_height = 0.9
 	old_body.radius = 0.35
 	var motor := _motor(old_body, world)
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, 0.5, 0.0)
 	var bytes := PackedByteArray()
 	for i in range(600):
 		var buttons := 0
 		if i % 23 == 0:
-			buttons |= DotFpsCommand.BUTTON_JUMP
+			buttons |= GSFpsCommand.BUTTON_JUMP
 		if (i / 40) % 3 == 1:
-			buttons |= DotFpsCommand.BUTTON_CROUCH
+			buttons |= GSFpsCommand.BUTTON_CROUCH
 		if (i / 40) % 3 == 2:
-			buttons |= DotFpsCommand.BUTTON_SPRINT
+			buttons |= GSFpsCommand.BUTTON_SPRINT
 		var c := _command(1.0, sin(float(i) * 0.11), sin(float(i) * 0.05) * 70.0 - 30.0, buttons)
 		motor.simulate(s, c, STEP)
 		bytes.append_array(var_to_bytes([s.position, s.velocity, s.mode, s.time_since_jump, s.time_since_grounded]))

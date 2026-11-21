@@ -1,6 +1,6 @@
 extends Node
 
-## DotFpsLiftCycle: a car's height as a pure function of time, and carrying a rider on it.
+## GSFpsLiftCycle: a car's height as a pure function of time, and carrying a rider on it.
 
 var _passed := 0
 var _failed := 0
@@ -20,7 +20,7 @@ func _check(ok: bool, what: String) -> void:
 
 func _run() -> void:
 	print("dot-player-controller lift cycle self-test")
-	var lift := DotFpsLiftCycle.new(3.0, 3.0)
+	var lift := GSFpsLiftCycle.new(3.0, 3.0)
 	_check(is_equal_approx(lift.period(), 12.0), "period is two rests and two trips")
 	_check(lift.fraction(0.0) == 0.0 and lift.fraction(2.9) == 0.0, "rests at the bottom")
 	_check(is_equal_approx(lift.fraction(4.5), 0.5), "halfway up half way through the trip")

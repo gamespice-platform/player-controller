@@ -1,14 +1,14 @@
-# Collision: DotFpsBody and the swept query
+# Collision: GSFpsBody and the swept query
 
 Most of the bugs this addon has had came from one place: what a swept shape query does and does not report. Every recovery below exists for a specific failure; none is redundant, and removing one because it looks like belt and braces brings its bug back. The stories are in [history.md](history.md).
 
-## Why collision goes through DotFpsBody
+## Why collision goes through GSFpsBody
 
-1. **Testing.** The determinism test needs thousands of ticks against known geometry. `DotFpsFlatBody` (analytic boxes, half-space planes, `add_ramp`) makes it arithmetic, and a failure has one possible cause.
+1. **Testing.** The determinism test needs thousands of ticks against known geometry. `GSFpsFlatBody` (analytic boxes, half-space planes, `add_ramp`) makes it arithmetic, and a failure has one possible cause.
 2. **`move_and_slide` keeps state.** The floor normal and velocity it remembers between calls are not restored by a rewind, so the motor does its own collide-and-slide over a stateless query.
-3. **A server needs no rendering physics world**, and a game whose collision is a heightfield or a BSP can implement `DotFpsBody` against that directly.
+3. **A server needs no rendering physics world**, and a game whose collision is a heightfield or a BSP can implement `GSFpsBody` against that directly.
 
-`DotFpsPhysicsBody` is the implementation the games run on. It is where the engine's behaviour leaks through, so it is where most of what follows lives.
+`GSFpsPhysicsBody` is the implementation the games run on. It is where the engine's behaviour leaks through, so it is where most of what follows lives.
 
 ## The swept-query traps
 
@@ -18,7 +18,7 @@ Most of the bugs this addon has had came from one place: what a swept shape quer
 - **`cast_motion` ignores any collider the shape already overlaps.** A shape starting inside something has no first contact to report, so to the sweep a surface you are inside does not exist at any depth.
 - **On a large convex `cast_motion` can be late, or miss entirely.** Its `safe` can be centimetres past the real contact on a very large wall, and occasionally a sideways sweep along one sees nothing and ends inside it.
 
-`DotFpsMotor._sweep` answers the first two: every query sweeps a margin further than asked and gives the distance back, the margin being `max(skin_width, length * SWEEP_TOLERANCE)`.
+`GSFpsMotor._sweep` answers the first two: every query sweeps a margin further than asked and gives the distance back, the margin being `max(skin_width, length * SWEEP_TOLERANCE)`.
 
 ## Skins and snaps
 
@@ -31,9 +31,9 @@ A grounded walker's tick asks the ground question three times: at the start, ins
 
 **Nothing is reused across ticks**: the world moves between them (game-airdrift sinks blocks per player), so a ground answer from the last tick is a different question. And no query is skipped because it "looks like" it cannot matter: the quarter probes cannot be ruled out without asking the world, because the floor they find is exactly the one the whole capsule's probe cannot reach.
 
-**Unless the game says the world is static.** `DotFpsController.static_world` (`DotFpsMotor.static_world`, off by default) lets the motor reuse the ground probe, the quarter probes and the edge-floor probe across ticks, keyed on position, size, mask and skin: the last ground check of a tick and the first of the next are one question. It is exact only while nothing the body queries moves (no platforms, doors, props or hulls), so the game owns the flag and calls `invalidate_probe_cache()` on a level change. game-airdrift sets it per tick from `AirdriftGame.world_is_static()`. surf_physics_selftest replays one recorded input log both ways and compares every tick's bits; load_probe `LOAD_HASH=1` does the same for 32 players. surf_mesa 32 at 128 Hz: game half 5.9 to 4.75 ms/tick.
+**Unless the game says the world is static.** `GSFpsController.static_world` (`GSFpsMotor.static_world`, off by default) lets the motor reuse the ground probe, the quarter probes and the edge-floor probe across ticks, keyed on position, size, mask and skin: the last ground check of a tick and the first of the next are one question. It is exact only while nothing the body queries moves (no platforms, doors, props or hulls), so the game owns the flag and calls `invalidate_probe_cache()` on a level change. game-airdrift sets it per tick from `AirdriftGame.world_is_static()`. surf_physics_selftest replays one recorded input log both ways and compares every tick's bits; load_probe `LOAD_HASH=1` does the same for 32 players. surf_mesa 32 at 128 Hz: game half 5.9 to 4.75 ms/tick.
 
-**Idle fast path.** A body with no input, zero velocity, grounded, and the same position, normal, ground collider and ground transform as the settled stamp skips the whole tick after the crouch update: it asks one `rest_contact` (any penetration means the full path) and one ground sweep (a miss, a different collider or normal, or a gap under half the skin means the full path and drops the stamp, so a floor removed under a sleeper wakes it). Every `idle_full_every` ticks (32) it recomputes in full as a safety net. `DotFpsMotor.idle_fast_path` turns it on (default off: measured 31 us a tick against 27 for the full path with `reuse_settled_ground`, since the timers, modifiers and effects run before the gate and it adds a second query); `idle_ticks` counts the ticks taken. The parity section `idle fast path parity` in `movement_selftest` runs it against the full path for 900 ticks of idle, walk, stop, jump, a moving platform and a removed floor. It is off for bodies with wall run or wall jump enabled, with modifiers, or on a pushing surface.
+**Idle fast path.** A body with no input, zero velocity, grounded, and the same position, normal, ground collider and ground transform as the settled stamp skips the whole tick after the crouch update: it asks one `rest_contact` (any penetration means the full path) and one ground sweep (a miss, a different collider or normal, or a gap under half the skin means the full path and drops the stamp, so a floor removed under a sleeper wakes it). Every `idle_full_every` ticks (32) it recomputes in full as a safety net. `GSFpsMotor.idle_fast_path` turns it on (default off: measured 31 us a tick against 27 for the full path with `reuse_settled_ground`, since the timers, modifiers and effects run before the gate and it adds a second query); `idle_ticks` counts the ticks taken. The parity section `idle fast path parity` in `movement_selftest` runs it against the full path for 900 ticks of idle, walk, stop, jump, a moving platform and a removed floor. It is off for bodies with wall run or wall jump enabled, with modifiers, or on a pushing surface.
 
 ## Embedded in a floor
 
@@ -47,14 +47,14 @@ That alone is an absorbing state: the probe still starts in geometry next tick, 
 
 The floor recovery above runs only from the branch that requires the player to have been GROUNDED last tick, and **a player on a surf ramp is never grounded, by design**. Because surfing is a continuous overlap, `cast_motion` stops seeing the ramp at all once the capsule is touching or inside it (measured on 4.7.2 against a 60° face: 2 cm clear is reported correctly; touching, or 1 mm to 50 cm inside, is free space). Nothing clips the velocity, gravity keeps pulling, and the player accelerates through the inside of the level with every stuck and embed counter at zero.
 
-- **`DotFpsBody.rest_contact`** asks what a sweep cannot: `get_rest_info` reports the resting surface's own normal and, measured against its contact point, the exact penetration. `DotFpsPhysicsBody.sweep` consults it when `cast_motion` sees nothing, and returns a fraction-0 hit **only when the motion goes into that surface**: a capsule inside something is usually also trying to leave it (after a push, a step up, a crouch under a lip), and blocking the way out pins a player against what they are escaping.
+- **`GSFpsBody.rest_contact`** asks what a sweep cannot: `get_rest_info` reports the resting surface's own normal and, measured against its contact point, the exact penetration. `GSFpsPhysicsBody.sweep` consults it when `cast_motion` sees nothing, and returns a fraction-0 hit **only when the motion goes into that surface**: a capsule inside something is usually also trying to leave it (after a push, a step up, a crouch under a lip), and blocking the way out pins a player against what they are escaping.
 - **`_depenetrate`** is `_lift_clear` generalised. Straight up is right for a floor and wrong for a ramp, where the shortest way out is mostly sideways. It pushes along the contact normal by the measured depth plus a skin, **clamped to a step per tick**: the clamp is what makes a wrong answer survivable, since a bad normal that moves a player a centimetre is a glitch and the same normal unclamped against a deep embed throws them across the level. A deep embed converges over a few ticks because each is measured afresh. It costs one query per tick per player, worth it because the cheaper `overlaps` cannot tell resting from buried. `depenetrated_ticks` counts it.
 
 The measurement that finds this class of bug is **penetration, not speed**: a player sinking through a ramp has a plausible speed, position and stuck count, and only a geometric test of the capsule against the face says otherwise.
 
 ## Late and missing contacts
 
-`DotFpsPhysicsBody.sweep` checks for both:
+`GSFpsPhysicsBody.sweep` checks for both:
 
 - **Late**: it measures how deep `unsafe` is from the rest query it already makes there and, past `LATE_CONTACT_DEPTH` (0.5 mm), backs the fraction off by that depth over the rate of approach.
 - **Missing**: after the resting check and the downward ray, `_end_overlap_fallback` asks for a rest contact at the END of the move and backs off the same way. One more query per unobstructed sweep.
@@ -73,20 +73,20 @@ The measurement that finds this class of bug is **penetration, not speed**: a pl
 
 ## Other players: a layer a player may walk out of
 
-`DotFpsBody.pass_out_mask` (set through `DotFpsController.set_pass_out_layers`, which `DotPlayerBodyRules.apply_to` does for `mp_solidplayers`) names layers a player stops at but is never held inside. While the capsule overlaps something on those layers the cast leaves them out, because a convex cast that starts inside another convex shape reports it at fraction 0; and every question about what the capsule is already touching (`rest_contact`, `overlaps`, the fallbacks after an empty sweep) ignores them always. Without it two players placed on one spot both pushed into each other's hull and stood still for good (mg-look-at-me's door check, 2026-10-12).
+`GSFpsBody.pass_out_mask` (set through `GSFpsController.set_pass_out_layers`, which `GSPlayerBodyRules.apply_to` does for `mp_solidplayers`) names layers a player stops at but is never held inside. While the capsule overlaps something on those layers the cast leaves them out, because a convex cast that starts inside another convex shape reports it at fraction 0; and every question about what the capsule is already touching (`rest_contact`, `overlaps`, the fallbacks after an empty sweep) ignores them always. Without it two players placed on one spot both pushed into each other's hull and stood still for good (mg-look-at-me's door check, 2026-10-12).
 
 
 ## Pairs that pass through
 
-`mp_solidplayers` is all or nothing. dot-team's `mp_teamblock` / `mp_enemyblock` need a pair at a time (teammates walk through each other, enemies stop), so `DotPlayerBodyRules.pair_fn` answers per pair and `apply_exceptions` gives each controller the RIDs of the bodies it passes through (`DotFpsController.set_extra_excludes`, added to the body's own collider in `exclude`). An exclusion is the one thing both the sweep and every rest, overlap and ground question honour, which a mask or a pass-out layer is not, and it needs no layer per team. It must be symmetric and applied on every machine (the rules and their requests are replicated cvars), or the client predicts a wall the server walks through. Order of effect: `mp_solidplayers` 0, nobody blocks; 1, `pair_fn` decides; a game whose body is analytic (game-fatal-contact) filters its hull list with `body_rules.blocks(a, b)` instead.
+`mp_solidplayers` is all or nothing. dot-team's `mp_teamblock` / `mp_enemyblock` need a pair at a time (teammates walk through each other, enemies stop), so `GSPlayerBodyRules.pair_fn` answers per pair and `apply_exceptions` gives each controller the RIDs of the bodies it passes through (`GSFpsController.set_extra_excludes`, added to the body's own collider in `exclude`). An exclusion is the one thing both the sweep and every rest, overlap and ground question honour, which a mask or a pass-out layer is not, and it needs no layer per team. It must be symmetric and applied on every machine (the rules and their requests are replicated cvars), or the client predicts a wall the server walks through. Order of effect: `mp_solidplayers` 0, nobody blocks; 1, `pair_fn` decides; a game whose body is analytic (game-fatal-contact) filters its hull list with `body_rules.blocks(a, b)` instead.
 
-## Lag-compensated hulls for physics-capsule players (`DotPlayerHullRewind`)
+## Lag-compensated hulls for physics-capsule players (`GSPlayerHullRewind`)
 
-A game whose players block through `apply_hull` (a real capsule on every machine) predicts a bump against the remote hull where the client's physics server has it: the interpolated, drawn position, behind the server's by the view lag. The server moves the mover against the present. Every bump with a moving player is then a correction, and the faster the other player, the bigger. game-fatal-contact fixes this for its analytic hulls by colliding at the mover's view tick on both ends (`FcGame.solid_hulls_for`); `DotPlayerHullRewind` is the same rule for physics capsules.
+A game whose players block through `apply_hull` (a real capsule on every machine) predicts a bump against the remote hull where the client's physics server has it: the interpolated, drawn position, behind the server's by the view lag. The server moves the mover against the present. Every bump with a moving player is then a correction, and the faster the other player, the bigger. game-fatal-contact fixes this for its analytic hulls by colliding at the mover's view tick on both ends (`FcGame.solid_hulls_for`); `GSPlayerHullRewind` is the same rule for physics capsules.
 
 - **Per mover, rewind the others' hull bodies.** `rewind.around(body_rules, mover_key, bodies, tick, work, mover_feet)` moves each other player's hull body (`PhysicsServer3D.body_set_state` on its transform, never the node) to what the game's `feet_fn(mover, other, tick) -> Vector3 | null` answers, runs `work` (the mover's motor step), and puts them back. The answer comes from the server's per-tick history and, on the client, from the interpolator at the same view tick (GameSpice Net's `value_between` over the snapshot bracket the command names, API 15). Null leaves that hull where it stands.
-- **Off by default, behind the replicated cvar `mp_solidplayers_unlag`** (`DotPlayerBodyRules.unlag`, carried by `bind_cvars` and `follow_cvars`), read on every machine like `mp_solidplayers`; `mp_solidplayers 0` overrules it.
-- **Still the game's to do:** the command must carry the view lag and the snapshot bracket, memoised per tick so every copy of a command says the same thing. Set `snap_fn` to the wire grid of the replicated position (`DotNetVar.wire_value`), because half a centimetre is a contact.
+- **Off by default, behind the replicated cvar `mp_solidplayers_unlag`** (`GSPlayerBodyRules.unlag`, carried by `bind_cvars` and `follow_cvars`), read on every machine like `mp_solidplayers`; `mp_solidplayers 0` overrules it.
+- **Still the game's to do:** the command must carry the view lag and the snapshot bracket, memoised per tick so every copy of a command says the same thing. Set `snap_fn` to the wire grid of the replicated position (`GSNetVar.wire_value`), because half a centimetre is a contact.
 - **Cost:** N players each move N-1 bodies twice a tick, N² transform writes, and a broadphase update each time. Acceptable for a dozen players, not for a hundred; `reach` (a box around the mover's feet, then or now) bounds it.
 - **It only holds while a hull only stops the mover.** Once capsules push each other, or push rigid bodies through `move_and_slide`, the other player's response is part of the simulation and a rewound copy cannot answer for it.
 - Tested in `movement_selftest` ("hull rewind"): a sweep stops at the rewound hull, the hull and its node are back after, off and `mp_solidplayers 0` run against the present.

@@ -1,9 +1,9 @@
 @tool
-class_name DotFpsModifier
+class_name GSFpsModifier
 extends Resource
 
 ## A temporary change to how the player moves: a speed pad, a slow field, a stun.
-## Definitions are configuration; the active set is [DotFpsState], so a rewind restores it and replays predict it.
+## Definitions are configuration; the active set is [GSFpsState], so a rewind restores it and replays predict it.
 ## Effects multiply, so the order the network applied them in does not matter.
 
 ## Name this modifier is added and removed by. Must match on every machine.
@@ -38,12 +38,12 @@ extends Resource
 
 @export_group("Abilities")
 
-## Hold the player in noclip while active, whatever [member DotFpsTunables.can_noclip] says.
-## A modifier because it is already replicated and rewound: setting [member DotFpsState.mode] alone is undone by the client's replay.
-## Removing it does not land the player; see [method DotFpsAdminModifiers.set_noclip].
+## Hold the player in noclip while active, whatever [member GSFpsTunables.can_noclip] says.
+## A modifier because it is already replicated and rewound: setting [member GSFpsState.mode] alone is undone by the client's replay.
+## Removing it does not land the player; see [method GSFpsAdminModifiers.set_noclip].
 @export var forces_noclip: bool = false
 
-## Lets the noclip button work while this is active, whatever [member DotFpsTunables.can_noclip] says.
+## Lets the noclip button work while this is active, whatever [member GSFpsTunables.can_noclip] says.
 ## A permission, not a force: the server adds it for somebody its groups allow, so the key is
 ## predicted on the owner's client and never works without it.
 @export var grants_noclip: bool = false
@@ -57,8 +57,8 @@ extends Resource
 @export var impulse_clears_velocity: bool = false
 
 
-static func make(p_id: StringName) -> DotFpsModifier:
-	var m := DotFpsModifier.new()
+static func make(p_id: StringName) -> GSFpsModifier:
+	var m := GSFpsModifier.new()
 	m.id = p_id
 	return m
 
@@ -85,7 +85,7 @@ func _denials() -> String:
 
 
 func _to_string() -> String:
-	return "DotFpsModifier(%s)" % id
+	return "GSFpsModifier(%s)" % id
 
 
 
@@ -119,7 +119,7 @@ class Aggregate extends RefCounted:
 		force_noclip = false
 		grant_noclip = false
 
-	func apply(modifier: DotFpsModifier) -> void:
+	func apply(modifier: GSFpsModifier) -> void:
 		max_speed *= modifier.max_speed_scale
 		accelerate *= modifier.accelerate_scale
 		air_accelerate *= modifier.air_accelerate_scale

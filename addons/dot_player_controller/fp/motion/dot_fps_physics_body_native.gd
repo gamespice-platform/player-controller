@@ -1,6 +1,6 @@
-extends DotFpsBody
+extends GSFpsBody
 
-## [DotFpsPhysicsBody]'s space binding, query parameters, cost accounting and the native (GameSpice Sim) fast path.
+## [GSFpsPhysicsBody]'s space binding, query parameters, cost accounting and the native (GameSpice Sim) fast path.
 ## Split out of dot_fps_physics_body.gd for file size; nothing outside the body names this script.
 
 const CHANNEL := "fps.body"
@@ -24,10 +24,10 @@ var query_count: int:
 
 var _queries: int = 0
 
-## GameSpice Sim's native body ([code]DotSimFpsBody[/code], the [code]motor[/code] module): the same sweep, rest contact and overlap, rounded the same way, so its answers are this script's to the bit (GameSpice Sim's motor parity suite proves it over recorded input streams).
+## GameSpice Sim's native body ([code]GSSimFpsBody[/code], the [code]motor[/code] module): the same sweep, rest contact and overlap, rounded the same way, so its answers are this script's to the bit (GameSpice Sim's motor parity suite proves it over recorded input streams).
 ## Used when the extension is loaded, [member native_enabled] is on and [member profile] is off; on the web, or with no library installed, this script answers.
 ## The motor's collide-and-slide runs there too ([method native_slide]).
-const NATIVE_CLASS := &"DotSimFpsBody"
+const NATIVE_CLASS := &"GSSimFpsBody"
 
 ## Whether the native body is used when present (a game's cvar; a suite turns it off to compare).
 static var native_enabled: bool = true
@@ -86,7 +86,7 @@ func native_slide(
 	if nat == null:
 		return PackedFloat64Array()
 	native_slides += 1
-	var t := DotFrameCost.now()
+	var t := GSFrameCost.now()
 	var before: int = nat.query_count() if t > 0 else 0
 	var r: PackedFloat64Array = nat.move_slide(
 		from, velocity, motion, height, mode, flag, tun, has_hulls, hulls, collision_mask, pass_out_mask
@@ -122,7 +122,7 @@ static func native_full_available() -> bool:
 ## Whether [method set_hull_world] can work: the loaded library has GameSpice Sim's hull world.
 static func native_hull_world_available() -> bool:
 	if _world_known < 0:
-		_world_known = 1 if ClassDB.class_exists(&"DotSimHullWorld") and ClassDB.class_has_method(NATIVE_CLASS, &"set_hull_world") else 0
+		_world_known = 1 if ClassDB.class_exists(&"GSSimHullWorld") and ClassDB.class_has_method(NATIVE_CLASS, &"set_hull_world") else 0
 	return _world_known == 1 and native_full_available()
 
 
@@ -210,7 +210,7 @@ func uses_native() -> bool:
 	return _native != null
 
 
-## A native answer as a [DotFpsBody.Hit]: empty for a miss, else fraction, normal, point, depth and the collider id in halves.
+## A native answer as a [GSFpsBody.Hit]: empty for a miss, else fraction, normal, point, depth and the collider id in halves.
 static func _hit_of(a: PackedFloat64Array) -> Hit:
 	var h := Hit.new()
 	if a.is_empty():
@@ -231,58 +231,58 @@ func _perf_caches_changed() -> void:
 ## Per engine query kind (cast, rest, overlap, ray): calls and microseconds, filled only while [member profile] is on.
 static var profile: bool = false
 static var prof := PackedInt64Array([0, 0, 0, 0, 0, 0, 0, 0])
-## The system queries are charged to in DotFrameCost (dot-profiler's query table) while it is enabled.
+## The system queries are charged to in GSFrameCost (dot-profiler's query table) while it is enabled.
 static var cost_system: StringName = &"p_controller"
 
 
 func _q_cast() -> PackedFloat32Array:
-	if not profile and not DotFrameCost.enabled:
+	if not profile and not GSFrameCost.enabled:
 		return _space.cast_motion(_shape_params)
 	var t := Time.get_ticks_usec()
 	var r := _space.cast_motion(_shape_params)
-	_charge(0, DotSpaceQuery.CAST, t)
+	_charge(0, GSSpaceQuery.CAST, t)
 	return r
 
 
 func _q_rest() -> Dictionary:
-	if not profile and not DotFrameCost.enabled:
+	if not profile and not GSFrameCost.enabled:
 		return _space.get_rest_info(_shape_params)
 	var t := Time.get_ticks_usec()
 	var r := _space.get_rest_info(_shape_params)
-	_charge(2, DotSpaceQuery.REST, t)
+	_charge(2, GSSpaceQuery.REST, t)
 	return r
 
 
 func _q_overlap() -> Array[Dictionary]:
-	if not profile and not DotFrameCost.enabled:
+	if not profile and not GSFrameCost.enabled:
 		return _space.intersect_shape(_shape_params, 1)
 	var t := Time.get_ticks_usec()
 	var r := _space.intersect_shape(_shape_params, 1)
-	_charge(4, DotSpaceQuery.SHAPE, t)
+	_charge(4, GSSpaceQuery.SHAPE, t)
 	return r
 
 
 func _q_ray(query: PhysicsRayQueryParameters3D) -> Dictionary:
-	if not profile and not DotFrameCost.enabled:
+	if not profile and not GSFrameCost.enabled:
 		return _space.intersect_ray(query)
 	var t := Time.get_ticks_usec()
 	var r := _space.intersect_ray(query)
-	_charge(6, DotSpaceQuery.RAY, t)
+	_charge(6, GSSpaceQuery.RAY, t)
 	return r
 
 
-## Times one script-path query into [member prof] and DotFrameCost, whichever is on.
+## Times one script-path query into [member prof] and GSFrameCost, whichever is on.
 static func _charge(i: int, kind: StringName, t: int) -> void:
 	if profile:
 		prof[i] += 1
 		prof[i + 1] += Time.get_ticks_usec() - t
-	DotFrameCost.add_query(cost_system, kind, t)
+	GSFrameCost.add_query(cost_system, kind, t)
 
 
-## Charges a native call to DotFrameCost as [param kind], counting the engine queries it ran; a no-op while off.
+## Charges a native call to GSFrameCost as [param kind], counting the engine queries it ran; a no-op while off.
 func _charge_native(kind: StringName, t: int, before: int) -> void:
 	if t > 0:
-		DotFrameCost.add_query(cost_system, kind, t, maxi(_native.query_count() - before, 1))
+		GSFrameCost.add_query(cost_system, kind, t, maxi(_native.query_count() - before, 1))
 
 
 ## Whether physics runs on its own thread (`physics/3d/run_on_separate_thread`, GameSpice Server Deploy's `sv_physics_thread`):
@@ -293,11 +293,11 @@ static var threaded_physics: bool = bool(ProjectSettings.get_setting("physics/3d
 ## Binds to the physics space [param node] lives in. A scene change invalidates the handle, so [method is_bound] is checked before use.
 ## A body made between ticks on a threaded server (a join, a module load) binds without the handle, which would be an engine
 ## error there; every query entry point fetches it through [method revalidate], inside the step.
-func bind(node: Node3D) -> DotResult:
+func bind(node: Node3D) -> GSResult:
 	if node == null or not node.is_inside_tree():
-		return DotResult.fail(
-			DotError.CODE_STATE,
-			"DotFpsPhysicsBody needs a node inside the tree."
+		return GSResult.fail(
+			GSError.CODE_STATE,
+			"GSFpsPhysicsBody needs a node inside the tree."
 		)
 
 	_owner = node
@@ -307,16 +307,16 @@ func bind(node: Node3D) -> DotResult:
 
 	if threaded_physics and not Engine.is_in_physics_frame():
 		_space = null
-		return DotResult.success(null)
+		return GSResult.success(null)
 
 	_space = node.get_world_3d().direct_space_state
 
 	if _space == null:
-		return DotResult.fail(
-			DotError.CODE_STATE, "No physics space is available yet."
+		return GSResult.fail(
+			GSError.CODE_STATE, "No physics space is available yet."
 		)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func is_bound() -> bool:
@@ -331,7 +331,7 @@ func _configure(height: float, radius: float) -> void:
 	if radius != _cfg_radius:
 		_shape.radius = radius
 		_cfg_radius = radius
-	# Godot's capsule height includes both caps and clamps to 2 * radius; DotFpsTunables.validate() rejects configurations
+	# Godot's capsule height includes both caps and clamps to 2 * radius; GSFpsTunables.validate() rejects configurations
 	# that would hit the clamp, since a collider of the wrong size is unfindable from the symptom.
 	if total != _cfg_height:
 		_shape.height = total
@@ -388,7 +388,7 @@ func revalidate() -> bool:
 		_space = space
 		_rm_valid = false
 		_shape_params.shape = _shape
-		DotLog.debug(CHANNEL, "re-bound to a new physics space")
+		GSLog.debug(CHANNEL, "re-bound to a new physics space")
 
 	return true
 

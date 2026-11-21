@@ -2,9 +2,9 @@ extends Node
 
 ## A playable course for feeling the movement out. Not a test. Run: [code]godot --path . res://examples/sandbox.tscn[/code], add [code]-- --seconds 3[/code] to exit on its own.
 ## Stairs of increasing height, a surf ramp and an open floor. WASD move, space jump, ctrl crouch, shift sprint, alt walk, V noclip, F1 dumps the controller's state, escape releases the mouse.
-## Nothing is wired: [code]player.tscn[/code] sets no [DotNodeRef]s, and the view and controller find the camera, collider and view by type. This is what the default costs.
+## Nothing is wired: [code]player.tscn[/code] sets no [GSNodeRef]s, and the view and controller find the camera, collider and view by type. This is what the default costs.
 
-@onready var _controller: DotFpsController = $Player/Controller
+@onready var _controller: GSFpsController = $Player/Controller
 @onready var _readout: Label = $UI/Container/Port/Readout
 
 
@@ -49,14 +49,14 @@ func _mark_surfaces() -> void:
 
 
 func _register_movement_extras() -> void:
-	var ice := DotFpsSurface.make(&"ice")
+	var ice := GSFpsSurface.make(&"ice")
 	ice.friction_scale = 0.04
 	ice.accelerate_scale = 0.2
 
-	var metal := DotFpsSurface.make(&"metal")
+	var metal := GSFpsSurface.make(&"metal")
 	metal.material_tag = &"metal"
 
-	var set := DotFpsSurfaceSet.new()
+	var set := GSFpsSurfaceSet.new()
 	set.add(ice).add(metal)
 
 	# Applied after setup, so the motor is told directly rather than through the
@@ -65,7 +65,7 @@ func _register_movement_extras() -> void:
 	_controller.motor.surfaces = set
 	_controller.motor.surface_resolver = _controller._resolve_surface_id
 
-	var pad := DotFpsModifier.make(&"speed_pad")
+	var pad := GSFpsModifier.make(&"speed_pad")
 	pad.max_speed_scale = 2.0
 	pad.accelerate_scale = 1.5
 	pad.duration_sec = 4.0
@@ -107,7 +107,7 @@ func _process(_delta: float) -> void:
 	_readout.text = "%d fps   %.1f m/s   %s%s%s%s" % [
 		Engine.get_frames_per_second(),
 		state.horizontal_speed(),
-		DotFpsState.mode_name(state.mode, _controller.motor).to_lower(),
+		GSFpsState.mode_name(state.mode, _controller.motor).to_lower(),
 		"  crouched" if state.is_crouched() else "",
 		"  on %s" % state.surface if state.surface != &"" else "",
 		"  boosted" if _controller.has_modifier(&"speed_pad") else "",

@@ -1,7 +1,7 @@
-class_name DotFpsFlatBody
-extends DotFpsBody
+class_name GSFpsFlatBody
+extends GSFpsBody
 
-## A [DotFpsBody] made of analytic planes and boxes, with no physics server.
+## A [GSFpsBody] made of analytic planes and boxes, with no physics server.
 ## Exists so determinism (replay reproduces the simulation) can be tested headless in milliseconds, with a failure that has one cause; also an example for a heightfield or BSP body.
 ## Not a collision engine: axis-aligned boxes, an infinite ground plane and half-space planes, the capsule swept as a box. See [method add_ramp].
 
@@ -12,7 +12,7 @@ var floor_y: float = 0.0
 var boxes: Array[AABB] = []
 
 ## Solid half-spaces: everything BEHIND each plane is solid.
-## [Plane] normals point out of the solid, as in [member DotFpsBody.Hit.normal]. Infinite so surf tests need no convex-hull sweep; speed kept down a face is a property of the face.
+## [Plane] normals point out of the solid, as in [member GSFpsBody.Hit.normal]. Infinite so surf tests need no convex-hull sweep; speed kept down a face is a property of the face.
 var planes: Array[Plane] = []
 
 ## Synthetic collider id reported for the ground plane; the motor resolves surfaces from the reported hit, so surfaces would be untestable without one. Boxes get [code]BOX_ID_BASE + index[/code].
@@ -28,7 +28,7 @@ static func box_id(index: int) -> int:
 	return BOX_ID_BASE + index
 
 
-static func with_floor(y: float = 0.0) -> DotFpsFlatBody:
+static func with_floor(y: float = 0.0) -> GSFpsFlatBody:
 	# Not this class's own name. A script that names itself in an expression, loaded after
 	# its base, cuts Godot 4.7.2's exit teardown short and leaks every script loaded before
 	# it. See docs/gdscript-hazards.md, "A script that names itself".
@@ -37,13 +37,13 @@ static func with_floor(y: float = 0.0) -> DotFpsFlatBody:
 	return b
 
 
-func add_box(box: AABB) -> DotFpsFlatBody:
+func add_box(box: AABB) -> GSFpsFlatBody:
 	boxes.append(box.abs())
 	return self
 
 
 ## Adds a step of [param height] at [param at], for testing stair climbing.
-func add_step(at: Vector3, size: Vector3) -> DotFpsFlatBody:
+func add_step(at: Vector3, size: Vector3) -> GSFpsFlatBody:
 	return add_box(AABB(at, size))
 
 
@@ -52,19 +52,19 @@ static func plane_id(index: int) -> int:
 	return PLANE_ID_BASE + index
 
 
-func add_plane(plane: Plane) -> DotFpsFlatBody:
+func add_plane(plane: Plane) -> GSFpsFlatBody:
 	planes.append(plane)
 	return self
 
 
 ## Adds a surf ramp: a face through [param through], tilted [param angle_degrees] from horizontal, falling away toward [param fall].
-## [param fall] is the horizontal direction a player on it slides. Above [member DotFpsTunables.max_slope_angle] it is a ramp, below a walkable hill.
+## [param fall] is the horizontal direction a player on it slides. Above [member GSFpsTunables.max_slope_angle] it is a ramp, below a walkable hill.
 ## Height along the fall is [code]through.y - tan(angle) * distance[/code]; see [method ramp_height].
 func add_ramp(
 	through: Vector3,
 	fall: Vector3,
 	angle_degrees: float
-) -> DotFpsFlatBody:
+) -> GSFpsFlatBody:
 	var horizontal := Vector3(fall.x, 0.0, fall.z)
 
 	if horizontal.length_squared() < 1e-9:
@@ -104,7 +104,7 @@ const SWEEP_REJECT_MARGIN := 1e-3
 const COARSE_REACH := 6.0
 ## Below this many boxes a candidate list costs more than it saves.
 const COARSE_MIN := 8
-## False walks every box on every sweep (the equivalence test and the A/B tools flip it); true uses the per-tick candidate list when [member DotFpsBody.perf_caches] is on.
+## False walks every box on every sweep (the equivalence test and the A/B tools flip it); true uses the per-tick candidate list when [member GSFpsBody.perf_caches] is on.
 static var world_coarse: bool = true
 var _in_tick: bool = false
 var _c_valid: bool = false
@@ -348,7 +348,7 @@ static func _axis_normal(axis: int, motion: Vector3) -> Vector3:
 
 
 ## The deepest surface the capsule at [param at] is already inside.
-## The analytic counterpart of [method DotFpsPhysicsBody.rest_contact], so de-penetration is proven against a known answer. Boxes report the face least far past; planes are exact.
+## The analytic counterpart of [method GSFpsPhysicsBody.rest_contact], so de-penetration is proven against a known answer. Boxes report the face least far past; planes are exact.
 func rest_contact(at: Vector3, height: float, radius: float) -> Hit:
 	var best := Hit.miss()
 	var deepest := 0.0
@@ -361,7 +361,7 @@ func rest_contact(at: Vector3, height: float, radius: float) -> Hit:
 
 	for i in range(planes.size()):
 		var plane := planes[i]
-		var support := DotFpsBody.capsule_support(plane.normal, height, radius)
+		var support := GSFpsBody.capsule_support(plane.normal, height, radius)
 		var depth := support - (plane.normal.dot(at) - plane.d)
 		if depth > deepest:
 			deepest = depth
@@ -427,8 +427,8 @@ func overlaps(at: Vector3, height: float, radius: float) -> bool:
 
 
 ## The same boxes, planes and floor (shared: a sweep only reads them), with this body's masks.
-func copy_for_simulation() -> DotFpsBody:
-	var copy: DotFpsFlatBody = (get_script() as GDScript).new()
+func copy_for_simulation() -> GSFpsBody:
+	var copy: GSFpsFlatBody = (get_script() as GDScript).new()
 	copy.floor_y = floor_y
 	copy.boxes = boxes
 	copy.planes = planes

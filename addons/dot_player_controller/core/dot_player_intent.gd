@@ -1,4 +1,4 @@
-class_name DotPlayerIntent
+class_name GSPlayerIntent
 extends RefCounted
 
 ## One tick of what a player wants, in a form every controller understands.
@@ -81,8 +81,8 @@ static func make(
 	p_move: Vector2 = Vector2.ZERO,
 	p_buttons: int = 0,
 	p_tick: int = 0
-) -> DotPlayerIntent:
-	var i := DotPlayerIntent.new()
+) -> GSPlayerIntent:
+	var i := GSPlayerIntent.new()
 	i.move = p_move
 	i.buttons = p_buttons
 	i.tick = p_tick
@@ -112,8 +112,8 @@ func is_idle() -> bool:
 	return buttons == 0 and move.is_zero_approx() and look.is_zero_approx()
 
 
-func copy_intent() -> DotPlayerIntent:
-	var i := DotPlayerIntent.new()
+func copy_intent() -> GSPlayerIntent:
+	var i := GSPlayerIntent.new()
 	i.move = move
 	i.look = look
 	i.buttons = buttons
@@ -139,8 +139,8 @@ func to_dict() -> Dictionary:
 	}
 
 
-static func from_dict(d: Dictionary) -> DotPlayerIntent:
-	var i := DotPlayerIntent.new()
+static func from_dict(d: Dictionary) -> GSPlayerIntent:
+	var i := GSPlayerIntent.new()
 	i.move = Vector2(float(d.get("mx", 0.0)), float(d.get("my", 0.0)))
 	i.buttons = int(d.get("b", 0))
 	i.tick = int(d.get("t", 0))
@@ -178,4 +178,4 @@ func describe() -> String:
 
 
 func _to_string() -> String:
-	return "DotPlayerIntent(%s)" % describe()
+	return "GSPlayerIntent(%s)" % describe()

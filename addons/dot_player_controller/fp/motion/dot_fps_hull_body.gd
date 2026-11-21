@@ -1,6 +1,6 @@
-class_name DotFpsHullBody
-extends DotFpsBody
-## Wraps a world body and adds other players' hulls ([member hulls_fn], an Array of AABB) as solid boxes, for [member DotPlayerBodyRules.solid].
+class_name GSFpsHullBody
+extends GSFpsBody
+## Wraps a world body and adds other players' hulls ([member hulls_fn], an Array of AABB) as solid boxes, for [member GSPlayerBodyRules.solid].
 ## The list is gathered once per motor tick (nobody else moves during it) and a sweep tests only the boxes its bounds touch, so cost does not grow with the square of the player count.
 
 ## First collider id reported for a hull; a hit on box n has id [constant HULL_ID_BASE] + n.
@@ -9,7 +9,7 @@ const HULL_ID_BASE := 1 << 24
 ## Sweeps stopped by a hull rather than the world, for tests and tuning.
 static var hull_stops: int = 0
 
-var inner: DotFpsBody = null
+var inner: GSFpsBody = null
 var hulls_fn: Callable = Callable()
 
 ## GameSpice Sim's hull world the native tick gathers from instead of [member hulls_fn] ([method set_hull_world]), or null.
@@ -22,7 +22,7 @@ var _in_tick: bool = false
 var _sent: bool = false
 ## Sent where the native tick reads no list (modes 2 and 3), instead of a new Array a player a tick; never written.
 var _no_hulls: Array = []
-var _near := DotFpsFlatBody.new()
+var _near := GSFpsFlatBody.new()
 var _near_index := PackedInt32Array()
 
 ## Per-tick candidate list (perf_caches): the hulls within [constant COARSE_REACH] of the first sweep of the tick, as indices into the gathered list in their order, and the region they were chosen for.
@@ -49,7 +49,7 @@ func _perf_caches_changed() -> void:
 		inner.perf_caches = perf_caches
 
 
-func wrap(map_body: DotFpsBody, hulls: Callable) -> DotFpsBody:
+func wrap(map_body: GSFpsBody, hulls: Callable) -> GSFpsBody:
 	inner = map_body
 	if map_body != null:
 		map_body.set_static_world(_static_world)
@@ -162,7 +162,7 @@ func sweep(from: Vector3, motion: Vector3, height: float, radius: float) -> Hit:
 
 	hull_stops += 1
 	hull_blocks += 1
-	other.collider_id = HULL_ID_BASE + _near_index[other.collider_id - DotFpsFlatBody.box_id(0)]
+	other.collider_id = HULL_ID_BASE + _near_index[other.collider_id - GSFpsFlatBody.box_id(0)]
 	return other
 
 
@@ -240,7 +240,7 @@ func rest_contact(at: Vector3, height: float, radius: float) -> Hit:
 
 
 func describe() -> Dictionary:
-	var out := {"implementation": "DotFpsHullBody", "hulls": _boxes.size()}
+	var out := {"implementation": "GSFpsHullBody", "hulls": _boxes.size()}
 	if inner != null:
 		out["inner"] = inner.describe()
 	return out

@@ -12,7 +12,7 @@ var _completed := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -49,7 +49,7 @@ func _check(ok: bool, what: String, detail: String = "") -> void:
 
 
 ## Largest wobble magnitude over [param from] to [param to] seconds, sampled at 240 Hz.
-func _peak(b: DotFpsAimBreak, from: float, to: float) -> float:
+func _peak(b: GSFpsAimBreak, from: float, to: float) -> float:
 	var peak := 0.0
 	var t := from
 	while t <= to:
@@ -60,8 +60,8 @@ func _peak(b: DotFpsAimBreak, from: float, to: float) -> float:
 
 func _test_default_keeps_aiming() -> void:
 	_section("default: a hit does not stop aiming")
-	var t := DotFpsTunables.new()
-	var b := DotFpsAimBreak.new()
+	var t := GSFpsTunables.new()
+	var b := GSFpsAimBreak.new()
 	_check(not t.unscope_on_hit, "unscope_on_hit is off by default")
 	b.note_hit(10.0, t, 25.0)
 	_check(not b.blocked(10.01), "the sights are not refused after a hit")
@@ -73,9 +73,9 @@ func _test_default_keeps_aiming() -> void:
 
 func _test_legacy_drops_aiming() -> void:
 	_section("legacy: a hit flinches out of the sights")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	t.unscope_on_hit = true
-	var b := DotFpsAimBreak.new()
+	var b := GSFpsAimBreak.new()
 	b.note_hit(10.0, t, 25.0)
 	_check(b.blocked(10.1), "the sights are refused just after the hit")
 	_check(not b.blocked(10.0 + t.unscope_hit_time + 0.01), "and allowed again after unscope_hit_time")
@@ -85,8 +85,8 @@ func _test_legacy_drops_aiming() -> void:
 
 func _test_decay_and_scaling() -> void:
 	_section("the wobble decays after its time and scales with damage")
-	var t := DotFpsTunables.new()
-	var b := DotFpsAimBreak.new()
+	var t := GSFpsTunables.new()
+	var b := GSFpsAimBreak.new()
 	b.note_hit(5.0, t, 25.0)
 	var early := _peak(b, 5.0, 5.15)
 	var late := _peak(b, 5.0 + t.hit_flinch_time * 0.6, 5.0 + t.hit_flinch_time * 0.8)
@@ -94,22 +94,22 @@ func _test_decay_and_scaling() -> void:
 	_check(b.wobble(5.0 + t.hit_flinch_time + 0.01) == Vector2.ZERO, "no wobble after hit_flinch_time")
 	_check(b.shake(5.0 + t.hit_flinch_time + 0.01) == Vector3.ZERO, "no shake after hit_flinch_time")
 	_check(not b.flinching(5.0 + t.hit_flinch_time + 0.01), "the flinch is over")
-	var small := DotFpsAimBreak.new()
+	var small := GSFpsAimBreak.new()
 	small.note_hit(1.0, t, 10.0)
-	var big := DotFpsAimBreak.new()
+	var big := GSFpsAimBreak.new()
 	big.note_hit(1.0, t, 75.0)
 	_check(_peak(big, 1.0, 1.2) > _peak(small, 1.0, 1.2) * 1.5, "more damage wobbles more")
 	t.hit_damage_scale = 0.0
-	var flat_a := DotFpsAimBreak.new()
+	var flat_a := GSFpsAimBreak.new()
 	flat_a.note_hit(1.0, t, 10.0)
-	var flat_b := DotFpsAimBreak.new()
+	var flat_b := GSFpsAimBreak.new()
 	flat_b.note_hit(1.0, t, 75.0)
 	_check(is_equal_approx(_peak(flat_a, 1.0, 1.2), _peak(flat_b, 1.0, 1.2)), "hit_damage_scale 0 flinches every hit alike")
-	var steady := DotFpsAimBreak.new()
+	var steady := GSFpsAimBreak.new()
 	steady.note_hit(1.0, t, 25.0, 0.0)
 	_check(not steady.flinching(1.05), "a weapon multiplier of 0 is steady")
 	t.hit_wobble = 0.0
-	var no_wobble := DotFpsAimBreak.new()
+	var no_wobble := GSFpsAimBreak.new()
 	no_wobble.note_hit(1.0, t, 25.0)
 	_check(_peak(no_wobble, 1.0, 1.2) == 0.0 and no_wobble.shake(1.02).length() > 0.0, "hit_wobble 0 leaves only the shake")
 	_completed += 1
@@ -117,7 +117,7 @@ func _test_decay_and_scaling() -> void:
 
 func _test_cvars() -> void:
 	_section("every flinch number is a server cvar")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	var members := {}
 	for spec in t.cvar_specs():
 		members[spec.get("member", "")] = true

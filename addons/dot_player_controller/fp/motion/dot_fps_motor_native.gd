@@ -1,15 +1,15 @@
 extends "dot_fps_motor_slide.gd"
 
 ## The motor's native side: the tunables and input rows it hands GameSpice Sim, the answers it writes back, and the rest
-## stamp that lets a settled walker skip its ground probe. Split out of [DotFpsMotor] for file size; it is the layer
+## stamp that lets a settled walker skip its ground probe. Split out of [GSFpsMotor] for file size; it is the layer
 ## between that and dot_fps_motor_slide.gd, and nothing outside the motor names this script.
 
 
 ## [member native_tick]'s tunables for this tick, or empty when this tick may not run natively.
-func _native_tick_tun(state: DotFpsState) -> PackedFloat64Array:
+func _native_tick_tun(state: GSFpsState) -> PackedFloat64Array:
 	if (
 		not native_tick or surfaces != null or tunables.edge_friction > 1.0
-		or (state.mode != DotFpsState.Mode.GROUND and state.mode != DotFpsState.Mode.AIR)
+		or (state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR)
 	):
 		return PackedFloat64Array()
 	if tunables != _tun_for or tunables.revision != _tun_rev:
@@ -21,10 +21,10 @@ func _native_tick_tun(state: DotFpsState) -> PackedFloat64Array:
 
 
 ## [method _native_tick_tun]'s array and [method _native_full_tun]'s, kept until [member tunables] or one of its values
-## changes ([member DotFpsTunables.revision]): rebuilding them was a per-tick copy of about 75 values per player.
+## changes ([member GSFpsTunables.revision]): rebuilding them was a per-tick copy of about 75 values per player.
 var _tun_cache := PackedFloat64Array()
 var _tun_full_cache := PackedFloat64Array()
-var _tun_for: DotFpsTunables = null
+var _tun_for: GSFpsTunables = null
 var _tun_rev := -1
 
 
@@ -46,7 +46,7 @@ var _native_start_settled := false
 ## [method _depenetrate], [method _reuse_rest] and [method _categorise_ground_settled] in one native call; false (nothing
 ## written) when the body cannot. The script decides everything [method _reuse_rest] compares but the position, which the
 ## native depenetration may move.
-func _native_tick_pre(state: DotFpsState, tun: PackedFloat64Array) -> bool:
+func _native_tick_pre(state: GSFpsState, tun: PackedFloat64Array) -> bool:
 	var height := _height(state)
 	var rest_ok := _native_rest_ok(state, height)
 	var p := state.position
@@ -69,9 +69,9 @@ func _native_tick_pre(state: DotFpsState, tun: PackedFloat64Array) -> bool:
 
 
 ## Whether [method _reuse_rest] may reuse the last rest, for the native start: all it compares but the position.
-func _native_rest_ok(state: DotFpsState, height: float) -> bool:
+func _native_rest_ok(state: GSFpsState, height: float) -> bool:
 	return (
-		_rest_valid and state.mode == DotFpsState.Mode.GROUND
+		_rest_valid and state.mode == GSFpsState.Mode.GROUND
 		and state.velocity == _rest_velocity
 		and state.ground_normal == _rest_normal and state.ground_id == _rest_ground_id
 		and state.surface == _rest_surface and height == _rest_height
@@ -111,7 +111,7 @@ var _full_in := PackedFloat64Array()
 
 ## The whole tick from the start ground check to the end one in one native call: the halves and every move between;
 ## false (nothing written) when the body cannot.
-func _native_tick_full(state: DotFpsState, command: DotFpsCommand, delta: float, tun: PackedFloat64Array) -> bool:
+func _native_tick_full(state: GSFpsState, command: GSFpsCommand, delta: float, tun: PackedFloat64Array) -> bool:
 	var a := _full_in
 	if a.size() != 55:
 		a.resize(55)
@@ -124,7 +124,7 @@ func _native_tick_full(state: DotFpsState, command: DotFpsCommand, delta: float,
 
 
 ## The whole tick's input, 55 values from [param o] in [param a] (set by index: a literal built a Variant Array of every value, each tick).
-func _fill_full_in(state: DotFpsState, command: DotFpsCommand, delta: float, a: PackedFloat64Array, o: int) -> void:
+func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: PackedFloat64Array, o: int) -> void:
 	var height := _height(state)
 	var p := state.position
 	var v := state.velocity
@@ -132,7 +132,7 @@ func _fill_full_in(state: DotFpsState, command: DotFpsCommand, delta: float, a: 
 	var id := state.ground_id
 	var push := _surface.push
 	var w := state.wall_normal
-	var buttons := command.buttons if state.sprinting else command.buttons & ~DotFpsCommand.BUTTON_SPRINT
+	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
 	var t := tunables
 	if t != _fill_for or t.revision != _fill_rev:
 		_fill_for = t
@@ -217,10 +217,10 @@ func _fill_values() -> PackedFloat64Array:
 
 
 ## [method _fill_values] kept while the effects are clean (all ones, [member _effects_clean]) and [member tunables] and
-## its [member DotFpsTunables.revision] stay, and the last [method DotFpsTunables.speed_for] with its buttons and load:
+## its [member GSFpsTunables.revision] stay, and the last [method GSFpsTunables.speed_for] with its buttons and load:
 ## about a dozen reads and two calls a player a tick.
 var _fill_clean := PackedFloat64Array()
-var _fill_for: DotFpsTunables = null
+var _fill_for: GSFpsTunables = null
 var _fill_rev := -1
 var _fill_buttons := -1
 var _fill_load := NAN
@@ -228,13 +228,13 @@ var _fill_speed := 0.0
 
 
 ## Writes a whole native tick's 45 values into the state and the counters.
-func _native_full_apply(state: DotFpsState, r: PackedFloat64Array, o: int = 0) -> void:
+func _native_full_apply(state: GSFpsState, r: PackedFloat64Array, o: int = 0) -> void:
 	_rest_valid = false
 	var flags := _native_tick_apply(state, r, o)
 	if flags & 2 != 0:
 		reused_ground_ticks += 1
 	if flags & 16 != 0:
-		DotLog.warn(CHANNEL, "velocity became non-finite; reset to zero")
+		GSLog.warn(CHANNEL, "velocity became non-finite; reset to zero")
 	if flags & 8 != 0:
 		settled_ground_ticks += 1
 		_stamp_rest(state)
@@ -262,13 +262,13 @@ func _native_full_apply(state: DotFpsState, r: PackedFloat64Array, o: int = 0) -
 
 ## From friction to the end ground check in one native call; false (nothing written) when the body cannot.
 func _native_tick_post(
-	state: DotFpsState, command: DotFpsCommand, delta: float, tun: PackedFloat64Array, jumped: bool,
-	wall: DotFpsBody.Hit, start_settled: bool, start_position: Vector3, start_velocity: Vector3
+	state: GSFpsState, command: GSFpsCommand, delta: float, tun: PackedFloat64Array, jumped: bool,
+	wall: GSFpsBody.Hit, start_settled: bool, start_position: Vector3, start_velocity: Vector3
 ) -> bool:
-	if state.mode != DotFpsState.Mode.GROUND and state.mode != DotFpsState.Mode.AIR:
+	if state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR:
 		return false
 	var sliding := state.is_sliding()
-	var buttons := command.buttons if state.sprinting else command.buttons & ~DotFpsCommand.BUTTON_SPRINT
+	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
 	var flags := (
 		(1 if jumped else 0) | (2 if sliding else 0) | (4 if _effects.deny_move else 0)
 		| (8 if _wall_slide_ok(state, command, wall) else 0) | (16 if start_settled else 0)
@@ -292,7 +292,7 @@ func _native_tick_post(
 		return false
 	var out := _native_tick_apply(state, r)
 	if out & 16 != 0:
-		DotLog.warn(CHANNEL, "velocity became non-finite; reset to zero")
+		GSLog.warn(CHANNEL, "velocity became non-finite; reset to zero")
 	if out & 8 != 0:
 		settled_ground_ticks += 1
 		_stamp_rest(state)
@@ -302,7 +302,7 @@ func _native_tick_post(
 
 
 ## Writes a native tick half's answer to [param state] and the counters; returns its flags.
-func _native_tick_apply(state: DotFpsState, r: PackedFloat64Array, o: int = 0) -> int:
+func _native_tick_apply(state: GSFpsState, r: PackedFloat64Array, o: int = 0) -> int:
 	state.position = Vector3(r[o], r[o + 1], r[o + 2])
 	state.velocity = Vector3(r[o + 3], r[o + 4], r[o + 5])
 	state.ground_normal = Vector3(r[o + 6], r[o + 7], r[o + 8])
@@ -323,10 +323,10 @@ func _native_tick_apply(state: DotFpsState, r: PackedFloat64Array, o: int = 0) -
 
 ## The whole tick for a walker standing still on the floor the last tick proved, or false (nothing written) when anything differs.
 ## Same answers as the full path, which for such a tick changes nothing: wish, velocity and buttons are zero, so only the world can differ, and two queries ask it (embedded? floor still there?).
-func _idle_tick(state: DotFpsState, command: DotFpsCommand) -> bool:
+func _idle_tick(state: GSFpsState, command: GSFpsCommand) -> bool:
 	if (
 		not _rest_valid or command.move != Vector2.ZERO or command.buttons != 0
-		or state.previous_buttons != 0 or state.mode != DotFpsState.Mode.GROUND
+		or state.previous_buttons != 0 or state.mode != GSFpsState.Mode.GROUND
 		or state.velocity != Vector3.ZERO or state.is_sliding() or state.is_wall_running()
 		or state.position != _rest_position or state.velocity != _rest_velocity
 		or state.ground_normal != _rest_normal or state.ground_id != _rest_ground_id
@@ -366,8 +366,8 @@ func _idle_tick(state: DotFpsState, command: DotFpsCommand) -> bool:
 
 
 ## Remembers the state a settled ground check just proved, for [method _reuse_rest].
-func _stamp_rest(state: DotFpsState) -> void:
-	_rest_valid = reuse_settled_ground and state.mode == DotFpsState.Mode.GROUND
+func _stamp_rest(state: GSFpsState) -> void:
+	_rest_valid = reuse_settled_ground and state.mode == GSFpsState.Mode.GROUND
 	_rest_position = state.position
 	_rest_velocity = state.velocity
 	_rest_height = _height(state)
@@ -393,12 +393,12 @@ func _ground_node(id: int) -> Node3D:
 
 ## Whether the state is the one the last tick ended on after a settled ground check, so the start-of-tick check would repeat its queries.
 ## Only the world can differ between ticks; the stamp is dropped on any other change, so a mover carrying its rider is still probed.
-func _reuse_rest(state: DotFpsState) -> bool:
+func _reuse_rest(state: GSFpsState) -> bool:
 	if not _rest_valid:
 		return false
 	_rest_valid = false
 	if (
-		state.mode == DotFpsState.Mode.GROUND
+		state.mode == GSFpsState.Mode.GROUND
 		and state.position == _rest_position and state.velocity == _rest_velocity
 		and state.ground_normal == _rest_normal and state.ground_id == _rest_ground_id
 		and state.surface == _rest_surface and _height(state) == _rest_height

@@ -1,7 +1,7 @@
 extends "dot_fps_motor_walls.gd"
 
 ## The motor's collide-and-slide: the ground probes and their per-tick cache, the slide, stepping, creases,
-## depenetration and the snap to ground. Split out of [DotFpsMotor] for file size; it is the layer between
+## depenetration and the snap to ground. Split out of [GSFpsMotor] for file size; it is the layer between
 ## that and dot_fps_motor_walls.gd, and nothing outside the motor names this script.
 
 
@@ -16,7 +16,7 @@ const QUADRANTS: Array[Vector2] = [
 
 ## One of four half-radius capsules, one per quarter of the player, that finds a FLOOR along [param probe]. See [method _categorise_ground].
 ## Each sits half a radius out along its diagonal, inside the player's footprint: one poking outside would start inside the very face that made it necessary, or find floor the player is not over.
-func _quadrant_floor(centre: Vector3, probe: Vector3, height: float) -> DotFpsBody.Hit:
+func _quadrant_floor(centre: Vector3, probe: Vector3, height: float) -> GSFpsBody.Hit:
 	if not static_world:
 		return _quadrant_floor_probe(centre, probe, height)
 	# The end-of-tick check and the next tick's first check ask this at one position, and in a
@@ -25,7 +25,7 @@ func _quadrant_floor(centre: Vector3, probe: Vector3, height: float) -> DotFpsBo
 	var mask := body.collision_mask
 	if (_qf_valid and centre == _qf_centre and probe == _qf_probe and height == _qf_height
 			and radius == _qf_radius and mask == _qf_mask):
-		return _copy_hit(_qf_hit) if _qf_hit != null else DotFpsBody.Hit.new()
+		return _copy_hit(_qf_hit) if _qf_hit != null else GSFpsBody.Hit.new()
 	var found := _quadrant_floor_probe(centre, probe, height)
 	_qf_valid = true
 	_qf_centre = centre
@@ -39,7 +39,7 @@ func _quadrant_floor(centre: Vector3, probe: Vector3, height: float) -> DotFpsBo
 
 ## The ground check's sweep, remembered across ticks under [member static_world] like
 ## [method _quadrant_floor]: the last check of a tick and the first of the next are one question.
-func _ground_probe(centre: Vector3, probe: Vector3, height: float) -> DotFpsBody.Hit:
+func _ground_probe(centre: Vector3, probe: Vector3, height: float) -> GSFpsBody.Hit:
 	if not static_world:
 		return _sweep(centre, probe, height)
 	var radius := tunables.radius
@@ -66,7 +66,7 @@ var _gp_height := 0.0
 var _gp_radius := 0.0
 var _gp_mask := 0
 var _gp_skin := 0.0
-var _gp_hit: DotFpsBody.Hit = null
+var _gp_hit: GSFpsBody.Hit = null
 
 
 ## True when nothing the body queries moves between ticks (no platforms, doors or hulls), so
@@ -89,8 +89,8 @@ func invalidate_probe_cache() -> void:
 	_en_valid = false
 
 
-func _copy_hit(from: DotFpsBody.Hit) -> DotFpsBody.Hit:
-	var out := DotFpsBody.Hit.new()
+func _copy_hit(from: GSFpsBody.Hit) -> GSFpsBody.Hit:
+	var out := GSFpsBody.Hit.new()
 	out.hit = from.hit
 	out.fraction = from.fraction
 	out.normal = from.normal
@@ -107,22 +107,22 @@ var _qf_probe := Vector3.ZERO
 var _qf_height := 0.0
 var _qf_radius := 0.0
 var _qf_mask := 0
-var _qf_hit: DotFpsBody.Hit = null
+var _qf_hit: GSFpsBody.Hit = null
 
 
-func _quadrant_floor_probe(centre: Vector3, probe: Vector3, height: float) -> DotFpsBody.Hit:
+func _quadrant_floor_probe(centre: Vector3, probe: Vector3, height: float) -> GSFpsBody.Hit:
 	var half := tunables.radius * 0.5
 	for quarter: Vector2 in QUADRANTS:
 		var offset := Vector3(quarter.x, 0.0, quarter.y).normalized() * half
 		var hit := _sweep(centre + offset, probe, height, half)
 		if hit.hit and _is_floor(hit.normal):
 			return hit
-	return DotFpsBody.Hit.miss()
+	return GSFpsBody.Hit.miss()
 
 
 ## The collide-and-slide result to keep: the plain slide, or the stepped one when it got further.
 func _prefer_step(
-	state: DotFpsState, plain: MoveResult, motion: Vector3, height: float,
+	state: GSFpsState, plain: MoveResult, motion: Vector3, height: float,
 	walking: bool, hull_only: bool
 ) -> MoveResult:
 	# Stepping is tried only when it could help: grounded, blocked, and not the tick a jump left the surface.
@@ -145,7 +145,7 @@ func _prefer_step(
 
 ## Removes the lift a steep face added to a walker's velocity along the floor they stood on.
 func _strip_steep_lift(
-	state: DotFpsState, plain: MoveResult, velocity_in: Vector3, stood_on: Vector3, walking: bool
+	state: GSFpsState, plain: MoveResult, velocity_in: Vector3, stood_on: Vector3, walking: bool
 ) -> void:
 	# A walker is not lifted by a face they cannot stand on (`[steep-climb-1]`). The classic walk move zeroes the vertical before and after, so a walk never climbs.
 	# Here only the lift the slide ADDED along the floor's normal goes, and only when a steep face did it; a walkable ramp's lift is the floor's own, and a jump never reaches this.
@@ -455,9 +455,9 @@ func _resolve_planes(planes: Array[Vector3], original: Vector3) -> Vector3:
 	return Vector3.ZERO
 
 
-## Whether there is a drop just in front of the player. For [member DotFpsTunables.edge_friction].
+## Whether there is a drop just in front of the player. For [member GSFpsTunables.edge_friction].
 ## Probed with a thin capsule offset past their radius: sweeping the full capsule would answer "no" for anybody standing against a wall, doubling the friction of every player in a corridor.
-func _near_ledge(state: DotFpsState) -> bool:
+func _near_ledge(state: GSFpsState) -> bool:
 	var horizontal := Vector3(state.velocity.x, 0.0, state.velocity.z)
 
 	if horizontal.length_squared() < 1e-6:
@@ -553,13 +553,13 @@ func _slide_with_step(
 ## Whether a steep landing contact is the capsule's rounded bottom on the edge of a floor, rather than a steep face.
 ## The step's down leg reports the capsule's normal, not the kerb's (50 to 80 degrees from up at walking pace), so a thin probe just past the contact must find a floor at the contact's own height. A steep face answers no, so surf and walls are unaffected.
 ## And the floor must be within a step of where the step started ([param start_y]): the across leg rides the hemisphere up the corner, so without that any kerb answered yes (0.7 m at 7 m/s with step_height 0.45).
-func _floor_beyond_edge(landing: DotFpsBody.Hit, feet: Vector3, start_y: float) -> bool:
+func _floor_beyond_edge(landing: GSFpsBody.Hit, feet: Vector3, start_y: float) -> bool:
 	return _edge_floor_normal(landing, feet, start_y) != Vector3.ZERO
 
 
 ## The floor's own normal behind [method _floor_beyond_edge]'s answer, or
 ## [constant Vector3.ZERO] when there is none.
-func _edge_floor_normal(landing: DotFpsBody.Hit, feet: Vector3, start_y: float) -> Vector3:
+func _edge_floor_normal(landing: GSFpsBody.Hit, feet: Vector3, start_y: float) -> Vector3:
 	if landing.point.y - start_y > tunables.step_height + tunables.skin_width:
 		return Vector3.ZERO
 
@@ -583,7 +583,7 @@ func _edge_floor_normal(landing: DotFpsBody.Hit, feet: Vector3, start_y: float) 
 ## Puts a grounded player back a skin clear of the floor [param hit] found, if closer than half of one. Straight up, never further than the skin.
 ## Exactly touching a floor is a state a horizontal sweep cannot move out of: cast_motion reports the floor as an obstacle to a HORIZONTAL move at fraction ~0 in about one position in five, so a runner spawned on a floor froze in front of every kerb.
 ## Every query here stops a skin short, so only a spawn at the floor's height gets there, and a grounded player is never snapped.
-func _keep_skin(state: DotFpsState, hit: DotFpsBody.Hit, probe: Vector3) -> void:
+func _keep_skin(state: GSFpsState, hit: GSFpsBody.Hit, probe: Vector3) -> void:
 	var gap := probe.length() * hit.fraction
 	if gap < tunables.skin_width * 0.5 and hit.normal.y > 0.0:
 		state.position.y += tunables.skin_width - gap
@@ -592,7 +592,7 @@ func _keep_skin(state: DotFpsState, hit: DotFpsBody.Hit, probe: Vector3) -> void
 ## The floor [param hit] puts the player on, or [constant Vector3.ZERO] if it is not one.
 ## A walkable contact is its own answer. A steep one is the capsule's rounded bottom on an edge and counts as the floor beyond it ([method _edge_floor_normal]), [b]only for a player moving onto that floor[/b].
 ## Otherwise the next tick read a kerb corner's normal as AIR and the air slide turned a run into a climb (1.07 m at 15 m/s over a 0.34 m kerb). Standing on, walking off or running along a ledge keep the capsule's answer.
-func _standable_normal(state: DotFpsState, hit: DotFpsBody.Hit) -> Vector3:
+func _standable_normal(state: GSFpsState, hit: GSFpsBody.Hit) -> Vector3:
 	if not hit.hit:
 		return Vector3.ZERO
 
@@ -632,8 +632,8 @@ var _en_normal := Vector3.ZERO
 
 ## Pushes the capsule out of whatever it is inside along that surface's own normal. Returns whether it moved.
 ## The general form of [method _lift_clear]: straight up is right out of a floor and wrong out of a 60 degree ramp, and [method _lift_clear] is reached only for a player GROUNDED last tick, which a surfer never is.
-## One query a tick per player: the cheaper [method DotFpsBody.overlaps] cannot tell a player resting on a floor from one buried in it.
-func _depenetrate(state: DotFpsState, height: float) -> bool:
+## One query a tick per player: the cheaper [method GSFpsBody.overlaps] cannot tell a player resting on a floor from one buried in it.
+func _depenetrate(state: GSFpsState, height: float) -> bool:
 	var centre := _capsule_centre(state.position, height)
 	var resting := body.rest_contact(centre, height, tunables.radius)
 
@@ -656,7 +656,7 @@ func _depenetrate(state: DotFpsState, height: float) -> bool:
 ## Lifts a player who is inside geometry until they are not, and says whether it worked.
 ## Straight up and never further than a step: the player got here by sinking through a surface they stood on. Lifting further would be a teleport.
 ## The lift doubles each try (about nine overlap queries to cover a step, not hundreds), landing up to twice as high as needed; the next ground probe brings them back down. Deterministic: shape queries and arithmetic only.
-func _lift_clear(state: DotFpsState, height: float) -> bool:
+func _lift_clear(state: GSFpsState, height: float) -> bool:
 	var lift := maxf(tunables.skin_width * 2.0, 0.0005)
 	var limit := maxf(tunables.step_height, lift)
 	var moved := 0.0
@@ -680,7 +680,7 @@ func _lift_clear(state: DotFpsState, height: float) -> bool:
 ## Pulls the player back down onto ground they have just walked off the edge of, so walking down a ramp does not get air physics (no friction) one tick in a few.
 ## [param stood_on] is the floor at the start of the tick. Moving away from it means a launch the snap must not cancel; moving along it is a walk, and at a ramp's crest that walk still points upward.
 func _snap_to_ground(
-	state: DotFpsState,
+	state: GSFpsState,
 	height: float,
 	stood_on: Vector3 = Vector3.UP
 ) -> void:
@@ -711,7 +711,7 @@ func _snap_to_ground(
 		return
 
 	state.position += probe * hit.fraction
-	state.mode = DotFpsState.Mode.GROUND
+	state.mode = GSFpsState.Mode.GROUND
 	state.ground_normal = hit.normal
 	state.ground_id = hit.collider_id
 
@@ -726,10 +726,10 @@ func _snap_to_ground(
 
 
 ## Moves the player by its velocity for one tick, colliding and sliding.
-## Exposed so a [DotFpsMoveMode] gets the same skin-margin and step handling without re-implementing collide-and-slide.
+## Exposed so a [GSFpsMoveMode] gets the same skin-margin and step handling without re-implementing collide-and-slide.
 ## [param step] enables stair stepping; a swimming or flying mode wants it off.
 func move_and_slide(
-	state: DotFpsState,
+	state: GSFpsState,
 	delta: float,
 	step: bool = false
 ) -> void:
@@ -756,24 +756,24 @@ func move_and_slide(
 
 
 ## A swept capsule query with the skin margin applied, in world space.
-## [param from] is the player's feet, not the capsule centre, the same convention as [member DotFpsState.position].
+## [param from] is the player's feet, not the capsule centre, the same convention as [member GSFpsState.position].
 func probe(
-	state: DotFpsState,
+	state: GSFpsState,
 	from: Vector3,
 	motion: Vector3
-) -> DotFpsBody.Hit:
+) -> GSFpsBody.Hit:
 	var height := _height(state)
 	return _sweep(_capsule_centre(from, height), motion, height)
 
 
 ## Whether the player's capsule would overlap anything at [param feet].
-func would_overlap(state: DotFpsState, feet: Vector3) -> bool:
+func would_overlap(state: GSFpsState, feet: Vector3) -> bool:
 	var height := _height(state)
 	return body.overlaps(_capsule_centre(feet, height), height, tunables.radius)
 
 
 ## [method _slide] then [method _prefer_step] (mode 0, [param flag] walking) or the slide and step of [method move_and_slide]
-## (mode 1, [param flag] step) in one native call, when the body runs one ([method DotFpsBody.native_slide]); null to run them here.
+## (mode 1, [param flag] step) in one native call, when the body runs one ([method GSFpsBody.native_slide]); null to run them here.
 ## The native slide is this script's to the bit (GameSpice Sim's motor parity suite), so a web client running the script agrees.
 func _native_move(
 	from: Vector3, velocity: Vector3, motion: Vector3, height: float, mode: int, flag: bool

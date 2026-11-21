@@ -1,7 +1,7 @@
-class_name DotPlayerHullRewind
+class_name GSPlayerHullRewind
 extends RefCounted
 
-## Lag-compensated collision for players whose hulls are physics bodies ([method DotPlayerBodyRules.apply_hull]): [method around] puts every other player's hull where the game's [member feet_fn] says the mover's view had it, runs the step, and puts the hulls back.
+## Lag-compensated collision for players whose hulls are physics bodies ([method GSPlayerBodyRules.apply_hull]): [method around] puts every other player's hull where the game's [member feet_fn] says the mover's view had it, runs the step, and puts the hulls back.
 ## Without it a client predicts a bump against the drawn (interpolated) remote and the server moves the mover against the present: every bump with a moving player is a correction. Design and limits: docs/collision.md, "Lag-compensated hulls".
 ## Only the physics server's transform is written, never the node, so nothing the game reads (positions, hitboxes, the interpolator) sees a rewound player.
 
@@ -10,7 +10,7 @@ extends RefCounted
 var feet_fn: Callable = Callable()
 
 ## `(feet: Vector3) -> Vector3`: snaps a rewound position to the wire grid of the replicated position
-## (`DotNetVar.wire_value`), so both ends stand the hull on the same millimetre. Unset: used as given.
+## (`GSNetVar.wire_value`), so both ends stand the hull on the same millimetre. Unset: used as given.
 var snap_fn: Callable = Callable()
 
 ## Only hulls within this many metres (a box around the mover's feet), then or now, are moved; 0 moves every hull.
@@ -75,9 +75,9 @@ func restore() -> int:
 
 
 ## Runs [param work] (a Callable) with the hulls rewound for [param mover] at [param tick] and returns its result.
-## With [member DotPlayerBodyRules.solid] or [member DotPlayerBodyRules.unlag] off in [param rules] (or null rules),
+## With [member GSPlayerBodyRules.solid] or [member GSPlayerBodyRules.unlag] off in [param rules] (or null rules),
 ## runs it against the present.
-func around(rules: DotPlayerBodyRules, mover: Variant, bodies: Dictionary, tick: int, work: Callable, mover_feet: Variant = null) -> Variant:
+func around(rules: GSPlayerBodyRules, mover: Variant, bodies: Dictionary, tick: int, work: Callable, mover_feet: Variant = null) -> Variant:
 	if rules == null or not rules.solid or not rules.unlag:
 		return work.call()
 	var _n := rewind(mover, bodies, tick, mover_feet)

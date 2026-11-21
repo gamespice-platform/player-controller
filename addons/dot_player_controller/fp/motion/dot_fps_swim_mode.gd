@@ -1,5 +1,5 @@
-class_name DotFpsSwimMode
-extends DotFpsMoveMode
+class_name GSFpsSwimMode
+extends GSFpsMoveMode
 
 ## Swimming: move where you look, jump rises, crouch dives, let go to float with the head out, jump at an edge to climb out.
 ## Water is data, not an area: [member volumes] is a box list the game supplies, so a replay can ask where a player WAS.
@@ -83,8 +83,8 @@ func is_in(feet: Vector3) -> bool:
 
 ## The game's once-a-tick call: puts a player whose waist is in the water into this mode.
 ## Leaving is handled by [method _simulate]. Noclip is left alone.
-func update(motor: DotFpsMotor, state: DotFpsState) -> void:
-	if mode_id < 0 or state.mode == mode_id or state.mode == DotFpsState.Mode.NOCLIP:
+func update(motor: GSFpsMotor, state: GSFpsState) -> void:
+	if mode_id < 0 or state.mode == mode_id or state.mode == GSFpsState.Mode.NOCLIP:
 		return
 	if is_in(state.position) and has_room_to_float(motor, state):
 		motor.set_mode(state, mode_id)
@@ -93,7 +93,7 @@ func update(motor: DotFpsMotor, state: DotFpsState) -> void:
 ## Whether the water under [param state] is deep enough to float in: false when the bed
 ## is above where a floating swimmer's feet would hang ([member float_depth] under the
 ## surface). Water that shallow is waded; a swimmer held there is pressed into the bed.
-func has_room_to_float(motor: DotFpsMotor, state: DotFpsState) -> bool:
+func has_room_to_float(motor: GSFpsMotor, state: GSFpsState) -> bool:
 	var surface := surface_at(state.position + Vector3.UP * waist)
 	if is_nan(surface):
 		return false
@@ -104,25 +104,25 @@ func has_room_to_float(motor: DotFpsMotor, state: DotFpsState) -> bool:
 
 
 func _simulate(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float,
-	motor: DotFpsMotor
+	motor: GSFpsMotor
 ) -> void:
 	var surface := surface_at(state.position + Vector3.UP * waist)
 
 	if is_nan(surface) or not has_room_to_float(motor, state):
 		# Out, or standing in water too shallow to float: the motor's own modes decide next tick.
-		motor.set_mode(state, DotFpsState.Mode.AIR)
+		motor.set_mode(state, GSFpsState.Mode.AIR)
 		motor.move_and_slide(state, delta)
 		return
 
-	var basis := DotFpsMotor._view_basis(state.yaw, state.pitch)
+	var basis := GSFpsMotor._view_basis(state.yaw, state.pitch)
 	var wish := (basis.right * command.move.x + basis.forward * command.move.y).limit_length(1.0) * swim_speed
 	var vertical := 0.0
-	if command.is_pressed(DotFpsCommand.BUTTON_JUMP):
+	if command.is_pressed(GSFpsCommand.BUTTON_JUMP):
 		vertical += 1.0
-	if command.is_pressed(DotFpsCommand.BUTTON_CROUCH):
+	if command.is_pressed(GSFpsCommand.BUTTON_CROUCH):
 		vertical -= 1.0
 
 	if vertical != 0.0:

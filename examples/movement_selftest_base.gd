@@ -22,7 +22,7 @@ var _completed := 0
 
 ## A ladder, of the kind a game would write. The smallest thing that proves the mode
 ## hook actually replaces the built-in simulation rather than running alongside it.
-class LadderMode extends DotFpsMoveMode:
+class LadderMode extends GSFpsMoveMode:
 	var entered := 0
 	var exited := 0
 	var ticks := 0
@@ -30,17 +30,17 @@ class LadderMode extends DotFpsMoveMode:
 	func _name() -> StringName:
 		return &"ladder"
 
-	func _enter(_state: DotFpsState, _motor: DotFpsMotor) -> void:
+	func _enter(_state: GSFpsState, _motor: GSFpsMotor) -> void:
 		entered += 1
 
-	func _exit(_state: DotFpsState, _motor: DotFpsMotor) -> void:
+	func _exit(_state: GSFpsState, _motor: GSFpsMotor) -> void:
 		exited += 1
 
 	func _simulate(
-		state: DotFpsState,
-		command: DotFpsCommand,
+		state: GSFpsState,
+		command: GSFpsCommand,
 		delta: float,
-		motor: DotFpsMotor
+		motor: GSFpsMotor
 	) -> void:
 		ticks += 1
 
@@ -51,30 +51,30 @@ class LadderMode extends DotFpsMoveMode:
 		motor.move_and_slide(state, delta)
 
 
-func _tunables() -> DotFpsTunables:
-	var t := DotFpsTunables.with_profile("legacy")
+func _tunables() -> GSFpsTunables:
+	var t := GSFpsTunables.with_profile("legacy")
 	# Deterministic and easy to reason about, not necessarily fun.
 	t.can_noclip = true
 	return t
 
 
 func _motor(
-	t: DotFpsTunables,
-	body: DotFpsBody = null
-) -> DotFpsMotor:
-	return DotFpsMotor.new(t, body if body != null else DotFpsFlatBody.with_floor(0.0))
+	t: GSFpsTunables,
+	body: GSFpsBody = null
+) -> GSFpsMotor:
+	return GSFpsMotor.new(t, body if body != null else GSFpsFlatBody.with_floor(0.0))
 
 
 ## A player standing on the floor at the origin, already settled.
-func _standing(motor: DotFpsMotor) -> DotFpsState:
-	var s := DotFpsState.new()
+func _standing(motor: GSFpsMotor) -> GSFpsState:
+	var s := GSFpsState.new()
 	s.position = Vector3.ZERO
-	s.mode = DotFpsState.Mode.GROUND
+	s.mode = GSFpsState.Mode.GROUND
 
 	# A few idle ticks so the ground categorisation and crouch fraction have settled;
 	# starting a test from a hand-built state tests the state, not the motor.
 	for _i in range(4):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	return s
 
@@ -84,8 +84,8 @@ func _command(
 	strafe: float = 0.0,
 	yaw: float = 0.0,
 	buttons: int = 0
-) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	c.move = Vector2(strafe, forward)
 	c.yaw = yaw
 	c.buttons = buttons
@@ -94,17 +94,17 @@ func _command(
 
 ## A motor with the surface set and modifier the determinism test uses.
 func _build_motor(
-	t: DotFpsTunables,
-	world: DotFpsFlatBody,
-	surface_set: DotFpsSurfaceSet,
-	boost: DotFpsModifier
-) -> DotFpsMotor:
-	var motor := DotFpsMotor.new(t, world)
+	t: GSFpsTunables,
+	world: GSFpsFlatBody,
+	surface_set: GSFpsSurfaceSet,
+	boost: GSFpsModifier
+) -> GSFpsMotor:
+	var motor := GSFpsMotor.new(t, world)
 	motor.surfaces = surface_set
 	# The first box is ice, everything else is default. Keyed on the body's own
 	# collider ids, which stand in for the scene metadata a game would read.
 	motor.surface_resolver = func(id: int) -> StringName:
-		return &"ice" if id == DotFpsFlatBody.box_id(0) else &""
+		return &"ice" if id == GSFpsFlatBody.box_id(0) else &""
 	motor.register_modifier(boost)
 	return motor
 
@@ -112,8 +112,8 @@ func _build_motor(
 ## Applies the modifier on a fixed tick index, so every run applies it identically.
 ## Keyed on the loop index: the point is to prove the replay reproduces a modifier, not what triggers one.
 static func _apply_scripted_modifier(
-	motor: DotFpsMotor,
-	state: DotFpsState,
+	motor: GSFpsMotor,
+	state: GSFpsState,
 	index: int
 ) -> void:
 	if index == 120 or index == 300:
@@ -121,8 +121,8 @@ static func _apply_scripted_modifier(
 
 
 func _run_window(
-	motor: DotFpsMotor,
-	state: DotFpsState,
+	motor: GSFpsMotor,
+	state: GSFpsState,
 	commands: Array,
 	from: int,
 	to: int
@@ -133,9 +133,9 @@ func _run_window(
 
 
 func _run_ticks(
-	motor: DotFpsMotor,
-	state: DotFpsState,
-	commands: Array[DotFpsCommand]
+	motor: GSFpsMotor,
+	state: GSFpsState,
+	commands: Array[GSFpsCommand]
 ) -> void:
 	for command in commands:
 		motor.simulate(state, command, STEP)
@@ -195,8 +195,8 @@ static func _drag(index: int, to: Vector2) -> InputEventScreenDrag:
 	return event
 
 
-## A stand-in for [code]DotNetWriter[/code] / [code]DotNetReader[/code]; dot-net must not be installed here.
-## It records the duck-typed calls of [method DotFpsCommand.write] so the contract is checked
+## A stand-in for [code]GSNetWriter[/code] / [code]GSNetReader[/code]; dot-net must not be installed here.
+## It records the duck-typed calls of [method GSFpsCommand.write] so the contract is checked
 ## without the dependency (a method-name typo would otherwise only fail in the host game).
 class FakeWire extends RefCounted:
 	var values: Array = []
@@ -255,14 +255,14 @@ var net_modifiers: int
 
 ## A floor and a corridor along -Z: a wall whose face is x = 1 (normal -X, on the right of
 ## a player looking down -Z) and one whose face is x = -3 (normal +X, on the left).
-func _wall_world() -> DotFpsFlatBody:
-	var world := DotFpsFlatBody.with_floor(0.0)
+func _wall_world() -> GSFpsFlatBody:
+	var world := GSFpsFlatBody.with_floor(0.0)
 	world.add_box(AABB(Vector3(1.0, 0.0, -200.0), Vector3(0.5, 12.0, 200.0)))
 	world.add_box(AABB(Vector3(-3.5, 0.0, -200.0), Vector3(0.5, 12.0, 200.0)))
 	return world
 
 
-func _wall_tunables() -> DotFpsTunables:
+func _wall_tunables() -> GSFpsTunables:
 	var t := _tunables()
 	t.wall_run_enabled = true
 	t.wall_jump_enabled = true
@@ -275,9 +275,9 @@ func _wall_tunables() -> DotFpsTunables:
 
 ## An airborne player 5 cm off the right-hand wall, moving down -Z at [param speed] and
 ## rising at [param rise], well past coyote time.
-func _beside_wall(speed: float, rise: float = 1.0, height: float = 3.0) -> DotFpsState:
-	var s := DotFpsState.new()
-	s.mode = DotFpsState.Mode.AIR
+func _beside_wall(speed: float, rise: float = 1.0, height: float = 3.0) -> GSFpsState:
+	var s := GSFpsState.new()
+	s.mode = GSFpsState.Mode.AIR
 	s.position = Vector3(1.0 - 0.35 - 0.05, height, -2.0)
 	s.velocity = Vector3(0.0, rise, -speed)
 	s.time_since_grounded = 1.0
@@ -286,7 +286,7 @@ func _beside_wall(speed: float, rise: float = 1.0, height: float = 3.0) -> DotFp
 
 ## Largest change of velocity between consecutive ticks over [param ticks] forward-held
 ## ticks, and how many of them were wall running.
-func _run_along(motor: DotFpsMotor, s: DotFpsState, ticks: int, yaw: float = 0.0) -> Dictionary:
+func _run_along(motor: GSFpsMotor, s: GSFpsState, ticks: int, yaw: float = 0.0) -> Dictionary:
 	var worst := 0.0
 	var running := 0
 	var before := s.velocity
@@ -313,7 +313,7 @@ func _timers2_carrier_script() -> GDScript:
 	return script
 
 
-func _slide_tunables() -> DotFpsTunables:
+func _slide_tunables() -> GSFpsTunables:
 	var t := _tunables()
 	t.slide_enabled = true
 	t.slide_min_speed = 6.0
@@ -324,21 +324,21 @@ func _slide_tunables() -> DotFpsTunables:
 	return t
 
 
-func _launch_tunables() -> DotFpsTunables:
+func _launch_tunables() -> GSFpsTunables:
 	var t := _tunables()
 	t.launch_enabled = true
-	t.launch_button = DotFpsCommand.BUTTON_USER_0
+	t.launch_button = GSFpsCommand.BUTTON_USER_0
 	t.launch_velocity = 12.0
 	t.launch_cooldown = 3.0
 	return t
 
 
 ## A player at a settled sprint along -Z, on the floor.
-func _running(motor: DotFpsMotor) -> DotFpsState:
+func _running(motor: GSFpsMotor) -> GSFpsState:
 	var s := _standing(motor)
 
 	for _i in range(120):
-		motor.simulate(s, _command(1.0, 0.0, 0.0, DotFpsCommand.BUTTON_SPRINT), STEP)
+		motor.simulate(s, _command(1.0, 0.0, 0.0, GSFpsCommand.BUTTON_SPRINT), STEP)
 
 	return s
 
@@ -347,17 +347,17 @@ func _check_mode_packing() -> void:
 	# Every mode has to survive the three-bit packing, noclip included — a player
 	# corrected out of noclip because the flag did not fit would be a good bug.
 	for mode in [
-		DotFpsState.Mode.GROUND, DotFpsState.Mode.AIR, DotFpsState.Mode.NOCLIP
+		GSFpsState.Mode.GROUND, GSFpsState.Mode.AIR, GSFpsState.Mode.NOCLIP
 	]:
-		var probe := DotFpsState.new()
+		var probe := GSFpsState.new()
 		probe.mode = mode
-		var restored := DotFpsState.new()
-		DotFpsNetSync.unpack_flags(
-			restored, DotFpsNetSync.pack_flags(probe)
+		var restored := GSFpsState.new()
+		GSFpsNetSync.unpack_flags(
+			restored, GSFpsNetSync.pack_flags(probe)
 		)
 		_check(
 			restored.mode == mode,
-			"mode %s survives packing" % DotFpsState.Mode.keys()[mode]
+			"mode %s survives packing" % GSFpsState.Mode.keys()[mode]
 		)
 
 	# Every mode has to survive the packing, including a custom one — a player
@@ -366,23 +366,23 @@ func _check_mode_packing() -> void:
 	var ladder_id := motor.register_mode(LadderMode.new())
 
 	for mode in [
-		DotFpsState.Mode.GROUND,
-		DotFpsState.Mode.AIR,
-		DotFpsState.Mode.NOCLIP,
+		GSFpsState.Mode.GROUND,
+		GSFpsState.Mode.AIR,
+		GSFpsState.Mode.NOCLIP,
 		ladder_id,
-		DotFpsState.MAX_MODES - 1,
+		GSFpsState.MAX_MODES - 1,
 	]:
-		var probe := DotFpsState.new()
+		var probe := GSFpsState.new()
 		probe.mode = mode
 		probe.crouch_held = true
 
-		var restored := DotFpsState.new()
-		DotFpsNetSync.unpack_flags(restored, DotFpsNetSync.pack_flags(probe))
+		var restored := GSFpsState.new()
+		GSFpsNetSync.unpack_flags(restored, GSFpsNetSync.pack_flags(probe))
 
 		_check(
 			restored.mode == mode and restored.crouch_held,
 			"mode %s survives packing alongside the crouch bit"
-				% DotFpsState.mode_name(mode, motor)
+				% GSFpsState.mode_name(mode, motor)
 		)
 
 
@@ -390,14 +390,14 @@ func _check_timer_and_button_packing() -> void:
 	# The slide and launch timers ride in the same word, and must not disturb the mode or
 	# crouch below them. Without them a rewind kept the client's own cooldown and refused
 	# a launch the server made (game-fatal-contact measured 3.2 m apart).
-	var timed := DotFpsState.new()
-	timed.mode = DotFpsState.Mode.AIR
+	var timed := GSFpsState.new()
+	timed.mode = GSFpsState.Mode.AIR
 	timed.crouch_held = true
 	timed.launch_cooldown_left = 7.25
 	timed.slide_time = 0.5
 	timed.slide_cooldown_left = 0.25
-	var untimed := DotFpsState.new()
-	DotFpsNetSync.unpack_flags(untimed, DotFpsNetSync.pack_flags(timed))
+	var untimed := GSFpsState.new()
+	GSFpsNetSync.unpack_flags(untimed, GSFpsNetSync.pack_flags(timed))
 	_check(
 		is_equal_approx(untimed.launch_cooldown_left, 7.25)
 			and is_equal_approx(untimed.slide_time, 0.5)
@@ -405,34 +405,34 @@ func _check_timer_and_button_packing() -> void:
 		"the slide and launch timers round-trip to the tick",
 		"%.4f %.4f %.4f" % [untimed.launch_cooldown_left, untimed.slide_time, untimed.slide_cooldown_left]
 	)
-	_check(untimed.mode == DotFpsState.Mode.AIR and untimed.crouch_held,
+	_check(untimed.mode == GSFpsState.Mode.AIR and untimed.crouch_held,
 		"without disturbing the mode or the crouch bit")
 	# At 30 Hz a timer counted down a tick at a time is a multiple of 1/30 s, which 1/64 s cannot hold.
-	DotFpsNetSync.set_tick_rate(30)
-	var thirty := DotFpsState.new()
+	GSFpsNetSync.set_tick_rate(30)
+	var thirty := GSFpsState.new()
 	thirty.slide_time = 7.0 / 30.0
 	thirty.dash_cooldown_left = 41.0 / 30.0
-	var thirty_back := DotFpsState.new()
-	DotFpsNetSync.unpack_flags(thirty_back, DotFpsNetSync.pack_flags(thirty))
+	var thirty_back := GSFpsState.new()
+	GSFpsNetSync.unpack_flags(thirty_back, GSFpsNetSync.pack_flags(thirty))
 	_check(
 		is_equal_approx(thirty_back.slide_time, 7.0 / 30.0)
 			and is_equal_approx(thirty_back.dash_cooldown_left, 41.0 / 30.0),
 		"at 30 Hz the timers round-trip exactly (the scale follows the tick rate)",
 		"%.5f %.5f" % [thirty_back.slide_time, thirty_back.dash_cooldown_left]
 	)
-	DotFpsNetSync.set_tick_rate(128)
-	_check(DotFpsNetSync.timer_scale == 64.0, "and above 64 Hz the wire keeps its 1/64 s scale")
-	var hi := DotFpsState.new()
+	GSFpsNetSync.set_tick_rate(128)
+	_check(GSFpsNetSync.timer_scale == 64.0, "and above 64 Hz the wire keeps its 1/64 s scale")
+	var hi := GSFpsState.new()
 	hi.slide_time = 37.0 / 128.0
 	hi.slide_cooldown_left = 101.0 / 128.0
 	hi.wall_run_time = 243.0 / 128.0
-	var hi_back := DotFpsState.new()
-	DotFpsNetSync.unpack_timers2(hi_back, DotFpsNetSync.pack_timers2(hi))
-	var hi_idle := DotFpsState.new()
-	DotFpsNetSync.unpack_timers2(hi_idle, DotFpsNetSync.pack_timers2(DotFpsState.new()))
-	var hi_spent := DotFpsState.new()
+	var hi_back := GSFpsState.new()
+	GSFpsNetSync.unpack_timers2(hi_back, GSFpsNetSync.pack_timers2(hi))
+	var hi_idle := GSFpsState.new()
+	GSFpsNetSync.unpack_timers2(hi_idle, GSFpsNetSync.pack_timers2(GSFpsState.new()))
+	var hi_spent := GSFpsState.new()
 	hi_spent.wall_run_spent = true
-	DotFpsNetSync.unpack_timers2(hi_spent, DotFpsNetSync.pack_timers2(hi_spent))
+	GSFpsNetSync.unpack_timers2(hi_spent, GSFpsNetSync.pack_timers2(hi_spent))
 	_check(
 		is_equal_approx(hi_back.slide_time, 37.0 / 128.0)
 			and is_equal_approx(hi_back.slide_cooldown_left, 101.0 / 128.0)
@@ -442,25 +442,25 @@ func _check_timer_and_button_packing() -> void:
 		"at 128 Hz net_timers2 round-trips slide, cooldown and a 1.9 s wall run to the tick",
 		"%.5f %.5f %.5f" % [hi_back.slide_time, hi_back.slide_cooldown_left, hi_back.wall_run_time]
 	)
-	DotFpsNetSync.set_tick_rate(66)
-	var sixty_six := DotFpsState.new()
+	GSFpsNetSync.set_tick_rate(66)
+	var sixty_six := GSFpsState.new()
 	sixty_six.wall_run_time = 19.0 / 66.0
-	var sixty_six_back := DotFpsState.new()
-	DotFpsNetSync.unpack_flags(sixty_six_back, DotFpsNetSync.pack_flags(sixty_six))
+	var sixty_six_back := GSFpsState.new()
+	GSFpsNetSync.unpack_flags(sixty_six_back, GSFpsNetSync.pack_flags(sixty_six))
 	_check(
 		is_equal_approx(sixty_six_back.wall_run_time, 19.0 / 66.0),
 		"at 66 Hz a wall run's time round-trips to the tick, so a rewind lands where the server is",
 		"%.5f" % sixty_six_back.wall_run_time
 	)
-	DotFpsNetSync.set_tick_rate(64)
-	var idle := DotFpsState.new()
-	DotFpsNetSync.unpack_flags(idle, DotFpsNetSync.pack_flags(DotFpsState.new()))
+	GSFpsNetSync.set_tick_rate(64)
+	var idle := GSFpsState.new()
+	GSFpsNetSync.unpack_flags(idle, GSFpsNetSync.pack_flags(GSFpsState.new()))
 	_check(not idle.is_sliding() and idle.launch_cooldown_left == 0.0,
 		"and a player doing neither arrives doing neither")
-	var pressed := DotFpsState.new()
-	pressed.previous_buttons = DotFpsCommand.BUTTON_USER_0 | DotFpsCommand.BUTTON_CROUCH
-	var restored_buttons := DotFpsState.new()
-	DotFpsNetSync.unpack_flags(restored_buttons, DotFpsNetSync.pack_flags(pressed))
+	var pressed := GSFpsState.new()
+	pressed.previous_buttons = GSFpsCommand.BUTTON_USER_0 | GSFpsCommand.BUTTON_CROUCH
+	var restored_buttons := GSFpsState.new()
+	GSFpsNetSync.unpack_flags(restored_buttons, GSFpsNetSync.pack_flags(pressed))
 	_check(restored_buttons.previous_buttons == pressed.previous_buttons,
 		"and the buttons every press is detected against arrive with it")
 
@@ -469,12 +469,12 @@ func _check_modifier_mask() -> void:
 	# The active modifier set travels as a mask, so membership and order both have
 	# to come back — the aggregate is a product and the order it is taken in is part
 	# of the determinism contract.
-	var with_mods := DotFpsState.new()
+	var with_mods := GSFpsState.new()
 	with_mods.modifiers = [Vector2i(0, 40), Vector2i(3, -1), Vector2i(31, 90)]
 
-	var mask := DotFpsNetSync.pack_modifiers(with_mods)
-	var rebuilt := DotFpsState.new()
-	DotFpsNetSync.unpack_modifiers(rebuilt, mask)
+	var mask := GSFpsNetSync.pack_modifiers(with_mods)
+	var rebuilt := GSFpsState.new()
+	GSFpsNetSync.unpack_modifiers(rebuilt, mask)
 
 	_check(rebuilt.modifiers.size() == 3, "every active modifier survives the mask")
 	_check(
@@ -488,14 +488,14 @@ func _check_modifier_mask() -> void:
 		"with expiry cleared, because it is deliberately not sent"
 	)
 
-	var empty := DotFpsState.new()
-	DotFpsNetSync.unpack_modifiers(empty, 0)
+	var empty := GSFpsState.new()
+	GSFpsNetSync.unpack_modifiers(empty, 0)
 	_check(empty.modifiers.is_empty(), "and an empty mask clears the set")
 
 
 ## The slide edge cases: held, too slow, crouch already held, no boost, past the cap.
-func _slide_edges(t: DotFpsTunables, motor: DotFpsMotor) -> void:
-	var crouch := DotFpsCommand.BUTTON_CROUCH
+func _slide_edges(t: GSFpsTunables, motor: GSFpsMotor) -> void:
+	var crouch := GSFpsCommand.BUTTON_CROUCH
 
 	# Held, it ends at slide_duration and carries on as a crouch.
 	var held := _running(motor)
@@ -555,23 +555,23 @@ func _slide_edges(t: DotFpsTunables, motor: DotFpsMotor) -> void:
 
 
 ## A replay from a snapshot mid-slide reproduces it; one that forgets the slide diverges.
-func _slide_replay(t: DotFpsTunables) -> void:
-	var crouch := DotFpsCommand.BUTTON_CROUCH
+func _slide_replay(t: GSFpsTunables) -> void:
+	var crouch := GSFpsCommand.BUTTON_CROUCH
 
 	# Determinism: a replay from a snapshot in the middle of a slide reproduces it. The
 	# negative control drops the slide from the snapshot, which is what a slide kept
 	# anywhere but the state would do on a rewind, and must diverge.
-	var commands: Array[DotFpsCommand] = []
+	var commands: Array[GSFpsCommand] = []
 
 	for i in range(200):
-		var buttons := DotFpsCommand.BUTTON_SPRINT
+		var buttons := GSFpsCommand.BUTTON_SPRINT
 		if (i % 70) >= 40 and (i % 70) < 62:
 			buttons = crouch
 		commands.append(_command(1.0, sin(float(i) * 0.07) * 0.3, float(i) * 0.4, buttons))
 
 	var full := _standing(_motor(t))
 	var full_motor := _motor(t)
-	var snapshot: DotFpsState = null
+	var snapshot: GSFpsState = null
 
 	for i in range(commands.size()):
 		full_motor.simulate(full, commands[i], STEP)

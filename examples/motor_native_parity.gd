@@ -1,6 +1,6 @@
 extends "res://examples/motor_determinism_selftest.gd"
 
-## Holds dot-sim's native collision body ([code]DotSimFpsBody[/code]) to [DotFpsPhysicsBody]'s script answers, to the bit, since web clients run the script and native clients and servers the library, and they play together. Two levels: the motor replays recorded input streams (the determinism world's twelve scenarios at 22, 33 and 66 Hz) once in script and once native, and every tick's state must be identical; then thousands of random sweeps, rest contacts and overlaps, inside and outside motor ticks, are asked of both and every field compared exactly. The replays run again with other players' hulls ([DotFpsHullBody]), and random slides compare the native collide-and-slide with the script's. With no library it says the native half was skipped and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_native_parity.tscn[/code]
+## Holds dot-sim's native collision body ([code]GSSimFpsBody[/code]) to [GSFpsPhysicsBody]'s script answers, to the bit, since web clients run the script and native clients and servers the library, and they play together. Two levels: the motor replays recorded input streams (the determinism world's twelve scenarios at 22, 33 and 66 Hz) once in script and once native, and every tick's state must be identical; then thousands of random sweeps, rest contacts and overlaps, inside and outside motor ticks, are asked of both and every field compared exactly. The replays run again with other players' hulls ([GSFpsHullBody]), and random slides compare the native collide-and-slide with the script's. With no library it says the native half was skipped and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_native_parity.tscn[/code]
 
 const RATES := [22, 33, 66]
 const RUN_TICKS := 900
@@ -26,8 +26,8 @@ var _sections := 0
 
 
 ## The input stream of one scenario, recorded once and replayed to both bodies.
-func _record(seed: int, plan: int, ticks: int) -> Array[DotFpsCommand]:
-	var out: Array[DotFpsCommand] = []
+func _record(seed: int, plan: int, ticks: int) -> Array[GSFpsCommand]:
+	var out: Array[GSFpsCommand] = []
 	for tick in range(ticks):
 		out.append(_command_for(tick, seed, plan))
 	return out
@@ -43,29 +43,29 @@ func _hull_boxes() -> Array:
 
 
 ## Every tick's state, as exact bytes, plus the body's and motor's counters at the end.
-func _replay(native: bool, sc: Array, stream: Array[DotFpsCommand], step: float, hulls: bool = false) -> Dictionary:
-	DotFpsPhysicsBody.native_enabled = native
-	var physics := DotFpsPhysicsBody.for_node(self)
+func _replay(native: bool, sc: Array, stream: Array[GSFpsCommand], step: float, hulls: bool = false) -> Dictionary:
+	GSFpsPhysicsBody.native_enabled = native
+	var physics := GSFpsPhysicsBody.for_node(self)
 	physics.pass_out_mask = 1 << 3
-	var body: DotFpsBody = physics
+	var body: GSFpsBody = physics
 	var boxes := _hull_boxes()
 	if hulls:
-		body = DotFpsHullBody.new().wrap(physics, func() -> Array: return boxes)
-	var motor := DotFpsMotor.new(_tunables(), body)
-	var s := DotFpsState.new()
+		body = GSFpsHullBody.new().wrap(physics, func() -> Array: return boxes)
+	var motor := GSFpsMotor.new(_tunables(), body)
+	var s := GSFpsState.new()
 	s.position = sc[1]
 	s.velocity = sc[2]
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	var ticks: Array[PackedByteArray] = []
-	var slides_before := DotFpsPhysicsBody.native_slides
-	var stops_before := DotFpsHullBody.hull_stops
+	var slides_before := GSFpsPhysicsBody.native_slides
+	var stops_before := GSFpsHullBody.hull_stops
 	for c in stream:
 		motor.simulate(s, c, step)
 		ticks.append(var_to_bytes([s.position, s.velocity, s.mode, s.move_flags(), s.ground_normal, s.crouch_held, s.wall_jump_count]))
 	var counters := [physics.query_count, physics.flipped_normals, physics.rest_memo_hits, body.hull_blocks, body.world_touches,
-		DotFpsHullBody.hull_stops - stops_before, motor.stuck_ticks, motor.duplicate_plane_ticks, motor.crease_leg_ticks, motor.split_leg_ticks]
+		GSFpsHullBody.hull_stops - stops_before, motor.stuck_ticks, motor.duplicate_plane_ticks, motor.crease_leg_ticks, motor.split_leg_ticks]
 	return {"ticks": ticks, "counters": counters, "end": s.position, "native": physics.uses_native(),
-		"slides": DotFpsPhysicsBody.native_slides - slides_before}
+		"slides": GSFpsPhysicsBody.native_slides - slides_before}
 
 
 func _motor_runs() -> void:
@@ -89,29 +89,29 @@ func _motor_runs() -> void:
 	_sections += 1
 
 
-## Random single moves, both ways a motor slides (a walk's slide-and-step and [method DotFpsMotor.move_and_slide]),
+## Random single moves, both ways a motor slides (a walk's slide-and-step and [method GSFpsMotor.move_and_slide]),
 ## from anywhere in the world with and without hulls, in and out of ticks: script and library must agree to the bit.
 func _slide_fuzz() -> void:
-	DotFpsPhysicsBody.native_enabled = true
+	GSFpsPhysicsBody.native_enabled = true
 	var boxes := _hull_boxes()
 	var hull_fn := func() -> Array: return boxes
-	var sp := DotFpsPhysicsBody.for_node(self)
+	var sp := GSFpsPhysicsBody.for_node(self)
 	sp.use_native = false
-	var np := DotFpsPhysicsBody.for_node(self)
-	var sh := DotFpsHullBody.new().wrap(sp, hull_fn)
-	var nh := DotFpsHullBody.new().wrap(np, hull_fn)
+	var np := GSFpsPhysicsBody.for_node(self)
+	var sh := GSFpsHullBody.new().wrap(sp, hull_fn)
+	var nh := GSFpsHullBody.new().wrap(np, hull_fn)
 	var pairs := [
-		[DotFpsMotor.new(_tunables(), sp), DotFpsMotor.new(_tunables(), np)],
-		[DotFpsMotor.new(_tunables(), sh), DotFpsMotor.new(_tunables(), nh)],
+		[GSFpsMotor.new(_tunables(), sp), GSFpsMotor.new(_tunables(), np)],
+		[GSFpsMotor.new(_tunables(), sh), GSFpsMotor.new(_tunables(), nh)],
 	]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20261109
 	var mismatched := 0
-	var slides_before := DotFpsPhysicsBody.native_slides
+	var slides_before := GSFpsPhysicsBody.native_slides
 	for i in range(SLIDE_FUZZ):
 		var pair: Array = pairs[i % 2]
 		var on := rng.randf() < 0.5
-		for m: DotFpsMotor in pair:
+		for m: GSFpsMotor in pair:
 			m.body.perf_caches = on
 			m.body.pass_out_mask = 1 << 3 if i % 5 == 0 else 0
 		var pos := Vector3(rng.randf_range(-31, 31), rng.randf_range(0.0, 3.0), rng.randf_range(-31, 31))
@@ -129,11 +129,11 @@ func _slide_fuzz() -> void:
 		var grounded := rng.randf() < 0.7
 		var tick := rng.randf() < 0.7
 		var out := []
-		for m: DotFpsMotor in pair:
-			var s := DotFpsState.new()
+		for m: GSFpsMotor in pair:
+			var s := GSFpsState.new()
 			s.position = pos
 			s.velocity = vel
-			s.mode = DotFpsState.Mode.GROUND if grounded else DotFpsState.Mode.AIR
+			s.mode = GSFpsState.Mode.GROUND if grounded else GSFpsState.Mode.AIR
 			if tick:
 				m.body.begin_tick()
 			if walk:
@@ -148,7 +148,7 @@ func _slide_fuzz() -> void:
 			mismatched += 1
 			if mismatched <= 5:
 				print("  slide mismatch at %d: at %s v %s dt %s walk %s flag %s hulls %s" % [i, pos, vel, delta, walk, flag, i % 2])
-	var native_slides := DotFpsPhysicsBody.native_slides - slides_before
+	var native_slides := GSFpsPhysicsBody.native_slides - slides_before
 	print("  %d slides, %d native; hull blocks %d/%d, world touches %d/%d, crease legs %d/%d, split legs %d/%d" % [
 		SLIDE_FUZZ, native_slides, sh.hull_blocks, nh.hull_blocks, sh.world_touches, nh.world_touches,
 		pairs[0][0].crease_leg_ticks + pairs[1][0].crease_leg_ticks, pairs[0][1].crease_leg_ticks + pairs[1][1].crease_leg_ticks,
@@ -159,15 +159,15 @@ func _slide_fuzz() -> void:
 	_sections += 1
 
 
-func _same_hit(a: DotFpsBody.Hit, b: DotFpsBody.Hit) -> bool:
+func _same_hit(a: GSFpsBody.Hit, b: GSFpsBody.Hit) -> bool:
 	return var_to_bytes([a.hit, a.fraction, a.normal, a.point, a.collider_id, a.depth]) == var_to_bytes([b.hit, b.fraction, b.normal, b.point, b.collider_id, b.depth])
 
 
 func _query_fuzz() -> void:
-	DotFpsPhysicsBody.native_enabled = true
-	var sb := DotFpsPhysicsBody.for_node(self)
+	GSFpsPhysicsBody.native_enabled = true
+	var sb := GSFpsPhysicsBody.for_node(self)
 	sb.use_native = false
-	var nb := DotFpsPhysicsBody.for_node(self)
+	var nb := GSFpsPhysicsBody.for_node(self)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20261108
 	var mismatched := 0
@@ -244,7 +244,7 @@ func _query_fuzz() -> void:
 
 func _run() -> void:
 	print("dot-player-controller motor native parity")
-	var loaded := DotFpsPhysicsBody.native_available()
+	var loaded := GSFpsPhysicsBody.native_available()
 	var expected := 3
 	if not loaded:
 		print("  dot-sim's motor module is not loaded: the native half is skipped")
@@ -253,15 +253,15 @@ func _run() -> void:
 		expected = 0
 	else:
 		# This suite holds the body's queries; the whole native tick has motor_native_tick_parity.
-		DotFpsMotor.native_tick = false
+		GSFpsMotor.native_tick = false
 		_build_world()
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		_motor_runs()
 		_query_fuzz()
 		_slide_fuzz()
-		DotFpsMotor.native_tick = true
-	DotFpsPhysicsBody.native_enabled = true
+		GSFpsMotor.native_tick = true
+	GSFpsPhysicsBody.native_enabled = true
 	print("%d passed, %d failed" % [_passed, _failed])
 	print("%d of %d sections ran to their last line" % [_sections, expected])
 	get_tree().quit(1 if _failed > 0 or _sections != expected else 0)

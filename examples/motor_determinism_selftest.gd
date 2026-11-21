@@ -17,13 +17,13 @@ var _digests := {}
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_print = "--print" in OS.get_cmdline_user_args()
 	_run.call_deferred()
 
 
-func _tunables() -> DotFpsTunables:
-	var t := DotFpsTunables.new()
+func _tunables() -> GSFpsTunables:
+	var t := GSFpsTunables.new()
 	t.slide_enabled = true
 	t.wall_run_enabled = true
 	return t
@@ -90,8 +90,8 @@ func _build_world() -> void:
 	_box(Vector3(0.8, 1.8, 0.8), Transform3D(Basis.IDENTITY, Vector3(-3, 0.9, 8)), 1 << 3)
 
 
-func _command_for(tick: int, seed: int, plan: int) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+func _command_for(tick: int, seed: int, plan: int) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	var phase := tick / 64
 	var h := hash([seed, phase, plan])
 	c.move = Vector2(float((h >> 3) % 3 - 1), float((h >> 5) % 3 - 1))
@@ -100,24 +100,24 @@ func _command_for(tick: int, seed: int, plan: int) -> DotFpsCommand:
 	c.yaw = float((h >> 7) % 628) * 0.01 - 3.14 if plan != 2 else float(tick) * 0.004
 	var b := 0
 	if plan >= 1 and (h >> 9) % 3 != 0:
-		b |= DotFpsCommand.BUTTON_SPRINT
+		b |= GSFpsCommand.BUTTON_SPRINT
 	if (h >> 11) % 5 == 0 and tick % 64 < 24:
-		b |= DotFpsCommand.BUTTON_CROUCH
+		b |= GSFpsCommand.BUTTON_CROUCH
 	if (tick * 7 + seed) % 61 < 3 or (h >> 13) % 4 == 0 and tick % 32 < 2:
-		b |= DotFpsCommand.BUTTON_JUMP
+		b |= GSFpsCommand.BUTTON_JUMP
 	c.buttons = b
 	return c
 
 
 func _scenario(name: String, start: Vector3, vel: Vector3, seed: int, plan: int) -> void:
-	var body := DotFpsPhysicsBody.for_node(self)
+	var body := GSFpsPhysicsBody.for_node(self)
 	body.pass_out_mask = 1 << 3
 	var t := _tunables()
-	var motor := DotFpsMotor.new(t, body)
-	var s := DotFpsState.new()
+	var motor := GSFpsMotor.new(t, body)
+	var s := GSFpsState.new()
 	s.position = start
 	s.velocity = vel
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	var digest := 0
 	var modes := {}
 	var maxspeed := 0.0

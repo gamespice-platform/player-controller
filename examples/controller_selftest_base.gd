@@ -76,9 +76,9 @@ func _test_space_query_audit() -> void:
 			missing.append(f)
 	_check(missing.is_empty(), "docs/threading.md names every one %s" % [missing])
 	var tps := FileAccess.get_file_as_string("res://addons/dot_player_controller/tp/nodes/dot_tps_controller.gd")
-	_check(tps.count("_apply_intent(") == 1, "DotTpsController._apply_intent has no caller of its own: only simulate reaches it")
+	_check(tps.count("_apply_intent(") == 1, "GSTpsController._apply_intent has no caller of its own: only simulate reaches it")
 	var fps := FileAccess.get_file_as_string("res://addons/dot_player_controller/fp/nodes/dot_fps_controller.gd")
-	_check(_func_body(fps, "func _physics_process(").contains("simulate_tick("), "DotFpsController runs its own ticks from _physics_process")
+	_check(_func_body(fps, "func _physics_process(").contains("simulate_tick("), "GSFpsController runs its own ticks from _physics_process")
 
 
 func _section(title: String) -> void:

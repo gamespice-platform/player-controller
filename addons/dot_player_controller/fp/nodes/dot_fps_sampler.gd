@@ -1,7 +1,7 @@
-class_name DotFpsSampler
+class_name GSFpsSampler
 extends RefCounted
 
-## Turns devices into a [DotFpsCommand]. The only part of the controller that reads the keyboard.
+## Turns devices into a [GSFpsCommand]. The only part of the controller that reads the keyboard.
 ## Separate from the motor so a server, replay, bot or demo can produce commands without a device, and so [code]Input.is_action_pressed[/code] is never called during a prediction replay.
 ## Action names are configurable because input action names are global; [method register_default_actions] adds this addon's set for a project that has none.
 
@@ -28,7 +28,7 @@ var actions: Dictionary = {
 ## A rate, not a delta: treating a held stick like mouse motion would make the turn rate depend on frame rate.
 var look_rate: float = 180.0
 
-var tunables: DotFpsTunables
+var tunables: GSFpsTunables
 
 ## Current view angles in degrees. Accumulated from mouse motion.
 var yaw: float = 0.0
@@ -47,7 +47,7 @@ var _mouse_delta: Vector2 = Vector2.ZERO
 ## Buttons from the previous sample, for edge detection outside the motor.
 var _previous_buttons: int = 0
 
-## Button presses seen since the last [method sample], as [constant DotFpsCommand] bits.
+## Button presses seen since the last [method sample], as [constant GSFpsCommand] bits.
 ## A latch because a wheel tick is a press and release in one event pair, so `is_action_pressed` is never true for it at a tick; each press reaches exactly one command.
 var _latched: int = 0
 
@@ -61,15 +61,15 @@ var _sprint_raw: bool = false
 
 ## Roles whose presses are latched, and their command bits.
 const _BUTTON_ROLES := {
-	"jump": DotFpsCommand.BUTTON_JUMP,
-	"crouch": DotFpsCommand.BUTTON_CROUCH,
-	"sprint": DotFpsCommand.BUTTON_SPRINT,
-	"walk": DotFpsCommand.BUTTON_WALK,
-	"noclip": DotFpsCommand.BUTTON_NOCLIP,
+	"jump": GSFpsCommand.BUTTON_JUMP,
+	"crouch": GSFpsCommand.BUTTON_CROUCH,
+	"sprint": GSFpsCommand.BUTTON_SPRINT,
+	"walk": GSFpsCommand.BUTTON_WALK,
+	"noclip": GSFpsCommand.BUTTON_NOCLIP,
 }
 
 
-func _init(p_tunables: DotFpsTunables) -> void:
+func _init(p_tunables: GSFpsTunables) -> void:
 	tunables = p_tunables
 
 
@@ -92,8 +92,8 @@ func handle_event(event: InputEvent) -> void:
 
 ## Builds the command for this tick and clears the accumulated mouse motion.
 ## Call once per simulated tick, not per frame, or the view lags the mouse by a frame-rate-dependent fraction.
-func sample(delta: float = 0.0) -> DotFpsCommand:
-	var command := DotFpsCommand.new()
+func sample(delta: float = 0.0) -> GSFpsCommand:
+	var command := GSFpsCommand.new()
 
 	if suspended:
 		command.yaw = yaw
@@ -132,19 +132,19 @@ func sample(delta: float = 0.0) -> DotFpsCommand:
 	return command
 
 
-## With [member DotFpsTunables.sprint_toggle], turns the sprint key's presses into a latch that standing still clears.
-func _apply_sprint_toggle(command: DotFpsCommand, move: Vector2) -> void:
+## With [member GSFpsTunables.sprint_toggle], turns the sprint key's presses into a latch that standing still clears.
+func _apply_sprint_toggle(command: GSFpsCommand, move: Vector2) -> void:
 	if not tunables.sprint_toggle:
 		_sprint_on = false
 		_sprint_raw = false
 		return
-	var raw := command.is_pressed(DotFpsCommand.BUTTON_SPRINT)
+	var raw := command.is_pressed(GSFpsCommand.BUTTON_SPRINT)
 	if raw and not _sprint_raw:
 		_sprint_on = not _sprint_on
 	_sprint_raw = raw
 	if move == Vector2.ZERO:
 		_sprint_on = false
-	command.set_button(DotFpsCommand.BUTTON_SPRINT, _sprint_on)
+	command.set_button(GSFpsCommand.BUTTON_SPRINT, _sprint_on)
 
 
 ## Turns the view from the analogue look actions, if bound. A [param delta] of zero disables it.
@@ -234,7 +234,7 @@ func missing_actions() -> PackedStringArray:
 
 ## Registers this addon's default bindings for any action the project lacks: WASD, space, ctrl, shift, alt, V for noclip.
 ## Added at runtime because an addon cannot merge input maps into a host project; existing actions are never touched.
-static func register_default_actions(sampler: DotFpsSampler = null) -> PackedStringArray:
+static func register_default_actions(sampler: GSFpsSampler = null) -> PackedStringArray:
 	var defaults := {
 		"left": KEY_A,
 		"right": KEY_D,
@@ -278,7 +278,7 @@ static func register_default_actions(sampler: DotFpsSampler = null) -> PackedStr
 		added.append(String(action))
 
 	if not added.is_empty():
-		DotLog.debug(
+		GSLog.debug(
 			"fps.input",
 			"registered default input actions",
 			{"actions": ", ".join(added)}

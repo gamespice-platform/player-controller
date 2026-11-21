@@ -1,8 +1,8 @@
-class_name DotTpsController
-extends DotPlayerController
+class_name GSTpsController
+extends GSPlayerController
 
-## Third-person movement, as a [DotPlayerController] the switch can hand a player to.
-## Movement is [DotTpsMotor]'s and the camera [DotTpsCameraRig]'s; this binds the body, the state and the
+## Third-person movement, as a [GSPlayerController] the switch can hand a player to.
+## Movement is [GSTpsMotor]'s and the camera [GSTpsCameraRig]'s; this binds the body, the state and the
 ## handover from first person without stopping dead in mid-air.
 
 const TPS_CHANNEL := "player.tps"
@@ -10,7 +10,7 @@ const TPS_CHANNEL := "player.tps"
 ## The character left the ground, or landed. For an animation driver that wants an edge.
 signal grounded_changed(on_floor: bool)
 
-@export var tunables: DotTpsTunables = null
+@export var tunables: GSTpsTunables = null
 
 ## Whether to build and drive a camera rig. Off on a server, and for a remote player.
 @export var owns_camera: bool = true
@@ -19,9 +19,9 @@ signal grounded_changed(on_floor: bool)
 ## Off when the visual model is a separate node that rotates itself.
 @export var rotate_body: bool = true
 
-var state: DotTpsState = null
+var state: GSTpsState = null
 
-var rig: DotTpsCameraRig = null
+var rig: GSTpsCameraRig = null
 
 var _body: CharacterBody3D = null
 var _was_on_floor: bool = true
@@ -29,10 +29,10 @@ var _was_on_floor: bool = true
 
 func _ready() -> void:
 	if tunables == null:
-		tunables = DotTpsTunables.new()
+		tunables = GSTpsTunables.new()
 
 	if state == null:
-		state = DotTpsState.new()
+		state = GSTpsState.new()
 
 	if controller_id == &"":
 		controller_id = &"tp"
@@ -61,7 +61,7 @@ func _process(delta: float) -> void:
 
 # The simulation
 
-func _apply_intent(intent: DotPlayerIntent, delta: float) -> void:
+func _apply_intent(intent: GSPlayerIntent, delta: float) -> void:
 	var body := character_body()
 
 	if body == null:
@@ -70,14 +70,14 @@ func _apply_intent(intent: DotPlayerIntent, delta: float) -> void:
 	if intent != null:
 		# The look delta is applied here rather than by a sampler, so that a replayed
 		# command produces the same camera angles as the live one did. See the note on
-		# rewinds in DotTpsState.
-		DotTpsMotor.look(state, intent.look, tunables)
+		# rewinds in GSTpsState.
+		GSTpsMotor.look(state, intent.look, tunables)
 
-		if intent.just_pressed(DotPlayerIntent.Btn.ABILITY_3) and rig != null:
+		if intent.just_pressed(GSPlayerIntent.Btn.ABILITY_3) and rig != null:
 			rig.swap_shoulder(state)
 
 	var on_floor := body.is_on_floor()
-	body.velocity = DotTpsMotor.step(state, intent, tunables, delta, on_floor)
+	body.velocity = GSTpsMotor.step(state, intent, tunables, delta, on_floor)
 	body.move_and_slide()
 	state.velocity = body.velocity
 
@@ -91,7 +91,7 @@ func _apply_intent(intent: DotPlayerIntent, delta: float) -> void:
 		body.rotation.y = state.facing
 
 
-# The DotPlayerController contract
+# The GSPlayerController contract
 
 func _read_transform() -> Transform3D:
 	var body := character_body()
@@ -159,7 +159,7 @@ func character_body() -> CharacterBody3D:
 	_body = player().body() as CharacterBody3D
 
 	if _body == null:
-		DotLog.warn(TPS_CHANNEL, "no CharacterBody3D for this player", {
+		GSLog.warn(TPS_CHANNEL, "no CharacterBody3D for this player", {
 			"player": player().player_key,
 		})
 
@@ -206,7 +206,7 @@ func _ensure_rig() -> void:
 		# does a client watching twenty-nine other people.
 		return
 
-	rig = DotTpsCameraRig.new()
+	rig = GSTpsCameraRig.new()
 	rig.name = "CameraRig"
 	rig.tunables = tunables
 	add_child(rig)

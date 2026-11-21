@@ -1,9 +1,9 @@
-class_name DotFpsMotorBatch
+class_name GSFpsMotorBatch
 extends RefCounted
-## Several players' motor ticks in runs of one native call (GameSpice Sim's [code]DotSimMotorBatch[/code]), for a server's players' loop.
-## The game first [method add]s every player in roster order (each motor runs the part of its tick no other player can change), then in the same order [method finish]es one, does its own work for that player and goes on. A run is the consecutive rows GameSpice Sim can tick; it is ticked when its first row is finished, each row seeing the earlier ones where they came to rest, as the players' ticks one after another do. A player that ends its tick elsewhere (a teleport, a death) takes the rows after it back ([method moved_after]); they run again. The answers are [method DotFpsMotor.simulate]'s to the bit.
+## Several players' motor ticks in runs of one native call (GameSpice Sim's [code]GSSimMotorBatch[/code]), for a server's players' loop.
+## The game first [method add]s every player in roster order (each motor runs the part of its tick no other player can change), then in the same order [method finish]es one, does its own work for that player and goes on. A run is the consecutive rows GameSpice Sim can tick; it is ticked when its first row is finished, each row seeing the earlier ones where they came to rest, as the players' ticks one after another do. A player that ends its tick elsewhere (a teleport, a death) takes the rows after it back ([method moved_after]); they run again. The answers are [method GSFpsMotor.simulate]'s to the bit.
 
-const NATIVE_CLASS := &"DotSimMotorBatch"
+const NATIVE_CLASS := &"GSSimMotorBatch"
 const _IN := 55
 const _OUT := 45
 ## Values [method post_row] writes per row (API 34).
@@ -20,9 +20,9 @@ var _native: Object = null
 var _meta_len: int = 3
 var _delta: float = 0.0
 var _count: int = 0
-var _motors: Array[DotFpsMotor] = []
-var _states: Array[DotFpsState] = []
-var _commands: Array[DotFpsCommand] = []
+var _motors: Array[GSFpsMotor] = []
+var _states: Array[GSFpsState] = []
+var _commands: Array[GSFpsCommand] = []
 var _bodies: Array = []
 var _tuns: Array = []
 var _stage := PackedByteArray()
@@ -64,7 +64,7 @@ func start(delta: float) -> bool:
 
 ## Adds [param motor]'s tick and runs its start; the row to [method finish]. [param delta] above zero is this row's tick
 ## length instead of [method start]'s (a body that sat out ticks makes them up in one, API 26).
-func add(motor: DotFpsMotor, state: DotFpsState, command: DotFpsCommand, delta: float = -1.0) -> int:
+func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: float = -1.0) -> int:
 	var row := _count
 	_count += 1
 	if _stage.size() < _count:
@@ -85,7 +85,7 @@ func add(motor: DotFpsMotor, state: DotFpsState, command: DotFpsCommand, delta: 
 	_deltas[row] = delta if delta > 0.0 else _delta
 	var stage := motor.batch_prepare(state, command, _deltas[row], _in, _meta, row, _meta_len)
 	_stage[row] = stage
-	if stage == DotFpsMotor.BATCH_READY:
+	if stage == GSFpsMotor.BATCH_READY:
 		_bodies[row] = motor.batch_body
 		_tuns[row] = motor.batch_tun
 		_sent_position[row] = state.position
@@ -98,11 +98,11 @@ func add(motor: DotFpsMotor, state: DotFpsState, command: DotFpsCommand, delta: 
 func finish(row: int) -> bool:
 	var stage := _stage[row]
 	_applied_row = -1
-	if stage == DotFpsMotor.BATCH_DONE:
+	if stage == GSFpsMotor.BATCH_DONE:
 		return false
 	var motor := _motors[row]
 	var state := _states[row]
-	if stage == DotFpsMotor.BATCH_READY:
+	if stage == GSFpsMotor.BATCH_READY:
 		if state.position != _sent_position[row] or state.velocity != _sent_velocity[row]:
 			# Something moved the player between add and its turn: the row and the ones after it are redone from here.
 			stale += 1
@@ -122,7 +122,7 @@ func finish(row: int) -> bool:
 
 
 ## Writes row [param row]'s state after its motor into [param into] at [param at], [constant POST] values: velocity x and z,
-## mode, crouch fraction, slide time, wall-run time, sprinting (1 or 0); GameSpice Sim's [code]DotSimPlayerPost[/code]
+## mode, crouch fraction, slide time, wall-run time, sprinting (1 or 0); GameSpice Sim's [code]GSSimPlayerPost[/code]
 ## input columns. Call it after [method finish] of that row, before the next row's. True when they came from the batch's answer
 ## (the velocity unrounded: as a float32 it is the state's), false when read from the state (a row the script ended).
 func post_row(row: int, into: PackedFloat64Array, at: int) -> bool:
@@ -149,10 +149,10 @@ func post_row(row: int, into: PackedFloat64Array, at: int) -> bool:
 ## The player of row [param row] will not tick after all (it died since [method add]). The start of its tick stays run:
 ## the tick is counted and the stance moved, which the loop one player after another would not have done.
 func skip(row: int) -> void:
-	if _stage[row] == DotFpsMotor.BATCH_DONE:
+	if _stage[row] == GSFpsMotor.BATCH_DONE:
 		return
 	_take_back(row)
-	_stage[row] = DotFpsMotor.BATCH_DONE
+	_stage[row] = GSFpsMotor.BATCH_DONE
 	_motors[row].batch_cancel(_states[row], _commands[row], _deltas[row])
 
 
@@ -184,7 +184,7 @@ func _take_back(row: int) -> void:
 
 func _run(row: int) -> void:
 	var to := row
-	while to < _count and _stage[to] == DotFpsMotor.BATCH_READY:
+	while to < _count and _stage[to] == GSFpsMotor.BATCH_READY:
 		to += 1
 		# A body outside the hull world does not tell it where it came to rest: the game does, before the next row.
 		if _meta[(to - 1) * _meta_len] != 3:

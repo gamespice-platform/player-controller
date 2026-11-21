@@ -1,13 +1,13 @@
-class_name DotFpsNetSync
+class_name GSFpsNetSync
 extends RefCounted
 
-## What a networked player has to replicate, and how to get it in and out of a [DotFpsState].
-## GameSpice Net is not a dependency and is not imported here: a script that mentions a missing `class_name` fails to parse, so the thin `DotNetBehaviour` that joins the two lives in the host game.
+## What a networked player has to replicate, and how to get it in and out of a [GSFpsState].
+## GameSpice Net is not a dependency and is not imported here: a script that mentions a missing `class_name` fails to parse, so the thin `GSNetBehaviour` that joins the two lives in the host game.
 ##
 ## [codeblock]
-## class_name PlayerNet extends DotNetBehaviour
+## class_name PlayerNet extends GSNetBehaviour
 ##
-## @export var controller: DotFpsController
+## @export var controller: GSFpsController
 ##
 ## var net_position: Vector3
 ## var net_velocity: Vector3
@@ -18,28 +18,28 @@ extends RefCounted
 ## var net_modifiers: int
 ##
 ## func _register_net_vars() -> void:
-##     for spec in DotFpsNetSync.state_specs():
-##         var declaration := replicate(spec.property, DotNetVar.Type[spec.type])
+##     for spec in GSFpsNetSync.state_specs():
+##         var declaration := replicate(spec.property, GSNetVar.Type[spec.type])
 ##         if spec.bits > 0:
 ##             declaration.bits(spec.bits)
 ##         if spec.interpolated:
 ##             declaration.interpolated()
 ##
-## func _net_apply_input(input: DotNetInput, _tick: int) -> void:
+## func _net_apply_input(input: GSNetInput, _tick: int) -> void:
 ##     controller.apply_command((input as PlayerInput).command)
 ##
 ## func _net_simulate(tick: int, delta: float) -> void:
 ##     controller.simulate_tick(tick, delta)
-##     DotFpsNetSync.pull(controller.state, self)
+##     GSFpsNetSync.pull(controller.state, self)
 ##
 ## func _net_state_applied(_tick: int) -> void:
-##     DotFpsNetSync.push(self, controller.state)
+##     GSFpsNetSync.push(self, controller.state)
 ## [/codeblock]
 ##
 ## The full worked example is in docs/networking.md.
 
 ## Bits the movement mode occupies in the packed flags. See [method pack_flags].
-## Wide enough for [constant DotFpsState.MAX_MODES]: the id travels, so a mode that did not fit would arrive as a different one.
+## Wide enough for [constant GSFpsState.MAX_MODES]: the id travels, so a mode that did not fit would arrive as a different one.
 const MODE_BITS := 4
 const MODE_MASK := (1 << MODE_BITS) - 1
 
@@ -67,16 +67,16 @@ const LAUNCH_SHIFT := MODE_BITS + 1
 const SLIDE_SHIFT := LAUNCH_SHIFT + LAUNCH_BITS
 const SLIDE_COOLDOWN_SHIFT := SLIDE_SHIFT + SLIDE_BITS
 
-## The buttons of the command the snapshot's tick applied, which every press is detected against ([member DotFpsState.previous_buttons]).
+## The buttons of the command the snapshot's tick applied, which every press is detected against ([member GSFpsState.previous_buttons]).
 ## Without it a rewind kept the current held buttons and the replayed press saw no edge.
 const BUTTONS_SHIFT := SLIDE_COOLDOWN_SHIFT + SLIDE_COOLDOWN_BITS
 
 ## The dash's cooldown, the launch's reason and width.
 const DASH_BITS := 12
-const DASH_SHIFT := BUTTONS_SHIFT + DotFpsCommand.BUTTON_BITS
+const DASH_SHIFT := BUTTONS_SHIFT + GSFpsCommand.BUTTON_BITS
 
 ## The wall run and wall jump, the last fields in the word, so an older encoding reads as "not running, no wall jumps".
-## The run field is one number: 0 ready, 1 spent this airborne stretch ([member DotFpsState.wall_run_spent]), 2 and up a run in progress (sixty-fourths plus two); 125 is the longest it holds ([constant DotFpsTunables.WALL_RUN_TIME_LIMIT]).
+## The run field is one number: 0 ready, 1 spent this airborne stretch ([member GSFpsState.wall_run_spent]), 2 and up a run in progress (sixty-fourths plus two); 125 is the longest it holds ([constant GSFpsTunables.WALL_RUN_TIME_LIMIT]).
 ## The heading names the wall the per-wall counter counts, in eighths of a turn. The two jump counters share three bits: only seven pairs can occur, (0,0) (1,1) (2,1) (2,2) (3,1) (3,2) (3,3).
 const WALL_RUN_BITS := 7
 const WALL_RUN_READY := 0
@@ -99,7 +99,7 @@ const MODIFIER_BITS := 48
 
 
 ## What a networked player replicates.
-## Types are named, not referenced, so this file never mentions [code]DotNetVar[/code]; a bridge resolves them with [code]DotNetVar.Type[spec.type][/code].
+## Types are named, not referenced, so this file never mentions [code]GSNetVar[/code]; a bridge resolves them with [code]GSNetVar.Type[spec.type][/code].
 ## Velocity is not redundant: it lets a receiver curve the path, extrapolate a late packet and place a late joiner without a stutter.
 static func state_specs() -> Array[Dictionary]:
 	return [
@@ -169,7 +169,7 @@ static func estimated_state_bits() -> int:
 	return 48 + 36 + 12 + 9 + 6 + FLAG_BITS + MODIFIER_BITS
 
 
-static func pack_flags(state: DotFpsState) -> int:
+static func pack_flags(state: GSFpsState) -> int:
 	var flags := state.mode & MODE_MASK
 
 	if state.crouch_held:
@@ -181,7 +181,7 @@ static func pack_flags(state: DotFpsState) -> int:
 	)
 	flags |= slide << SLIDE_SHIFT
 	flags |= _quantise(state.slide_cooldown_left, SLIDE_COOLDOWN_BITS) << SLIDE_COOLDOWN_SHIFT
-	flags |= (state.previous_buttons & ((1 << DotFpsCommand.BUTTON_BITS) - 1)) << BUTTONS_SHIFT
+	flags |= (state.previous_buttons & ((1 << GSFpsCommand.BUTTON_BITS) - 1)) << BUTTONS_SHIFT
 	flags |= _quantise(state.dash_cooldown_left, DASH_BITS) << DASH_SHIFT
 
 	var wall_run := WALL_RUN_READY
@@ -204,7 +204,7 @@ static func set_tick_rate(rate: int) -> void:
 	timer_scale = float(maxi(rate, 1)) if rate <= EXACT_RATE_LIMIT else TIMER_SCALE
 
 
-static func unpack_flags(state: DotFpsState, flags: int) -> void:
+static func unpack_flags(state: GSFpsState, flags: int) -> void:
 	state.crouch_held = (flags & FLAG_CROUCH_HELD) != 0
 	state.mode = flags & MODE_MASK
 
@@ -214,7 +214,7 @@ static func unpack_flags(state: DotFpsState, flags: int) -> void:
 	state.slide_cooldown_left = (
 		_field(flags, SLIDE_COOLDOWN_SHIFT, SLIDE_COOLDOWN_BITS) / timer_scale
 	)
-	state.previous_buttons = (flags >> BUTTONS_SHIFT) & ((1 << DotFpsCommand.BUTTON_BITS) - 1)
+	state.previous_buttons = (flags >> BUTTONS_SHIFT) & ((1 << GSFpsCommand.BUTTON_BITS) - 1)
 	state.dash_cooldown_left = _field(flags, DASH_SHIFT, DASH_BITS) / timer_scale
 
 	var wall_run := int(_field(flags, WALL_RUN_SHIFT, WALL_RUN_BITS))
@@ -259,7 +259,7 @@ static func _field(flags: int, shift: int, bits: int) -> float:
 
 
 ## The active modifier set as a bit per registered index.
-static func pack_modifiers(state: DotFpsState) -> int:
+static func pack_modifiers(state: GSFpsState) -> int:
 	var mask := 0
 
 	for entry in state.modifiers:
@@ -271,10 +271,10 @@ static func pack_modifiers(state: DotFpsState) -> int:
 
 ## Rebuilds the active set from a mask, preserving order.
 ## Expiries come back as "until removed" because they were not sent; see [code]net_modifiers[/code] in [method state_specs].
-static func unpack_modifiers(state: DotFpsState, mask: int) -> void:
+static func unpack_modifiers(state: GSFpsState, mask: int) -> void:
 	state.modifiers.clear()
 
-	# Ascending, which is the order DotFpsState.modifiers is required to be in — the
+	# Ascending, which is the order GSFpsState.modifiers is required to be in — the
 	# aggregate is a product, and floating-point multiplication is not associative.
 	for index in range(MODIFIER_BITS):
 		if mask & (1 << index):
@@ -282,8 +282,8 @@ static func unpack_modifiers(state: DotFpsState, mask: int) -> void:
 
 
 ## Copies a state onto a replicating object, ready to be sent.
-## [param target] is a [Variant] because it is a [code]DotNetBehaviour[/code] in practice and this file cannot name it.
-static func pull(state: DotFpsState, target: Variant) -> void:
+## [param target] is a [Variant] because it is a [code]GSNetBehaviour[/code] in practice and this file cannot name it.
+static func pull(state: GSFpsState, target: Variant) -> void:
 	var has := _carrier_has(target)
 	if has & _HAS_CORE:
 		target.net_position = state.position
@@ -370,7 +370,7 @@ static func stamina_specs() -> Array[Dictionary]:
 		"interpolated": false, "owner_only": true, "source": "stamina"}]
 
 
-static func pack_stamina(state: DotFpsState) -> int:
+static func pack_stamina(state: GSFpsState) -> int:
 	return (roundi(clampf(state.stamina, 0.0, 1.0) * 16383.0)
 		| (1 if state.stamina_exhausted else 0) << 14
 		| clampi(roundi(state.stamina_delay_left * 2048.0), 0, 8191) << 15)
@@ -378,24 +378,24 @@ static func pack_stamina(state: DotFpsState) -> int:
 
 ## Puts the state's stamina on the wire grid, so a state rewound from net_stamina is identical to the
 ## server's rather than close, which flips a sprint or exhaustion at the boundary.
-static func snap_stamina(state: DotFpsState) -> void:
+static func snap_stamina(state: GSFpsState) -> void:
 	unpack_stamina(state, pack_stamina(state))
 
 
-static func unpack_stamina(state: DotFpsState, code: int) -> void:
+static func unpack_stamina(state: GSFpsState, code: int) -> void:
 	state.stamina = float(code & 16383) / 16383.0
 	state.stamina_exhausted = (code >> 14) & 1 == 1
 	state.stamina_delay_left = float((code >> 15) & 8191) / 2048.0
 
 
-static func pack_timers(state: DotFpsState) -> int:
+static func pack_timers(state: GSFpsState) -> int:
 	return (_timer_code(state.time_since_grounded)
 		| _timer_code(state.time_since_jump) << JUMP_TIMER_BITS
 		| _timer_code(state.time_since_jump_pressed) << (2 * JUMP_TIMER_BITS)
 		| _timer_code(state.wall_run_cooldown_left) << (3 * JUMP_TIMER_BITS))
 
 
-static func unpack_timers(state: DotFpsState, code: int) -> void:
+static func unpack_timers(state: GSFpsState, code: int) -> void:
 	state.time_since_grounded = _timer_value(code)
 	state.time_since_jump = _timer_value(code >> JUMP_TIMER_BITS)
 	state.time_since_jump_pressed = _timer_value(code >> (2 * JUMP_TIMER_BITS))
@@ -413,7 +413,7 @@ static func rewind_specs2() -> Array[Dictionary]:
 		"interpolated": false, "owner_only": true, "source": "slide and wall-run timers"}]
 
 
-static func pack_timers2(state: DotFpsState) -> int:
+static func pack_timers2(state: GSFpsState) -> int:
 	var slide := 0
 	if state.slide_time >= 0.0:
 		slide = mini(roundi(state.slide_time * JUMP_TIMER_SCALE) + 1, _T2_MAX)
@@ -426,7 +426,7 @@ static func pack_timers2(state: DotFpsState) -> int:
 	return slide | cooldown << JUMP_TIMER_BITS | run << (2 * JUMP_TIMER_BITS)
 
 
-static func unpack_timers2(state: DotFpsState, code: int) -> void:
+static func unpack_timers2(state: GSFpsState, code: int) -> void:
 	var slide := code & _T2_MAX
 	state.slide_time = -1.0 if slide == 0 else float(slide - 1) / JUMP_TIMER_SCALE
 	state.slide_cooldown_left = float((code >> JUMP_TIMER_BITS) & _T2_MAX) / JUMP_TIMER_SCALE
@@ -449,7 +449,7 @@ static func _timer_value(code: int) -> float:
 
 ## Copies received values back into a state; on a predicting client this is the rewind half of reconciliation.
 ## Everything the simulation reads must be restored here, or the replay starts from a state the server never computed.
-static func push(source: Variant, state: DotFpsState) -> void:
+static func push(source: Variant, state: GSFpsState) -> void:
 	var has := _carrier_has(source)
 	if has & _HAS_CORE:
 		# Declared properties read directly: this runs per remote player per snapshot and per render frame.
@@ -491,14 +491,14 @@ static func push(source: Variant, state: DotFpsState) -> void:
 
 ## Whether two peers will simulate the same way.
 ## Call it at connect time: differing tunables show up as small constant corrections, indistinguishable from packet loss.
-static func agrees(mine: DotFpsTunables, theirs_fingerprint: String) -> bool:
+static func agrees(mine: GSFpsTunables, theirs_fingerprint: String) -> bool:
 	return mine != null and mine.fingerprint() == theirs_fingerprint
 
 
 ## Explains a fingerprint mismatch by naming the properties that differ.
 static func differences(
-	mine: DotFpsTunables,
-	theirs: DotFpsTunables
+	mine: GSFpsTunables,
+	theirs: GSFpsTunables
 ) -> PackedStringArray:
 	var out := PackedStringArray()
 

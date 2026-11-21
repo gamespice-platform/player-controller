@@ -1,6 +1,6 @@
 extends "res://examples/motor_determinism_selftest.gd"
 
-## The motor's perf work (DotFpsMotor.perf_caches: broad-phase rejection in the flat body, per-tick hull candidates, the rest-query memo, skipped stamina snaps and effect resets) must change nothing a player or the netcode can see. Replays the determinism scenarios' scripted inputs (runs, jumps, crouch-slides, wall runs, strafes, turns, ramps, stairs, corners) through two motors side by side, one on the original code paths and one on the optimised ones, in two worlds (the physics server and analytic boxes with other players' hulls), and asserts position, velocity, mode and flags agree to EPSILON on every one of TICKS ticks. Run: godot --headless --path . res://examples/motor_perf_equivalence.tscn A check that cannot fail proves nothing: the last section turns a perf flag on in one motor only with a deliberately wrong input and must report a divergence.
+## The motor's perf work (GSFpsMotor.perf_caches: broad-phase rejection in the flat body, per-tick hull candidates, the rest-query memo, skipped stamina snaps and effect resets) must change nothing a player or the netcode can see. Replays the determinism scenarios' scripted inputs (runs, jumps, crouch-slides, wall runs, strafes, turns, ramps, stairs, corners) through two motors side by side, one on the original code paths and one on the optimised ones, in two worlds (the physics server and analytic boxes with other players' hulls), and asserts position, velocity, mode and flags agree to EPSILON on every one of TICKS ticks. Run: godot --headless --path . res://examples/motor_perf_equivalence.tscn A check that cannot fail proves nothing: the last section turns a perf flag on in one motor only with a deliberately wrong input and must report a divergence.
 
 const EPSILON := 1e-6
 
@@ -9,7 +9,7 @@ var _flat_boxes: Array[AABB] = []
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run_equivalence.call_deferred()
 
 
@@ -17,10 +17,10 @@ func _section(title: String) -> void:
 	print(title)
 
 
-func _bodies_physics() -> Array[DotFpsBody]:
-	var out: Array[DotFpsBody] = []
+func _bodies_physics() -> Array[GSFpsBody]:
+	var out: Array[GSFpsBody] = []
 	for _i in range(2):
-		var body := DotFpsPhysicsBody.for_node(self)
+		var body := GSFpsPhysicsBody.for_node(self)
 		body.pass_out_mask = 1 << 3
 		out.append(body)
 	return out
@@ -41,10 +41,10 @@ func _make_flat_world() -> void:
 
 
 ## A flat body wrapped with the hulls of ten other players that walk circles, as FC does for each of its bots.
-func _bodies_flat(clock: Array, crowd: int = 10) -> Array[DotFpsBody]:
-	var out: Array[DotFpsBody] = []
+func _bodies_flat(clock: Array, crowd: int = 10) -> Array[GSFpsBody]:
+	var out: Array[GSFpsBody] = []
 	for _i in range(2):
-		var flat := DotFpsFlatBody.with_floor(0.0)
+		var flat := GSFpsFlatBody.with_floor(0.0)
 		for b in _flat_boxes:
 			flat.add_box(b)
 		var hulls := func() -> Array:
@@ -56,17 +56,17 @@ func _bodies_flat(clock: Array, crowd: int = 10) -> Array[DotFpsBody]:
 				var feet := Vector3(cos(a) * ring, 0.0, sin(a) * ring)
 				list.append(AABB(feet - Vector3(0.35, 0.0, 0.35), Vector3(0.7, 1.8, 0.7)))
 			return list
-		out.append(DotFpsHullBody.new().wrap(flat, hulls))
+		out.append(GSFpsHullBody.new().wrap(flat, hulls))
 	return out
 
 
-func _stamina_tunables() -> DotFpsTunables:
+func _stamina_tunables() -> GSFpsTunables:
 	var t := _tunables()
 	t.stamina_enabled = true
 	return t
 
 
-func _same(a: DotFpsState, b: DotFpsState) -> float:
+func _same(a: GSFpsState, b: GSFpsState) -> float:
 	var d := maxf(a.position.distance_to(b.position), a.velocity.distance_to(b.velocity))
 	d = maxf(d, a.ground_normal.distance_to(b.ground_normal))
 	d = maxf(d, absf(a.crouch_fraction - b.crouch_fraction))
@@ -78,21 +78,21 @@ func _same(a: DotFpsState, b: DotFpsState) -> float:
 	return d
 
 
-func _pair(name: String, bodies: Array[DotFpsBody], tun: DotFpsTunables, clock: Array, start: Vector3, vel: Vector3, seed: int, plan: int, modifier: bool = false) -> void:
-	var motors: Array[DotFpsMotor] = []
-	var states: Array[DotFpsState] = []
+func _pair(name: String, bodies: Array[GSFpsBody], tun: GSFpsTunables, clock: Array, start: Vector3, vel: Vector3, seed: int, plan: int, modifier: bool = false) -> void:
+	var motors: Array[GSFpsMotor] = []
+	var states: Array[GSFpsState] = []
 	for i in range(2):
-		var m := DotFpsMotor.new(tun.duplicate() as DotFpsTunables, bodies[i])
+		var m := GSFpsMotor.new(tun.duplicate() as GSFpsTunables, bodies[i])
 		m.perf_caches = i == 0
 		if modifier:
-			var slow := DotFpsModifier.make(&"slow")
+			var slow := GSFpsModifier.make(&"slow")
 			slow.max_speed_scale = 0.6
 			slow.duration_sec = 1.0
 			var _idx := m.register_modifier(slow)
-		var s := DotFpsState.new()
+		var s := GSFpsState.new()
 		s.position = start
 		s.velocity = vel
-		s.mode = DotFpsState.Mode.AIR
+		s.mode = GSFpsState.Mode.AIR
 		motors.append(m)
 		states.append(s)
 	var worst := 0.0
@@ -119,7 +119,7 @@ func _pair(name: String, bodies: Array[DotFpsBody], tun: DotFpsTunables, clock: 
 	_worst = maxf(_worst, worst)
 	print("  %-18s ticks %d  max divergence %.9f  states %d  end %s  memo hits %s" % [
 		name, TICKS, worst, modes.size(), states[0].position,
-		str((bodies[0] as DotFpsPhysicsBody).rest_memo_hits) if bodies[0] is DotFpsPhysicsBody else "-"])
+		str((bodies[0] as GSFpsPhysicsBody).rest_memo_hits) if bodies[0] is GSFpsPhysicsBody else "-"])
 	_check(hashes[0] == hashes[1], "%s: old and new paths are bit-for-bit identical (hash over every tick)" % name)
 	_check(worst <= EPSILON, "%s: old and new paths agree to %s on every tick" % [name, EPSILON] + ("" if first_bad < 0 else " (first at tick %d)" % first_bad))
 
@@ -174,10 +174,10 @@ func _run_equivalence() -> void:
 	_section("the check can fail")
 	# One motor fed a different seed must diverge: proves the comparison is not vacuous.
 	var bodies := _bodies_physics()
-	var a := DotFpsMotor.new(_tunables(), bodies[0])
-	var b := DotFpsMotor.new(_tunables(), bodies[1])
-	var sa := DotFpsState.new()
-	var sb := DotFpsState.new()
+	var a := GSFpsMotor.new(_tunables(), bodies[0])
+	var b := GSFpsMotor.new(_tunables(), bodies[1])
+	var sa := GSFpsState.new()
+	var sb := GSFpsState.new()
 	sa.position = Vector3(0, 0.05, 0)
 	sb.position = Vector3(0, 0.05, 0)
 	var diverged := 0.0

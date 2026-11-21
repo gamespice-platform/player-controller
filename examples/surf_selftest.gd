@@ -1,8 +1,8 @@
 extends Node
 
 ## Proves the things a surf or bhop timer depends on. Run: [code]godot --headless --path . res://examples/surf_selftest.tscn[/code]
-## The movement self-test covers strafe acceleration, air-strafing and the collision backend; this covers what a movement-game server adds, run against [DotFpsFlatBody] so a failure has one possible cause:
-## a ramp too steep to stand on does not ground the player (that IS surf); sliding into a seam between two ramps comes out the other side ([method DotFpsMotor._resolve_planes]); hopping keeps speed with the cap off and cannot with it on; a style is a pure transform of the tunables and the command.
+## The movement self-test covers strafe acceleration, air-strafing and the collision backend; this covers what a movement-game server adds, run against [GSFpsFlatBody] so a failure has one possible cause:
+## a ramp too steep to stand on does not ground the player (that IS surf); sliding into a seam between two ramps comes out the other side ([method GSFpsMotor._resolve_planes]); hopping keeps speed with the cap off and cannot with it on; a style is a pure transform of the tunables and the command.
 
 const STEP := 1.0 / 128.0
 
@@ -19,7 +19,7 @@ var _completed := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -66,8 +66,8 @@ func _run() -> void:
 
 
 
-func _tunables() -> DotFpsTunables:
-	var t := DotFpsTunables.with_profile("legacy")
+func _tunables() -> GSFpsTunables:
+	var t := GSFpsTunables.with_profile("legacy")
 	# A bhop/surf server's values, not the shooter defaults: hold to hop, no landing
 	# cap, and enough air acceleration for strafing to pay.
 	t.auto_hop = true
@@ -81,11 +81,11 @@ func _tunables() -> DotFpsTunables:
 	return t
 
 
-func _command(x: float, y: float, yaw: float, jump: bool = false) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+func _command(x: float, y: float, yaw: float, jump: bool = false) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	c.move = Vector2(x, y)
 	c.yaw = yaw
-	c.set_button(DotFpsCommand.BUTTON_JUMP, jump)
+	c.set_button(GSFpsCommand.BUTTON_JUMP, jump)
 	return c
 
 
@@ -122,9 +122,9 @@ func _check_near(
 
 
 ## A world with one surf ramp descending toward -Z through the origin.
-## Returned with the ramp's index so a test asks [method DotFpsFlatBody.ramp_height] where the surface is: a tilt with the sign backwards puts the player twenty metres under the map and reports that surf does not work.
-func _surf_world(angle: float) -> DotFpsFlatBody:
-	var body := DotFpsFlatBody.new()
+## Returned with the ramp's index so a test asks [method GSFpsFlatBody.ramp_height] where the surface is: a tilt with the sign backwards puts the player twenty metres under the map and reports that surf does not work.
+func _surf_world(angle: float) -> GSFpsFlatBody:
+	var body := GSFpsFlatBody.new()
 	body.floor_y = -500.0
 	body.add_ramp(Vector3.ZERO, Vector3.FORWARD, angle)
 	return body
@@ -132,7 +132,7 @@ func _surf_world(angle: float) -> DotFpsFlatBody:
 
 ## A state placed [param above] metres clear of the ramp at [param z].
 ## Clear of the surface, not above the point under the feet: the capsule touches a 60 degree face about a metre before its feet reach the surface height below them, so "0.2 above" starts the player deeply embedded.
-func _on_ramp(body: DotFpsFlatBody, z: float, above: float) -> DotFpsState:
+func _on_ramp(body: GSFpsFlatBody, z: float, above: float) -> GSFpsState:
 	var t := _tunables()
 	var normal := body.planes[0].normal
 
@@ -145,13 +145,13 @@ func _on_ramp(body: DotFpsFlatBody, z: float, above: float) -> DotFpsState:
 	)
 	var clearance := support / absf(normal.y) - t.stand_height * 0.5
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(
 		0.0,
 		body.ramp_height(0, Vector3(0.0, 0.0, z)) + clearance + above,
 		z
 	)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	return s
 
 
@@ -160,17 +160,17 @@ func _test_ramp_is_not_ground() -> void:
 
 	# 60° — well past the 46° the tunables allow anybody to stand on.
 	var body := _surf_world(60.0)
-	var motor := DotFpsMotor.new(_tunables(), body)
+	var motor := GSFpsMotor.new(_tunables(), body)
 
 	var s := _on_ramp(body, 6.0, 3.0)
 
 	for _i in range(256):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	_check(
 		not s.is_grounded(),
 		"a player on a 60° face is never grounded",
-		"mode %s" % DotFpsState.mode_name(s.mode)
+		"mode %s" % GSFpsState.mode_name(s.mode)
 	)
 	_check(
 		s.horizontal_speed() > 1.0,
@@ -186,11 +186,11 @@ func _test_ramp_is_not_ground() -> void:
 	# The control: the same face at 30° IS ground, so this is a test of the angle and
 	# not of planes-are-never-ground.
 	var walkable := _surf_world(30.0)
-	var motor2 := DotFpsMotor.new(_tunables(), walkable)
+	var motor2 := GSFpsMotor.new(_tunables(), walkable)
 	var s2 := _on_ramp(walkable, 6.0, 3.0)
 
 	for _i in range(256):
-		motor2.simulate(s2, DotFpsCommand.new(), STEP)
+		motor2.simulate(s2, GSFpsCommand.new(), STEP)
 
 	_check(s2.is_grounded(), "while a 30° face is ordinary ground")
 	_done()
@@ -200,7 +200,7 @@ func _test_surf_keeps_speed() -> void:
 	_section("surfing preserves speed")
 
 	var body := _surf_world(60.0)
-	var motor := DotFpsMotor.new(_tunables(), body)
+	var motor := GSFpsMotor.new(_tunables(), body)
 
 	var s := _on_ramp(body, 10.0, 0.2)
 	# Already moving down the slope: this is a player a few seconds into a ramp.
@@ -209,7 +209,7 @@ func _test_surf_keeps_speed() -> void:
 	var entry := s.horizontal_speed()
 
 	for _i in range(128):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	# Gravity's along-slope component is g·sin(60°) ≈ 17 m/s², so a second on the
 	# ramp should ADD speed rather than cost it. A collide-and-slide that clipped the
@@ -251,8 +251,8 @@ func _test_surf_gains_speed_from_strafing() -> void:
 
 
 ## Runs 200 ticks down the ramp, turning throughout, and returns the speed reached.
-func _run_ramp(body: DotFpsFlatBody, strafe: bool) -> float:
-	var motor := DotFpsMotor.new(_tunables(), body)
+func _run_ramp(body: GSFpsFlatBody, strafe: bool) -> float:
+	var motor := GSFpsMotor.new(_tunables(), body)
 
 	var s := _on_ramp(body, 10.0, 0.2)
 	s.velocity = Vector3(0.0, -8.66, -5.0)
@@ -271,7 +271,7 @@ func _test_crease_does_not_stop_a_surfer() -> void:
 
 	# Two ramps falling toward each other along X, meeting in a valley along Z: a player sliding down is in permanent contact with both.
 	# This is the shape every surf map is made of and the shape a sequential collide-and-slide stops dead in.
-	var body := DotFpsFlatBody.new()
+	var body := GSFpsFlatBody.new()
 	body.floor_y = -500.0
 	body.add_ramp(Vector3(-1.5, 0.0, 0.0), Vector3.RIGHT, 55.0)
 	body.add_ramp(Vector3(1.5, 0.0, 0.0), Vector3.LEFT, 55.0)
@@ -279,17 +279,17 @@ func _test_crease_does_not_stop_a_surfer() -> void:
 	var with_crease := _tunables()
 	with_crease.crease_slide = true
 
-	var motor := DotFpsMotor.new(with_crease, body)
+	var motor := GSFpsMotor.new(with_crease, body)
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, 4.0, 12.0)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	s.velocity = Vector3(0.0, 0.0, -16.0)
 
 	var start_z := s.position.z
 
 	for _i in range(200):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	var travelled := start_z - s.position.z
 
@@ -310,15 +310,15 @@ func _test_crease_does_not_stop_a_surfer() -> void:
 	var without := _tunables()
 	without.crease_slide = false
 
-	var motor2 := DotFpsMotor.new(without, body)
+	var motor2 := GSFpsMotor.new(without, body)
 
-	var s2 := DotFpsState.new()
+	var s2 := GSFpsState.new()
 	s2.position = Vector3(0.0, 4.0, 12.0)
-	s2.mode = DotFpsState.Mode.AIR
+	s2.mode = GSFpsState.Mode.AIR
 	s2.velocity = Vector3(0.0, 0.0, -16.0)
 
 	for _i in range(200):
-		motor2.simulate(s2, DotFpsCommand.new(), STEP)
+		motor2.simulate(s2, GSFpsCommand.new(), STEP)
 
 	var travelled2 := start_z - s2.position.z
 
@@ -334,14 +334,14 @@ func _test_crease_does_not_stop_a_surfer() -> void:
 func _test_bhop_preserves_speed() -> void:
 	_section("bunny-hopping")
 
-	var body := DotFpsFlatBody.with_floor(0.0)
+	var body := GSFpsFlatBody.with_floor(0.0)
 	var t := _tunables()
-	var motor := DotFpsMotor.new(t, body)
+	var motor := GSFpsMotor.new(t, body)
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3.ZERO
 	s.velocity = Vector3(0.0, 0.0, -14.0)
-	s.mode = DotFpsState.Mode.GROUND
+	s.mode = GSFpsState.Mode.GROUND
 
 	# Jump held the whole time, which is what auto_hop means. Two hundred ticks is
 	# several hops at this height.
@@ -355,14 +355,14 @@ func _test_bhop_preserves_speed() -> void:
 	)
 
 	# The control: the same run without the jump key loses it all to friction.
-	var s2 := DotFpsState.new()
+	var s2 := GSFpsState.new()
 	s2.velocity = Vector3(0.0, 0.0, -14.0)
-	s2.mode = DotFpsState.Mode.GROUND
+	s2.mode = GSFpsState.Mode.GROUND
 
-	var motor2 := DotFpsMotor.new(t, body)
+	var motor2 := GSFpsMotor.new(t, body)
 
 	for _i in range(200):
-		motor2.simulate(s2, DotFpsCommand.new(), STEP)
+		motor2.simulate(s2, GSFpsCommand.new(), STEP)
 
 	_check(
 		s2.horizontal_speed() < 1.0,
@@ -375,16 +375,16 @@ func _test_bhop_preserves_speed() -> void:
 func _test_bhop_cap_removes_it() -> void:
 	_section("the landing cap")
 
-	var body := DotFpsFlatBody.with_floor(0.0)
+	var body := GSFpsFlatBody.with_floor(0.0)
 
 	var capped := _tunables()
 	capped.bhop_speed_cap_scale = 1.104
 
-	var motor := DotFpsMotor.new(capped, body)
+	var motor := GSFpsMotor.new(capped, body)
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.velocity = Vector3(0.0, 0.0, -14.0)
-	s.mode = DotFpsState.Mode.GROUND
+	s.mode = GSFpsState.Mode.GROUND
 
 	for _i in range(200):
 		motor.simulate(s, _command(0.0, 0.0, 0.0, true), STEP)
@@ -402,15 +402,15 @@ func _test_bhop_cap_removes_it() -> void:
 func _test_perfect_jump_counting() -> void:
 	_section("perfect-hop statistics")
 
-	var body := DotFpsFlatBody.with_floor(0.0)
-	var motor := DotFpsMotor.new(_tunables(), body)
-	var stats := DotFpsStats.new()
+	var body := GSFpsFlatBody.with_floor(0.0)
+	var motor := GSFpsMotor.new(_tunables(), body)
+	var stats := GSFpsStats.new()
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.velocity = Vector3(0.0, 0.0, -10.0)
-	s.mode = DotFpsState.Mode.GROUND
+	s.mode = GSFpsState.Mode.GROUND
 
-	var previous: DotFpsCommand = null
+	var previous: GSFpsCommand = null
 
 	# 800 ticks at 128 Hz is 6.25 s, and one hop at this jump height and gravity is
 	# 0.66 s of air time — so this is nine or ten hops, not a boundary case.
@@ -431,11 +431,11 @@ func _test_perfect_jump_counting() -> void:
 	# A standing jump every second is the opposite: the player sat on the ground for
 	# a hundred ticks first, so it is not a hop attempt at all and must not be
 	# counted against them.
-	var stats2 := DotFpsStats.new()
-	var s2 := DotFpsState.new()
-	s2.mode = DotFpsState.Mode.GROUND
+	var stats2 := GSFpsStats.new()
+	var s2 := GSFpsState.new()
+	s2.mode = GSFpsState.Mode.GROUND
 
-	var previous2: DotFpsCommand = null
+	var previous2: GSFpsCommand = null
 
 	for i in range(600):
 		var c := _command(0.0, 0.0, 0.0, i % 100 == 0)
@@ -459,19 +459,19 @@ func _test_perfect_jump_counting() -> void:
 func _test_sync_measurement() -> void:
 	_section("strafe synchronisation")
 
-	var body := DotFpsFlatBody.new()
+	var body := GSFpsFlatBody.new()
 	body.floor_y = -500.0
 
-	var motor := DotFpsMotor.new(_tunables(), body)
-	var stats := DotFpsStats.new()
+	var motor := GSFpsMotor.new(_tunables(), body)
+	var stats := GSFpsStats.new()
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, 100.0, 0.0)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	s.velocity = Vector3(0.0, 0.0, -10.0)
 
 	var yaw := 0.0
-	var previous: DotFpsCommand = null
+	var previous: GSFpsCommand = null
 
 	# Right strafe, turning right. Godot's yaw increases counter-clockwise about +Y,
 	# so turning right is yaw DECREASING — the sign of this loop is the whole test.
@@ -484,14 +484,14 @@ func _test_sync_measurement() -> void:
 
 	_check_near(stats.sync(), 1.0, 0.02, "strafing with the turn is fully in sync")
 
-	var stats2 := DotFpsStats.new()
-	var s2 := DotFpsState.new()
+	var stats2 := GSFpsStats.new()
+	var s2 := GSFpsState.new()
 	s2.position = Vector3(0.0, 100.0, 0.0)
-	s2.mode = DotFpsState.Mode.AIR
+	s2.mode = GSFpsState.Mode.AIR
 	s2.velocity = Vector3(0.0, 0.0, -10.0)
 
 	var yaw2 := 0.0
-	var previous2: DotFpsCommand = null
+	var previous2: GSFpsCommand = null
 
 	for _i in range(200):
 		yaw2 += 0.3
@@ -517,7 +517,7 @@ func _test_style_transform() -> void:
 	base.gravity = 20.0
 	base.max_speed = 7.0
 
-	var low := DotFpsStyle.new()
+	var low := GSFpsStyle.new()
 	low.id = &"low_gravity"
 	low.gravity_scale = 0.5
 
@@ -535,7 +535,7 @@ func _test_style_transform() -> void:
 		"which is why apply_to always takes the base"
 	)
 
-	var fast := DotFpsStyle.new()
+	var fast := GSFpsStyle.new()
 	fast.speed_scale = 40.0
 	var fast_tunables := fast.apply_to(base)
 
@@ -544,8 +544,8 @@ func _test_style_transform() -> void:
 		"a style that outruns the velocity backstop lifts it rather than being refused"
 	)
 
-	var hard := DotFpsStyle.new()
-	hard.easy_bhop = DotFpsStyle.Toggle.OFF
+	var hard := GSFpsStyle.new()
+	hard.easy_bhop = GSFpsStyle.Toggle.OFF
 	_check_near(
 		hard.apply_to(base).jump_buffer_time, 0.0, 0.0001,
 		"turning easy-bhop off removes the jump buffer entirely"
@@ -556,8 +556,8 @@ func _test_style_transform() -> void:
 func _test_style_command_filter() -> void:
 	_section("styles filter the command")
 
-	var sideways := DotFpsStyle.new()
-	sideways.key_preset = DotFpsStyle.KeyPreset.SIDEWAYS
+	var sideways := GSFpsStyle.new()
+	sideways.key_preset = GSFpsStyle.KeyPreset.SIDEWAYS
 
 	var c := _command(0.7, 0.7, 0.0)
 	sideways.filter_command(c)
@@ -569,8 +569,8 @@ func _test_style_command_filter() -> void:
 	sideways.filter_command(c)
 	_check_near(c.move.x, 0.7, 0.0001, "filtering twice changes nothing")
 
-	var half := DotFpsStyle.new()
-	half.key_preset = DotFpsStyle.KeyPreset.HALF_SIDEWAYS
+	var half := GSFpsStyle.new()
+	half.key_preset = GSFpsStyle.KeyPreset.HALF_SIDEWAYS
 	half.one_strafe_key_only = true
 
 	var c2 := _command(0.7, 0.7, 0.0)
@@ -582,8 +582,8 @@ func _test_style_command_filter() -> void:
 		"and one-key-only drops the forward half of the diagonal, not the strafe"
 	)
 
-	var backwards := DotFpsStyle.new()
-	backwards.key_preset = DotFpsStyle.KeyPreset.BACKWARDS
+	var backwards := GSFpsStyle.new()
+	backwards.key_preset = GSFpsStyle.KeyPreset.BACKWARDS
 
 	var c3 := _command(0.5, -1.0, 0.0)
 	backwards.filter_command(c3)
@@ -591,15 +591,15 @@ func _test_style_command_filter() -> void:
 	_check_near(c3.move.y, -1.0, 0.0001, "backwards keeps the back key")
 	_check_near(c3.move.x, 0.0, 0.0001, "and removes the strafes")
 
-	var no_crouch := DotFpsStyle.new()
+	var no_crouch := GSFpsStyle.new()
 	no_crouch.block_crouch = true
 
 	var c4 := _command(0.0, 1.0, 0.0)
-	c4.set_button(DotFpsCommand.BUTTON_CROUCH, true)
+	c4.set_button(GSFpsCommand.BUTTON_CROUCH, true)
 	no_crouch.filter_command(c4)
 
 	_check(
-		not c4.is_pressed(DotFpsCommand.BUTTON_CROUCH),
+		not c4.is_pressed(GSFpsCommand.BUTTON_CROUCH),
 		"a style that blocks crouch clears the button"
 	)
 	_done()
@@ -608,8 +608,8 @@ func _test_style_command_filter() -> void:
 func _test_style_round_trip() -> void:
 	_section("styles survive serialisation")
 
-	for style in DotFpsStyle.defaults():
-		var back := DotFpsStyle.from_dictionary(style.to_dictionary())
+	for style in GSFpsStyle.defaults():
+		var back := GSFpsStyle.from_dictionary(style.to_dictionary())
 		_check(
 			back.fingerprint() == style.fingerprint(),
 			"%s round-trips through a dictionary" % style.display_name,
@@ -618,21 +618,21 @@ func _test_style_round_trip() -> void:
 
 	# Untrusted input: an out-of-range enum from a config file or a peer must land on
 	# a member that exists, not on a number every match falls through.
-	var junk := DotFpsStyle.from_dictionary({
+	var junk := GSFpsStyle.from_dictionary({
 		"id": "junk", "key_preset": 99, "auto_hop": -4
 	})
 
 	_check(
-		junk.key_preset == DotFpsStyle.KeyPreset.FREE,
+		junk.key_preset == GSFpsStyle.KeyPreset.FREE,
 		"an out-of-range key preset falls back to FREE"
 	)
 	_check(
-		junk.auto_hop == DotFpsStyle.Toggle.INHERIT,
+		junk.auto_hop == GSFpsStyle.Toggle.INHERIT,
 		"and an out-of-range toggle to INHERIT"
 	)
 
 	var ids := {}
-	for style in DotFpsStyle.defaults():
+	for style in GSFpsStyle.defaults():
 		_check(not ids.has(style.id), "%s has a unique id" % style.display_name)
 		ids[style.id] = true
 	_done()
@@ -643,7 +643,7 @@ func _test_edge_friction() -> void:
 
 	# A single block with nothing beyond it. A player sliding toward the drop passes
 	# over the edge partway through the run.
-	var body := DotFpsFlatBody.new()
+	var body := GSFpsFlatBody.new()
 	body.floor_y = -500.0
 	body.add_box(AABB(Vector3(-4.0, -1.0, -4.0), Vector3(8.0, 1.0, 8.0)))
 
@@ -666,20 +666,20 @@ func _test_edge_friction() -> void:
 
 
 ## Runs a player toward the lip of the block and returns how far they got.
-func _slide_to_edge(body: DotFpsBody, t: DotFpsTunables) -> float:
-	var motor := DotFpsMotor.new(t, body)
+func _slide_to_edge(body: GSFpsBody, t: GSFpsTunables) -> float:
+	var motor := GSFpsMotor.new(t, body)
 
 	# Started next to the lip, not across the block: edge friction can only change a
 	# run in which the player is actually near an edge, and the first version of this
 	# test skidded to a halt three metres short of one and measured nothing.
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, 0.0, -3.2)
 	s.velocity = Vector3(0.0, 0.0, -9.0)
-	s.mode = DotFpsState.Mode.GROUND
+	s.mode = GSFpsState.Mode.GROUND
 
 	var start := s.position.z
 
 	for _i in range(120):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	return start - s.position.z

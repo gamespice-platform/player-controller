@@ -1,11 +1,11 @@
 @tool
-extends DotConfig
+extends GSConfig
 
-## The exported numbers of [DotFpsTunables], kept apart so the class that reads them stays small.
-## Never instantiate this directly; use [DotFpsTunables].
+## The exported numbers of [GSFpsTunables], kept apart so the class that reads them stays small.
+## Never instantiate this directly; use [GSFpsTunables].
 
 ## Bumped by an exported property's setter when the value changes (a same-value write is a no-op), so a reader can
-## cache what it derives from them ([DotFpsMotor]'s native tick settings) and rebuild only when one changes. Not saved.
+## cache what it derives from them ([GSFpsMotor]'s native tick settings) and rebuild only when one changes. Not saved.
 var revision: int = 0
 
 @export_group("Collision")
@@ -80,7 +80,7 @@ var revision: int = 0
 
 @export_group("Sprint stamina")
 
-## Whether sprinting drains [member DotFpsState.stamina] and stops when it is empty. Off keeps sprint free.
+## Whether sprinting drains [member GSFpsState.stamina] and stops when it is empty. Off keeps sprint free.
 @export var stamina_enabled: bool = false:
 	set(value):
 		if stamina_enabled != value:
@@ -129,7 +129,7 @@ var revision: int = 0
 			sprint_load_drain = value
 			revision += 1
 
-## Whether a sprinting player may aim down sights or reload (read by weapon code through [member DotFpsState.sprinting]).
+## Whether a sprinting player may aim down sights or reload (read by weapon code through [member GSFpsState.sprinting]).
 @export var sprint_blocks_aim: bool = false:
 	set(value):
 		if sprint_blocks_aim != value:
@@ -150,9 +150,9 @@ var revision: int = 0
 			sprint_shot_follows_barrel = value
 			revision += 1
 
-## The move-command button that says the player is aiming down sights, as a [DotFpsCommand]
+## The move-command button that says the player is aiming down sights, as a [GSFpsCommand]
 ## button bit; 0 means none. A move bit rather than the weapon's, so prediction and the server
-## read the same input in [method DotFpsTunables.speed_for].
+## read the same input in [method GSFpsTunables.speed_for].
 @export_range(0, 255, 1) var aim_button: int = 0:
 	set(value):
 		if aim_button != value:
@@ -166,7 +166,7 @@ var revision: int = 0
 			aim_speed_scale = value
 			revision += 1
 
-## Whether taking damage drops the player out of the sights ([DotFpsAimBreak]). Off: the sights stay and the hit shakes the view and wobbles the aim instead (the `hit_*` members).
+## Whether taking damage drops the player out of the sights ([GSFpsAimBreak]). Off: the sights stay and the hit shakes the view and wobbles the aim instead (the `hit_*` members).
 @export var unscope_on_hit: bool = false:
 	set(value):
 		if unscope_on_hit != value:
@@ -215,7 +215,7 @@ var revision: int = 0
 			hit_damage_scale = value
 			revision += 1
 
-## Whether the sprint button toggles instead of being held (read by [DotFpsSampler]; stopping clears it).
+## Whether the sprint button toggles instead of being held (read by [GSFpsSampler]; stopping clears it).
 @export var sprint_toggle: bool = false:
 	set(value):
 		if sprint_toggle != value:
@@ -234,7 +234,7 @@ var revision: int = 0
 
 ## Whether the noclip button does anything.
 ## Off by default and gated separately on the server, because a client can set this bit
-## in a command at will. See [DotFpsController.allow_noclip].
+## in a command at will. See [GSFpsController.allow_noclip].
 @export var can_noclip: bool = false:
 	set(value):
 		if can_noclip != value:
@@ -337,7 +337,7 @@ var revision: int = 0
 @export_group("Launch")
 
 ## Whether [member launch_button] throws the player into the air. Off by default, like
-## [member slide_enabled]. An ability, not a [DotFpsModifier]: it is an impulse and a modifier
+## [member slide_enabled]. An ability, not a [GSFpsModifier]: it is an impulse and a modifier
 ## is a multiplier.
 @export var launch_enabled: bool = false:
 	set(value):
@@ -345,7 +345,7 @@ var revision: int = 0
 			launch_enabled = value
 			revision += 1
 
-## The command button that launches, as a [DotFpsCommand] button bit
+## The command button that launches, as a [GSFpsCommand] button bit
 ## ([code]BUTTON_USER_0[/code] is 32). 0 means no button does.
 ## A setting rather than a new bit, because every wire bit is already spoken for.
 @export_range(0, 255, 1) var launch_button: int = 0:
@@ -393,7 +393,7 @@ var revision: int = 0
 			dash_enabled = value
 			revision += 1
 
-## The command button that dashes, as a [DotFpsCommand] button bit. 0 means none. A game
+## The command button that dashes, as a [GSFpsCommand] button bit. 0 means none. A game
 ## with no sprint can give it the sprint bit, which is already on the wire.
 @export_range(0, 255, 1) var dash_button: int = 0:
 	set(value):

@@ -1,5 +1,5 @@
 @tool
-class_name DotFpsSurfaceSet
+class_name GSFpsSurfaceSet
 extends Resource
 
 ## The surfaces a game has, and how a collider is mapped to one.
@@ -7,11 +7,11 @@ extends Resource
 ## process-local and would make client and server disagree about friction. See [method resolve_from_node].
 
 ## Surfaces by id.
-@export var surfaces: Array[DotFpsSurface] = []
+@export var surfaces: Array[GSFpsSurface] = []
 
 ## Used when a collider names no surface, or one not here.
 ## Never null after [method get_surface]: an unconfigured set behaves like the tunables alone.
-@export var fallback: DotFpsSurface = null
+@export var fallback: GSFpsSurface = null
 
 ## Metadata key read from a collider node by [method resolve_from_node].
 @export var metadata_key: StringName = &"dot_fps_surface"
@@ -31,7 +31,7 @@ func _build() -> void:
 		if surface == null:
 			continue
 		if _by_id.has(surface.id):
-			DotLog.warn(
+			GSLog.warn(
 				"fps.surface",
 				"duplicate surface id; the later one wins",
 				{"id": String(surface.id)}
@@ -39,18 +39,18 @@ func _build() -> void:
 		_by_id[surface.id] = surface
 
 	if fallback == null:
-		fallback = DotFpsSurface.make(&"default")
+		fallback = GSFpsSurface.make(&"default")
 
 	_built = true
 
 
 ## The surface for an id, or the fallback. Never null.
-func get_surface(id: StringName) -> DotFpsSurface:
+func get_surface(id: StringName) -> GSFpsSurface:
 	if not _built:
 		_build()
 
 	var found: Variant = _by_id.get(id)
-	return found if found is DotFpsSurface else fallback
+	return found if found is GSFpsSurface else fallback
 
 
 func has_surface(id: StringName) -> bool:
@@ -59,20 +59,20 @@ func has_surface(id: StringName) -> bool:
 	return _by_id.has(id)
 
 
-## Every surface of a GameSpice Physics `DotPhysicsSurfaceSet` (anything with a `surfaces` array), through
-## [method DotFpsSurface.from_physics]. Its fallback is the plain default, not the physics set's:
+## Every surface of a GameSpice Physics `GSPhysicsSurfaceSet` (anything with a `surfaces` array), through
+## [method GSFpsSurface.from_physics]. Its fallback is the plain default, not the physics set's:
 ## an untagged floor is normal ground.
-static func from_physics(physics_set: Object) -> DotFpsSurfaceSet:
-	var out := DotFpsSurfaceSet.new()
+static func from_physics(physics_set: Object) -> GSFpsSurfaceSet:
+	var out := GSFpsSurfaceSet.new()
 	var list: Variant = physics_set.get("surfaces") if physics_set != null else null
 	if list is Array:
 		for each: Variant in list:
 			if each is Object:
-				var _added := out.add(DotFpsSurface.from_physics(each))
+				var _added := out.add(GSFpsSurface.from_physics(each))
 	return out
 
 
-func add(surface: DotFpsSurface) -> DotFpsSurfaceSet:
+func add(surface: GSFpsSurface) -> GSFpsSurfaceSet:
 	surfaces.append(surface)
 	_built = false
 	return self

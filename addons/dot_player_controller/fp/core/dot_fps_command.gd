@@ -1,9 +1,9 @@
-class_name DotFpsCommand
+class_name GSFpsCommand
 extends RefCounted
 
-## One tick of player intent, never outcome: the server applies it through the same [DotFpsMotor] and reaches the authoritative answer itself.
-## Nothing here reads the keyboard ([DotFpsSampler] does), so replays, bots and network packets produce commands too.
-## Usage: [code]motor.simulate(state, cmd, tick_delta)[/code]; [code]cmd.set_button(DotFpsCommand.BUTTON_JUMP, true)[/code].
+## One tick of player intent, never outcome: the server applies it through the same [GSFpsMotor] and reaches the authoritative answer itself.
+## Nothing here reads the keyboard ([GSFpsSampler] does), so replays, bots and network packets produce commands too.
+## Usage: [code]motor.simulate(state, cmd, tick_delta)[/code]; [code]cmd.set_button(GSFpsCommand.BUTTON_JUMP, true)[/code].
 
 ## Buttons as a bitfield: 8 bits on the wire, and a game adds actions ([constant BUTTON_USER_0]) without changing the packet layout.
 const BUTTON_JUMP := 1 << 0
@@ -43,24 +43,24 @@ func set_button(button: int, pressed: bool) -> void:
 
 ## Buttons pressed in this command but not in [param previous].
 ## Derived from the previous command rather than stored, so replaying out of a buffer gives the same answer as sampling live.
-func pressed_since(previous: DotFpsCommand) -> int:
+func pressed_since(previous: GSFpsCommand) -> int:
 	var before := previous.buttons if previous != null else 0
 	return buttons & ~before
 
 
-func just_pressed(button: int, previous: DotFpsCommand) -> bool:
+func just_pressed(button: int, previous: GSFpsCommand) -> bool:
 	return (pressed_since(previous) & button) != 0
 
 
 ## Stands still, releases every button and keeps the view angles (the default of
-## `DotNetInput._neutralise`, for a silent or blacked-out player).
+## `GSNetInput._neutralise`, for a silent or blacked-out player).
 func neutralise() -> void:
 	move = Vector2.ZERO
 	buttons = 0
 
 
-func duplicate_command() -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+func duplicate_command() -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	c.move = move
 	c.yaw = yaw
 	c.pitch = pitch
@@ -68,7 +68,7 @@ func duplicate_command() -> DotFpsCommand:
 	return c
 
 
-func equals(other: DotFpsCommand) -> bool:
+func equals(other: GSFpsCommand) -> bool:
 	if other == null:
 		return false
 	return (
@@ -99,7 +99,7 @@ func sanitise(pitch_min: float = -89.0, pitch_max: float = 89.0) -> void:
 
 
 ## Writes the command into a bit writer (8 bits buttons, 20 movement, 21 view).
-## [param writer] is [Variant] because a script that mentions a missing [code]DotNetWriter[/code] class fails to parse
+## [param writer] is [Variant] because a script that mentions a missing [code]GSNetWriter[/code] class fails to parse
 ## in a project without GameSpice Net.
 func write(writer: Variant) -> void:
 	writer.write_float_range(move.x, -1.0, 1.0, 10)
@@ -148,4 +148,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotFpsCommand(%s)" % str(describe())
+	return "GSFpsCommand(%s)" % str(describe())

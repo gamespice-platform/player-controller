@@ -12,14 +12,14 @@ const _FP := "res://addons/dot_player_controller/fp/nodes/"
 const _TP := "res://addons/dot_player_controller/tp/nodes/"
 
 const _TYPES := [
-	["DotPlayerControllerSwitch", "Node", _BASE + "dot_player_controller_switch.gd"],
-	["DotFpsController", "Node", _FP + "dot_fps_controller.gd"],
-	["DotFpsView", "Node3D", _FP + "dot_fps_view.gd"],
-	["DotFpsSampler", "Node", _FP + "dot_fps_sampler.gd"],
-	["DotFpsTouchSampler", "Node", _FP + "dot_fps_touch_sampler.gd"],
-	["DotTpsController", "Node", _TP + "dot_tps_controller.gd"],
-	["DotTpsCameraRig", "Node3D", _TP + "dot_tps_camera_rig.gd"],
-	["DotTpsSampler", "Node", _TP + "dot_tps_sampler.gd"],
+	["GSPlayerControllerSwitch", "Node", _BASE + "dot_player_controller_switch.gd"],
+	["GSFpsController", "Node", _FP + "dot_fps_controller.gd"],
+	["GSFpsView", "Node3D", _FP + "dot_fps_view.gd"],
+	["GSFpsSampler", "Node", _FP + "dot_fps_sampler.gd"],
+	["GSFpsTouchSampler", "Node", _FP + "dot_fps_touch_sampler.gd"],
+	["GSTpsController", "Node", _TP + "dot_tps_controller.gd"],
+	["GSTpsCameraRig", "Node3D", _TP + "dot_tps_camera_rig.gd"],
+	["GSTpsSampler", "Node", _TP + "dot_tps_sampler.gd"],
 ]
 
 

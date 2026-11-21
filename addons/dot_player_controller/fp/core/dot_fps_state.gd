@@ -1,21 +1,21 @@
-class_name DotFpsState
+class_name GSFpsState
 extends RefCounted
 
 ## Everything the movement simulation carries from one tick to the next.
 ## A separate object so prediction can capture, restore and compare it: a field left on the node is not rewound, and the replay diverges only under latency.
 ## Rule: if the simulation reads it, it lives here.
 
-## The built-in movement modes. [member mode] is an [code]int[/code] so [method DotFpsMotor.register_mode] can hand out ids above these for a game's own modes.
+## The built-in movement modes. [member mode] is an [code]int[/code] so [method GSFpsMotor.register_mode] can hand out ids above these for a game's own modes.
 enum Mode {
 	GROUND,
 	AIR,
 	NOCLIP,
 }
 
-## The first id [method DotFpsMotor.register_mode] hands out.
+## The first id [method GSFpsMotor.register_mode] hands out.
 const FIRST_CUSTOM_MODE := 3
 
-## Most modes one motor can have; the mode travels as a fixed-width field (see [DotFpsNetSync]).
+## Most modes one motor can have; the mode travels as a fixed-width field (see [GSFpsNetSync]).
 const MAX_MODES := 16
 
 var mode: int = Mode.AIR
@@ -42,7 +42,7 @@ var ground_normal: Vector3 = Vector3.UP
 var ground_id: int = 0
 
 ## Id of the surface under the player, [code]&""[/code] when unmarked or airborne.
-## Part of the simulation (it scales friction and acceleration), resolved from scene data so both machines agree. See [DotFpsSurfaceSet].
+## Part of the simulation (it scales friction and acceleration), resolved from scene data so both machines agree. See [GSFpsSurfaceSet].
 var surface: StringName = &""
 
 ## Active modifiers as (id index, tick they expire on), sorted by index; an expiry of [code]-1[/code] lasts until removed.
@@ -70,7 +70,7 @@ var ground_ticks: int = 0
 var previous_buttons: int = 0
 
 ## Seconds into the current slide, or -1.0 when not sliding.
-## In the state so a rewind replays a slide as a slide. See [member DotFpsTunables.slide_enabled].
+## In the state so a rewind replays a slide as a slide. See [member GSFpsTunables.slide_enabled].
 var slide_time: float = -1.0
 
 ## Seconds before another slide may start. 0 when one may.
@@ -81,16 +81,16 @@ var slide_cooldown_left: float = 0.0
 var launch_cooldown_left: float = 0.0
 
 ## Seconds before the dash may be used again. Replicated with the launch's; see
-## [DotFpsNetSync].
+## [GSFpsNetSync].
 var dash_cooldown_left: float = 0.0
 
-## Seconds before another wall run may start ([member DotFpsTunables.wall_run_cooldown]).
+## Seconds before another wall run may start ([member GSFpsTunables.wall_run_cooldown]).
 var wall_run_cooldown_left: float = 0.0
 
-## Sprint stamina, 0 empty to 1 full. Held in the state so a rewind restores it (see [DotFpsNetSync.pack_stamina]).
+## Sprint stamina, 0 empty to 1 full. Held in the state so a rewind restores it (see [GSFpsNetSync.pack_stamina]).
 var stamina: float = 1.0
 
-## Set when stamina ran out; sprint refuses until it recovers to [member DotFpsTunables.stamina_resume_at].
+## Set when stamina ran out; sprint refuses until it recovers to [member GSFpsTunables.stamina_resume_at].
 var stamina_exhausted: bool = false
 
 ## Seconds before stamina starts to refill after running out.
@@ -100,7 +100,7 @@ var stamina_delay_left: float = 0.0
 var sprinting: bool = false
 
 ## Seconds into the current wall run, or -1.0 when not running.
-## In the state and snapshot so a rewind does not replay a wall run as a fall. See [member DotFpsTunables.wall_run_enabled].
+## In the state and snapshot so a rewind does not replay a wall run as a fall. See [member GSFpsTunables.wall_run_enabled].
 var wall_run_time: float = -1.0
 
 ## A run has ended in this airborne stretch, so no other may start until the player lands
@@ -109,11 +109,11 @@ var wall_run_time: float = -1.0
 var wall_run_spent: bool = false
 
 ## Wall jumps made off the wall at [member wall_jump_heading] since last on the ground.
-## 0 when there is no such wall. See [member DotFpsTunables.wall_jump_max_per_wall].
+## 0 when there is no such wall. See [member GSFpsTunables.wall_jump_max_per_wall].
 var wall_jump_count: int = 0
 
 ## Wall jumps off any wall since last on the ground, 0..3. See
-## [member DotFpsTunables.wall_jump_max_per_air]. Never less than [member wall_jump_count].
+## [member GSFpsTunables.wall_jump_max_per_air]. Never less than [member wall_jump_count].
 var wall_jumps_in_air: int = 0
 
 ## Which wall [member wall_jump_count] counts, as the heading of its normal in eighths
@@ -122,7 +122,7 @@ var wall_jumps_in_air: int = 0
 var wall_jump_heading: int = 0
 
 ## The normal of the wall being run along or touched this tick, or zero.
-## An output the motor writes each tick (not replicated or compared), read by [DotFpsView] to roll the camera.
+## An output the motor writes each tick (not replicated or compared), read by [GSFpsView] to roll the camera.
 var wall_normal: Vector3 = Vector3.ZERO
 
 ## Ticks simulated. Diagnostic; not compared.
@@ -130,7 +130,7 @@ var tick: int = 0
 
 
 ## A readable name for a mode id; [param motor] supplies registered custom names, else the number is shown.
-static func mode_name(id: int, motor: RefCounted = null) -> String:  # a DotFpsMotor, untyped so this file and the motor do not keep each other's parsers alive
+static func mode_name(id: int, motor: RefCounted = null) -> String:  # a GSFpsMotor, untyped so this file and the motor do not keep each other's parsers alive
 	if id >= 0 and id < FIRST_CUSTOM_MODE:
 		return Mode.keys()[id]
 
@@ -178,7 +178,7 @@ func move_flags() -> int:
 	var f := 0
 	if is_crouched(): f |= Move.CROUCH
 	if is_sliding(): f |= Move.SLIDE
-	if sprinting or ((previous_buttons & DotFpsCommand.BUTTON_SPRINT) != 0 and is_grounded() and horizontal_speed() > 1.0): f |= Move.SPRINT
+	if sprinting or ((previous_buttons & GSFpsCommand.BUTTON_SPRINT) != 0 and is_grounded() and horizontal_speed() > 1.0): f |= Move.SPRINT
 	if is_wall_running(): f |= Move.WALL_RUN
 	if not is_grounded(): f |= Move.AIR
 	return f
@@ -194,7 +194,7 @@ func horizontal_speed() -> float:
 	return Vector2(velocity.x, velocity.z).length()
 
 
-func copy_from(other: DotFpsState) -> void:
+func copy_from(other: GSFpsState) -> void:
 	mode = other.mode
 	position = other.position
 	velocity = other.velocity
@@ -231,15 +231,15 @@ func copy_from(other: DotFpsState) -> void:
 	tick = other.tick
 
 
-func duplicate_state() -> DotFpsState:
-	var s := DotFpsState.new()
+func duplicate_state() -> GSFpsState:
+	var s := GSFpsState.new()
 	s.copy_from(self)
 	return s
 
 
 ## Whether two states are the same to within [param epsilon].
 ## Proves a replay reproduces a simulation; the epsilon is for comparing across quantisation, not nondeterminism.
-func equals(other: DotFpsState, epsilon: float = 0.0001) -> bool:
+func equals(other: GSFpsState, epsilon: float = 0.0001) -> bool:
 	if other == null:
 		return false
 	return (
@@ -274,7 +274,7 @@ func equals(other: DotFpsState, epsilon: float = 0.0001) -> bool:
 
 ## How far two states have diverged, in metres. For diagnostics and for deciding
 ## whether a correction is worth showing the player.
-func divergence(other: DotFpsState) -> float:
+func divergence(other: GSFpsState) -> float:
 	if other == null:
 		return INF
 	return position.distance_to(other.position)
@@ -323,6 +323,6 @@ func describe_lines() -> PackedStringArray:
 
 
 func _to_string() -> String:
-	return "DotFpsState(%s @ %.1f,%.1f,%.1f)" % [
+	return "GSFpsState(%s @ %.1f,%.1f,%.1f)" % [
 		mode_name(mode), position.x, position.y, position.z
 	]

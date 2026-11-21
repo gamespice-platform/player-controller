@@ -1,8 +1,8 @@
 @tool
-class_name DotFpsTunables
+class_name GSFpsTunables
 extends "dot_fps_tunables_movement.gd"
 
-## Every number the movement simulation reads, layered like every [DotConfig]: exported defaults, JSON file, [code]DOT_FPS_*[/code] environment, [code]--fps-*[/code] arguments.
+## Every number the movement simulation reads, layered like every [GSConfig]: exported defaults, JSON file, [code]DOT_FPS_*[/code] environment, [code]--fps-*[/code] arguments.
 ## Must be identical on client and server or reconciliation corrects forever; see [method fingerprint].
 ## Defaults are [constant PROFILE_CLASSIC]; [constant PROFILE_LEGACY] is the older set ([method apply_profile]). Every number is also a cvar ([method cvar_specs]).
 
@@ -101,25 +101,25 @@ const _CVARS := {
 
 
 ## A tunables set to [param profile_name] ([constant PROFILE_CLASSIC] or [constant PROFILE_LEGACY]).
-static func with_profile(profile_name: String) -> DotFpsTunables:
-	var t := DotFpsTunables.new()
+static func with_profile(profile_name: String) -> GSFpsTunables:
+	var t := GSFpsTunables.new()
 	var _res := t.apply_profile(profile_name)
 	return t
 
 
 ## Sets every member the profiles differ in to [param profile_name]'s values and remembers it.
 ## Fails on an unknown name and changes nothing. Members outside the table are left alone.
-func apply_profile(profile_name: String) -> DotResult:
+func apply_profile(profile_name: String) -> GSResult:
 	if not _PROFILES.has(profile_name):
-		return DotResult.fail(
-			DotError.CODE_INVALID, "Unknown movement profile.",
+		return GSResult.fail(
+			GSError.CODE_INVALID, "Unknown movement profile.",
 			"%s (have %s)" % [profile_name, ", ".join(profile_names())]
 		)
 	var values: Dictionary = _PROFILES[profile_name]
 	for key in values:
 		set(key, values[key])
 	movement_profile = profile_name
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
 static func profile_names() -> PackedStringArray:
@@ -162,8 +162,8 @@ func set_cvar(cvar_name: String, value: String) -> bool:
 
 ## Boots the layers with the profile first: the profile named by the file, environment or
 ## command line is applied, then those layers on top of it, so a single number still wins.
-func load_layered(file_path: String = "") -> DotResult:
-	var probe := DotFpsTunables.new()
+func load_layered(file_path: String = "") -> GSResult:
+	var probe := GSFpsTunables.new()
 	if file_path != "":
 		var _file := probe.apply_json_file(file_path)
 	var _env := probe.apply_env()
@@ -183,25 +183,25 @@ func cli_prefix() -> String:
 	return "--fps-"
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if crouch_height > stand_height:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"crouch_height must not exceed stand_height.",
 			"crouch %.2f, stand %.2f" % [crouch_height, stand_height]
 		)
 
 	# A capsule under twice its radius tall has no cylindrical section and Godot silently grows it, so the player sinks into floors only while crouched.
 	if crouch_height < radius * 2.0:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"crouch_height must be at least twice the radius.",
 			"crouch %.2f, radius %.2f" % [crouch_height, radius]
 		)
 
 	if pitch_min >= pitch_max:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"pitch_min must be below pitch_max.",
 			"%.1f .. %.1f" % [pitch_min, pitch_max]
 		)
@@ -210,27 +210,27 @@ func validate() -> DotResult:
 	# move at a time, which looks like the collision being broken rather than a
 	# misconfiguration.
 	if step_height >= crouch_height:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"step_height must be below crouch_height.",
 			"step %.2f, crouch %.2f" % [step_height, crouch_height]
 		)
 
 	if wall_run_max_time > WALL_RUN_TIME_LIMIT:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"wall_run_max_time must not exceed %.1f s, what the wire can carry." % WALL_RUN_TIME_LIMIT,
 			"%.2f s" % wall_run_max_time
 		)
 
 	if max_speed > max_velocity:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"max_velocity must not be below max_speed.",
 			"%.1f vs %.1f" % [max_velocity, max_speed]
 		)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## Upward launch speed for a jump, in m/s.
@@ -252,11 +252,11 @@ func speed_for(buttons: int, load_fraction: float = 0.0) -> float:
 	var scale := 1.0
 	var sprinting := false
 
-	if can_crouch and (buttons & DotFpsCommand.BUTTON_CROUCH):
+	if can_crouch and (buttons & GSFpsCommand.BUTTON_CROUCH):
 		scale = crouch_speed_scale
-	elif can_walk and (buttons & DotFpsCommand.BUTTON_WALK):
+	elif can_walk and (buttons & GSFpsCommand.BUTTON_WALK):
 		scale = walk_speed_scale
-	elif can_sprint and (buttons & DotFpsCommand.BUTTON_SPRINT):
+	elif can_sprint and (buttons & GSFpsCommand.BUTTON_SPRINT):
 		scale = 1.0 + (sprint_speed_scale - 1.0) * (1.0 - clampf(load_fraction * sprint_load_speed, 0.0, 1.0))
 		sprinting = true
 
@@ -276,7 +276,7 @@ func speed_for(buttons: int, load_fraction: float = 0.0) -> float:
 const CLIMB_MARGIN := 0.9
 
 ## The longest [member wall_run_max_time] can be, in seconds: what the run's replicated
-## field holds (125 sixty-fourths; see [DotFpsNetSync]). A longer run would arrive in a
+## field holds (125 sixty-fourths; see [GSFpsNetSync]). A longer run would arrive in a
 ## snapshot as a shorter one, and the client would drop off the wall early.
 const WALL_RUN_TIME_LIMIT := 1.9
 
@@ -357,7 +357,7 @@ func fingerprint() -> String:
 	for key in _fp_keys:
 		parts.append("%s=%s" % [key, str(get(key))])
 
-	_fp_cache = DotHash.sha256_text("|".join(parts)).substr(0, 16)
+	_fp_cache = GSHash.sha256_text("|".join(parts)).substr(0, 16)
 	_fp_revision = revision
 	return _fp_cache
 

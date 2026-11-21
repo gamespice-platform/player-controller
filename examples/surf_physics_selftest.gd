@@ -1,8 +1,8 @@
 extends "res://examples/surf_physics_selftest_base.gd"
 
 ## Surf, against the physics server the games actually run on. Run: [code]godot --headless --path . res://examples/surf_physics_selftest.tscn[/code]
-## surf_selftest runs against [DotFpsFlatBody] and all its checks passed while a player on a real map sank through the ramp: a swept query against Godot's physics server does not see a collider the capsule already touches. A suite that substitutes the component under suspicion cannot see a bug in it.
-## So this builds real [StaticBody3D] geometry and runs the same motor against [DotFpsPhysicsBody]. Penetration is the measurement, not speed: a sinking player has plausible speed, position and [member DotFpsMotor.stuck_ticks], and only a geometric test of the capsule against the face shows it.
+## surf_selftest runs against [GSFpsFlatBody] and all its checks passed while a player on a real map sank through the ramp: a swept query against Godot's physics server does not see a collider the capsule already touches. A suite that substitutes the component under suspicion cannot see a bug in it.
+## So this builds real [StaticBody3D] geometry and runs the same motor against [GSFpsPhysicsBody]. Penetration is the measurement, not speed: a sinking player has plausible speed, position and [member GSFpsMotor.stuck_ticks], and only a geometric test of the capsule against the face shows it.
 
 const CHECKS := 52
 
@@ -12,7 +12,7 @@ const SECTIONS := 13
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -69,8 +69,8 @@ func _test_rest_contact_sees_what_a_sweep_cannot() -> void:
 	await _settle()
 
 	var normal := _normal_for(60.0)
-	var body := DotFpsPhysicsBody.for_node(self)
-	var support := DotFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
+	var body := GSFpsPhysicsBody.for_node(self)
+	var support := GSFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
 
 	# Clear of the face, the sweep is correct and needs no help.
 	var clear_centre := normal * (support + 0.03)
@@ -119,14 +119,14 @@ func _test_a_surfer_stays_on_the_ramp() -> void:
 	await _settle()
 
 	var normal := _normal_for(60.0)
-	var motor := DotFpsMotor.new(_tunables(), DotFpsPhysicsBody.for_node(self))
+	var motor := GSFpsMotor.new(_tunables(), GSFpsPhysicsBody.for_node(self))
 	var s := _on_ramp(normal, 6.0, 0.05)
 	s.velocity = Vector3(6.0, 0.0, 0.0)
 
 	var worst := 0.0
 
 	for _i in range(256):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 		worst = maxf(worst, _penetration(s.position, normal))
 
 	# The number that matters. Before the resting query this reached 0.83 m in 96
@@ -140,7 +140,7 @@ func _test_a_surfer_stays_on_the_ramp() -> void:
 	_check(
 		not s.is_grounded(),
 		"is never grounded on it, which is what makes it surf",
-		"mode %s" % DotFpsState.mode_name(s.mode)
+		"mode %s" % GSFpsState.mode_name(s.mode)
 	)
 	_check(
 		s.horizontal_speed() > 8.0,
@@ -154,16 +154,16 @@ func _test_a_surfer_stays_on_the_ramp() -> void:
 	await _settle()
 
 	var hill := _normal_for(20.0)
-	var hill_motor := DotFpsMotor.new(_tunables(), DotFpsPhysicsBody.for_node(self))
+	var hill_motor := GSFpsMotor.new(_tunables(), GSFpsPhysicsBody.for_node(self))
 	var h := _on_ramp(hill, 4.0, 0.05)
 
 	for _i in range(192):
-		hill_motor.simulate(h, DotFpsCommand.new(), STEP)
+		hill_motor.simulate(h, GSFpsCommand.new(), STEP)
 
 	_check(
 		h.is_grounded(),
 		"a 20° face is still ground and still stands a player up",
-		"mode %s" % DotFpsState.mode_name(h.mode)
+		"mode %s" % GSFpsState.mode_name(h.mode)
 	)
 	_check(
 		_penetration(h.position, hill) < 0.02,
@@ -181,7 +181,7 @@ func _test_an_embedded_spawn_recovers() -> void:
 	await _settle()
 
 	var normal := _normal_for(60.0)
-	var motor := DotFpsMotor.new(_tunables(), DotFpsPhysicsBody.for_node(self))
+	var motor := GSFpsMotor.new(_tunables(), GSFpsPhysicsBody.for_node(self))
 
 	# Spawned 20 cm inside the ramp — a spawn point placed a little generously, or a
 	# prediction correction landing in solid. Before the push this was terminal: the
@@ -194,7 +194,7 @@ func _test_an_embedded_spawn_recovers() -> void:
 	)
 
 	for _i in range(64):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	_check(
 		_penetration(s.position, normal) < 0.02,
@@ -216,20 +216,20 @@ func _test_a_standing_player_is_left_alone() -> void:
 	_add_floor(0.0)
 	await _settle()
 
-	var motor := DotFpsMotor.new(_tunables(), DotFpsPhysicsBody.for_node(self))
-	var s := DotFpsState.new()
+	var motor := GSFpsMotor.new(_tunables(), GSFpsPhysicsBody.for_node(self))
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, 0.5, 0.0)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 
 	for _i in range(128):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
 	var settled := s.position.y
 
 	for _i in range(256):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 
-	_check(s.is_grounded(), "stands on the floor", "mode %s" % DotFpsState.mode_name(s.mode))
+	_check(s.is_grounded(), "stands on the floor", "mode %s" % GSFpsState.mode_name(s.mode))
 	_check(
 		absf(s.position.y - settled) < 0.002,
 		"and does not creep up or down over 256 further ticks",
@@ -258,8 +258,8 @@ func _test_leaving_a_surface_is_not_blocked() -> void:
 	await _settle()
 
 	var normal := _normal_for(60.0)
-	var body := DotFpsPhysicsBody.for_node(self)
-	var support := DotFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
+	var body := GSFpsPhysicsBody.for_node(self)
+	var support := GSFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
 	var buried := normal * (support - 0.05)
 
 	# Outward: nothing is in the way, and reporting the surface behind would pin a
@@ -338,8 +338,8 @@ func _test_a_reversed_rest_normal_is_turned_round() -> void:
 	add_child(sb)
 	await _settle()
 
-	var body := DotFpsPhysicsBody.for_node(self)
-	var support := DotFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
+	var body := GSFpsPhysicsBody.for_node(self)
+	var support := GSFpsBody.capsule_support(normal, _t.stand_height, _t.radius)
 	var raw_reversed := 0
 	var reported_reversed := 0
 	var worst := 0.0
@@ -360,12 +360,12 @@ func _test_a_reversed_rest_normal_is_turned_round() -> void:
 
 	# The motor's view: a capsule resting on the face is never moved INTO it. Before the
 	# fix _depenetrate pushed these a full step through the slab.
-	var motor := DotFpsMotor.new(_t, body)
+	var motor := GSFpsMotor.new(_t, body)
 	var deepest := -INF
 	for centre in _resting_on_slab(normal, support):
-		var s := DotFpsState.new()
+		var s := GSFpsState.new()
 		s.position = centre - Vector3.UP * (_t.stand_height * 0.5)
-		s.mode = DotFpsState.Mode.AIR
+		s.mode = GSFpsState.Mode.AIR
 		motor._depenetrate(s, _t.stand_height)
 		deepest = maxf(deepest, _penetration(s.position, normal))
 	_check(deepest < 0.001, "depenetration never pushes a resting capsule into the face",
@@ -386,15 +386,15 @@ func _test_a_body_falls_out_of_an_acute_corner() -> void:
 	t.radius = 0.35
 	t.stand_height = 1.8
 	t.step_height = 0.4
-	var motor := DotFpsMotor.new(t, DotFpsPhysicsBody.for_node(self))
+	var motor := GSFpsMotor.new(t, GSFpsPhysicsBody.for_node(self))
 
 	# Where the bot froze, moved to this wall: touching the wall's face to 15 micrometres and the panel to under a millimetre, at the top of an unstick hop, still pushing at the panel.
 	# Without the fix the slide met the wall at fraction ~0 twice, called it a duplicate plane, and the move stopped every tick with the fall speed kept (hanging at 0.6 m).
-	var s := DotFpsState.new()
-	s.mode = DotFpsState.Mode.AIR
+	var s := GSFpsState.new()
+	s.mode = GSFpsState.Mode.AIR
 	s.position = Vector3(-0.4742, 0.6136, 0.350015)
 	s.velocity = Vector3(1.2, -4.47, 0.0)
-	var body := DotFpsPhysicsBody.for_node(self)
+	var body := GSFpsPhysicsBody.for_node(self)
 	var centre := s.position + Vector3.UP * (t.stand_height * 0.5)
 	var down := body.sweep(centre, Vector3(0.0, -0.15, 0.0), t.stand_height, t.radius)
 	var rest := body.rest_contact(centre, t.stand_height, t.radius)
@@ -410,7 +410,7 @@ func _test_a_body_falls_out_of_an_acute_corner() -> void:
 		"a push at the panel is reported as the wall it grazes (the engine's answer the fix copes with)",
 		"hit %s n=%v" % [into.hit, into.normal])
 
-	var command := DotFpsCommand.new()
+	var command := GSFpsCommand.new()
 	command.move = Vector2(1.0, 0.0)
 	var lowest := s.position.y
 	for _i in range(48):
@@ -419,7 +419,7 @@ func _test_a_body_falls_out_of_an_acute_corner() -> void:
 	_check(lowest < 0.05, "it reaches the floor within a second and a half", "lowest feet %.3f, at %v" % [lowest, s.position])
 	# Out by the crease of the wall and the panel (straight down) since the crease leg runs
 	# first; by the split leg before that existed. Either is the counter that says so.
-	_check(s.mode == DotFpsState.Mode.GROUND and motor.split_leg_ticks + motor.crease_leg_ticks > 0,
+	_check(s.mode == GSFpsState.Mode.GROUND and motor.split_leg_ticks + motor.crease_leg_ticks > 0,
 		"and stands there, and says how it got out",
 		"mode %d, %d split legs, %d crease legs" % [s.mode, motor.split_leg_ticks, motor.crease_leg_ticks])
 
@@ -440,7 +440,7 @@ func _test_a_body_falls_out_of_an_acute_corner() -> void:
 
 # The simulator a bot plans with
 
-## DotFpsSimulator is a second motor over a copy of the body, what a surf bot stands on: a ride simulated ahead is the ride the player will have, and changes nothing live.
+## GSFpsSimulator is a second motor over a copy of the body, what a surf bot stands on: a ride simulated ahead is the ride the player will have, and changes nothing live.
 ## Armed by dropping the tunables duplicate (the sim then shares the live ones; the counter check still passes) and by making copy_for_simulation return the live body (the query-count check fails).
 func _test_a_simulator_is_the_motor() -> void:
 	_section("a simulator rides a ramp exactly as the live motor does, and touches nothing live")
@@ -451,18 +451,18 @@ func _test_a_simulator_is_the_motor() -> void:
 	await _settle()
 
 	var normal := _normal_for(60.0)
-	var live_body := DotFpsPhysicsBody.for_node(self)
-	var live := DotFpsMotor.new(_tunables(), live_body)
+	var live_body := GSFpsPhysicsBody.for_node(self)
+	var live := GSFpsMotor.new(_tunables(), live_body)
 	var start := _on_ramp(normal, 6.0, 0.05)
 	start.velocity = Vector3(6.0, 0.0, 0.0)
-	var commands: Array[DotFpsCommand] = []
+	var commands: Array[GSFpsCommand] = []
 	for i in range(256):
-		var c := DotFpsCommand.new()
+		var c := GSFpsCommand.new()
 		c.yaw = -90.0
 		c.move = Vector2(-1.0 if i < 128 else 1.0, 0.0)
 		commands.append(c)
 
-	var sim := DotFpsSimulator.new().setup(live.tunables, live, live_body, 128)
+	var sim := GSFpsSimulator.new().setup(live.tunables, live, live_body, 128)
 	var queries_before := live_body.query_count
 	var a := start.duplicate_state()
 	for c in commands:
@@ -483,27 +483,27 @@ func _test_a_simulator_is_the_motor() -> void:
 		"%.6f m apart, %.2f m/s" % [s.position.distance_to(a.position), a.horizontal_speed()])
 
 	# The oracle ends a step: a pit under the ramp.
-	sim.oracle = func(state: DotFpsState) -> int:
-		return DotFpsSimulator.EVENT_PIT if state.position.y < -3.0 else DotFpsSimulator.EVENT_NONE
+	sim.oracle = func(state: GSFpsState) -> int:
+		return GSFpsSimulator.EVENT_PIT if state.position.y < -3.0 else GSFpsSimulator.EVENT_NONE
 	var fall := start.duplicate_state()
-	var event := DotFpsSimulator.EVENT_NONE
+	var event := GSFpsSimulator.EVENT_NONE
 	var ticks := 0
-	while event == DotFpsSimulator.EVENT_NONE and ticks < 2048:
-		event = sim.step(fall, DotFpsCommand.new())
+	while event == GSFpsSimulator.EVENT_NONE and ticks < 2048:
+		event = sim.step(fall, GSFpsCommand.new())
 		ticks += 1
-	_check(event == DotFpsSimulator.EVENT_PIT and fall.position.y < -3.0,
+	_check(event == GSFpsSimulator.EVENT_PIT and fall.position.y < -3.0,
 		"the oracle reports the pit the ride falls into", "event %d after %d ticks" % [event, ticks])
 
 	# A flat body copies itself too: the same boxes, the same answer.
-	var flat := DotFpsFlatBody.with_floor(0.0)
+	var flat := GSFpsFlatBody.with_floor(0.0)
 	var _box := flat.add_box(AABB(Vector3(2.0, 0.0, -2.0), Vector3(1.0, 2.0, 4.0)))
-	var flat_motor := DotFpsMotor.new(_tunables(), flat)
-	var flat_sim := DotFpsSimulator.new().setup(flat_motor.tunables, flat_motor, flat, 128)
-	var walk := DotFpsCommand.new()
+	var flat_motor := GSFpsMotor.new(_tunables(), flat)
+	var flat_sim := GSFpsSimulator.new().setup(flat_motor.tunables, flat_motor, flat, 128)
+	var walk := GSFpsCommand.new()
 	walk.yaw = -90.0
 	walk.move = Vector2(0.0, 1.0)
-	var f1 := DotFpsState.new()
-	var f2 := DotFpsState.new()
+	var f1 := GSFpsState.new()
+	var f2 := GSFpsState.new()
 	for _i in range(128):
 		flat_motor.simulate(f1, walk, STEP)
 		var _e := flat_sim.step(f2, walk)
@@ -516,7 +516,7 @@ func _test_a_simulator_is_the_motor() -> void:
 
 ## `g2gfast-surf-crease-hang-1`: in the V of two 50 degree slabs the capsule sits in both faces equally deep, and which one the rest query names is the physics server's business.
 ## Ridden here from 48 starts (two places in the world, six along the crease, four micrometre offsets across it), because each start is a different tie.
-## Armed: with [method DotFpsMotor._leave_crease] skipped, all 48 freeze at some point (worst 218 ticks) and the shortest ride covers 3.1 m of 23.
+## Armed: with [method GSFpsMotor._leave_crease] skipped, all 48 freeze at some point (worst 218 ticks) and the shortest ride covers 3.1 m of 23.
 func _test_a_surfer_rides_the_crease_of_two_slabs() -> void:
 	_section("a surfer in the crease of two slabs rides along it, whatever it starts from")
 
@@ -533,12 +533,12 @@ func _test_a_surfer_rides_the_crease_of_two_slabs() -> void:
 		_add_crease(x0)
 		await _settle()
 		# Dropped into the V and left to settle, so the start is where a rider really sits.
-		var motor := DotFpsMotor.new(_crease_tunables(), DotFpsPhysicsBody.for_node(self))
-		var drop := DotFpsState.new()
-		drop.mode = DotFpsState.Mode.AIR
+		var motor := GSFpsMotor.new(_crease_tunables(), GSFpsPhysicsBody.for_node(self))
+		var drop := GSFpsState.new()
+		drop.mode = GSFpsState.Mode.AIR
 		drop.position = Vector3(x0, 1.0, 20.0)
 		for _i in range(256):
-			motor.simulate(drop, DotFpsCommand.new(), STEP)
+			motor.simulate(drop, GSFpsCommand.new(), STEP)
 		for dz: float in [0.0, 0.0123, 0.37, 1.1, 2.5, 3.33]:
 			for dx: float in [0.0, 1e-5, -1e-5, 3e-4]:
 				var start := drop.duplicate_state()
@@ -608,17 +608,17 @@ func _test_a_teleported_platform_leaves_a_pinned_rider(pinned: bool) -> void:
 	add_child(wall)
 	await _settle()
 
-	var motor := DotFpsMotor.new(_tunables(), DotFpsPhysicsBody.for_node(self))
-	var s := DotFpsState.new()
+	var motor := GSFpsMotor.new(_tunables(), GSFpsPhysicsBody.for_node(self))
+	var s := GSFpsState.new()
 	s.position = Vector3(0.4, 0.0, 0.0)
-	s.mode = DotFpsState.Mode.GROUND
-	var push := DotFpsCommand.new()
+	s.mode = GSFpsState.Mode.GROUND
+	var push := GSFpsCommand.new()
 	push.move = Vector2(0.0, -1.0) if pinned else Vector2.ZERO
 	push.yaw = 90.0
 	for i in range(160):
 		motor.simulate(s, push, STEP)
 	var rest_y := s.position.y
-	_check(s.mode == DotFpsState.Mode.GROUND and absf(rest_y) < 0.05,
+	_check(s.mode == GSFpsState.Mode.GROUND and absf(rest_y) < 0.05,
 		"the rider stands on the platform",
 		"mode %d y %.3f x %.3f" % [s.mode, rest_y, s.position.x])
 	_check(motor.reused_ground_ticks > 0, "and the motor is reusing the settled ground check",
@@ -628,7 +628,7 @@ func _test_a_teleported_platform_leaves_a_pinned_rider(pinned: bool) -> void:
 	await _settle()
 	for i in range(128):
 		motor.simulate(s, push, STEP)
-	_check(s.mode != DotFpsState.Mode.GROUND and s.position.y < rest_y - 1.0,
+	_check(s.mode != GSFpsState.Mode.GROUND and s.position.y < rest_y - 1.0,
 		"the platform leaves from under the rider and the rider falls",
 		"mode %d y %.3f" % [s.mode, s.position.y])
 	_done()

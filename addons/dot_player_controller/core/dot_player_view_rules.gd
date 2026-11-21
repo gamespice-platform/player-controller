@@ -1,4 +1,4 @@
-class_name DotPlayerViewRules
+class_name GSPlayerViewRules
 extends RefCounted
 
 ## Whether a player sees through their own eyes or from behind, and what the server owner lets them choose: the `mp_forceview` cvar.
@@ -75,7 +75,7 @@ var first_person_legs: bool:
 			first_person_body = BODY_LEGS if value else BODY_OFF
 
 
-## Multiplier for the camera's landing kick (`cl_landing_kick`); the game hands it to `DotFpsView.landing_strength`.
+## Multiplier for the camera's landing kick (`cl_landing_kick`); the game hands it to `GSFpsView.landing_strength`.
 var landing_kick: float = 1.0:
 	set(value):
 		value = clampf(value, 0.0, 2.0)
@@ -189,7 +189,7 @@ func bind_cvars(add: Callable, flags: int = 0) -> Array:
 	return made
 
 
-## Follows a server's value through [param source] (GameSpice Server's `DotClientLink`, or
+## Follows a server's value through [param source] (GameSpice Server's `GSClientLink`, or
 ## anything with `replicated_cvar(name, fallback)` and a `replicated_cvar_changed(name,
 ## value)` signal). False when it cannot (an older shell's link); the rules keep their own.
 func follow_cvars(source: Object) -> bool:
@@ -235,7 +235,7 @@ func set_cvar(cvar_name: String, value: String) -> bool:
 	if cvar_name != CVAR_FORCE:
 		return false
 	if not text.is_valid_int() or text.to_int() < ANY or text.to_int() > THIRD_ONLY:
-		DotLog.debug("player.view", "mp_forceview refused a value", {"value": value})
+		GSLog.debug("player.view", "mp_forceview refused a value", {"value": value})
 		return false
 	force_view = text.to_int()
 	return true

@@ -1,4 +1,4 @@
-class_name DotFpsAimBreak
+class_name GSFpsAimBreak
 extends RefCounted
 ## What a hit does to a player who is aiming. With `unscope_on_hit` it refuses the sights for a moment (the flinch-out mode); otherwise the sights stay and the view shakes and the aim wobbles for `hit_flinch_time`, scaled by the damage. The server feeds it damage and ignores the aim bit while [method blocked]; a client feeds it the confirmed hit so the picture agrees.
 
@@ -18,7 +18,7 @@ var _phase: float = 0.0
 
 
 ## Records a hit at [param now] (seconds). [param weapon_scale] is the held weapon's multiplier on the flinch (its profile).
-func note_hit(now: float, tunables: DotFpsTunables, damage: float = 0.0, weapon_scale: float = 1.0) -> void:
+func note_hit(now: float, tunables: GSFpsTunables, damage: float = 0.0, weapon_scale: float = 1.0) -> void:
 	if tunables == null:
 		return
 	if tunables.unscope_on_hit:

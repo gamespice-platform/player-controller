@@ -2,7 +2,7 @@ extends Node3D
 
 ## Micro-benchmark of the first-person controller tick: N controllers on a flat floor and in a collision world, each ticked TICKS times.
 ## Reports microseconds per controller per tick and physics queries per tick. Run: godot --headless --path . res://examples/motor_bench.tscn [-- --n=32 --ticks=1000 --legacy]
-## --legacy turns off every cache the perf work added (DotFpsMotor.perf_caches), for before/after numbers from one tree.
+## --legacy turns off every cache the perf work added (GSFpsMotor.perf_caches), for before/after numbers from one tree.
 
 const STEP := 1.0 / 66.0
 
@@ -14,7 +14,7 @@ var _motor_only := false
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	for a in OS.get_cmdline_user_args():
 		if a.begins_with("--n="):
 			_n = int(a.substr(4))
@@ -28,10 +28,10 @@ func _ready() -> void:
 
 
 ## A controller on analytic geometry with the other players' hulls solid, as FC builds its bots (FcPlayer.HeadlessController).
-class FlatController extends DotFpsController:
-	var flat_body: DotFpsBody = null
+class FlatController extends GSFpsController:
+	var flat_body: GSFpsBody = null
 
-	func _make_body() -> DotFpsBody:
+	func _make_body() -> GSFpsBody:
 		return flat_body
 
 
@@ -56,17 +56,17 @@ func _hulls_for(i: int) -> Array:
 	for j in range(_flat_ctrls.size()):
 		if j == i:
 			continue
-		var c: DotFpsController = _flat_ctrls[j]
+		var c: GSFpsController = _flat_ctrls[j]
 		var feet: Vector3 = c.state.position
 		out.append(AABB(feet - Vector3(0.35, 0.0, 0.35), Vector3(0.7, 1.8, 0.7)))
 	return out
 
 
-func _flat_body_for(i: int) -> DotFpsBody:
-	var flat := DotFpsFlatBody.with_floor(0.0)
+func _flat_body_for(i: int) -> GSFpsBody:
+	var flat := GSFpsFlatBody.with_floor(0.0)
 	for b in _flat_boxes:
 		flat.add_box(b)
-	return DotFpsHullBody.new().wrap(flat, _hulls_for.bind(i))
+	return GSFpsHullBody.new().wrap(flat, _hulls_for.bind(i))
 
 
 func _box(size: Vector3, xf: Transform3D) -> void:
@@ -97,7 +97,7 @@ func _world(full: bool) -> void:
 		_box(Vector3(6, 0.5, 14), Transform3D(Basis.from_euler(Vector3(deg_to_rad(10 + i * 5), 0, 0)), Vector3(-50 + i * 10, 1.5, -40)))
 
 
-func _player(i: int, parent: Node, flat: bool = false) -> DotFpsController:
+func _player(i: int, parent: Node, flat: bool = false) -> GSFpsController:
 	var player := CharacterBody3D.new()
 	player.name = "P%d" % i
 	player.collision_layer = 0
@@ -113,18 +113,18 @@ func _player(i: int, parent: Node, flat: bool = false) -> DotFpsController:
 	var camera := Camera3D.new()
 	camera.name = "Camera"
 	head.add_child(camera)
-	var view := DotFpsView.new()
+	var view := GSFpsView.new()
 	view.name = "View"
 	player.add_child(view)
-	var c: DotFpsController
+	var c: GSFpsController
 	if flat:
 		var fc := FlatController.new()
 		fc.flat_body = _flat_body_for(i)
 		c = fc
 	else:
-		c = DotFpsController.new()
+		c = GSFpsController.new()
 	c.name = "Controller"
-	c.drive = DotFpsController.Drive.EXTERNAL
+	c.drive = GSFpsController.Drive.EXTERNAL
 	c.register_default_actions = false
 	c.register_service = false
 	player.add_child(c)
@@ -132,8 +132,8 @@ func _player(i: int, parent: Node, flat: bool = false) -> DotFpsController:
 
 
 ## A bot-like command: runs forward, wanders its yaw, jumps now and then, strafes in bursts. [param idle] stands still.
-static func command_for(tick: int, k: int, idle: bool) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+static func command_for(tick: int, k: int, idle: bool) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	if idle:
 		return c
 	var h := hash([k, tick / 48])
@@ -141,9 +141,9 @@ static func command_for(tick: int, k: int, idle: bool) -> DotFpsCommand:
 	c.yaw = float(k) * 0.7 + sin(float(tick) * 0.01 + k) * 2.0
 	var b := 0
 	if (tick + k * 13) % 97 < 2:
-		b |= DotFpsCommand.BUTTON_JUMP
+		b |= GSFpsCommand.BUTTON_JUMP
 	if (h >> 9) % 4 == 0:
-		b |= DotFpsCommand.BUTTON_SPRINT
+		b |= GSFpsCommand.BUTTON_SPRINT
 	c.buttons = b
 	return c
 
@@ -151,7 +151,7 @@ static func command_for(tick: int, k: int, idle: bool) -> DotFpsCommand:
 func _variant(full: bool, idle_fraction: float, legacy: bool, motor_only: bool, flat: bool = false) -> Dictionary:
 	var root := Node3D.new()
 	add_child(root)
-	var ctrls: Array[DotFpsController] = []
+	var ctrls: Array[GSFpsController] = []
 	if flat:
 		_make_flat_boxes()
 		_flat_ctrls = ctrls
@@ -167,7 +167,7 @@ func _variant(full: bool, idle_fraction: float, legacy: bool, motor_only: bool, 
 			c.setup()
 		c.teleport(Vector3(-40.0 + float(i % 8) * 10.0, 0.05, -30.0 + float(i / 8) * 10.0))
 		c.motor.perf_caches = not legacy
-	DotFpsPhysicsBody.profile = false
+	GSFpsPhysicsBody.profile = false
 	var spent := 0
 	var digest := 0
 	for tick in range(_ticks):
@@ -184,7 +184,7 @@ func _variant(full: bool, idle_fraction: float, legacy: bool, motor_only: bool, 
 		digest = hash([digest, ctrls[i].state.position, ctrls[i].state.velocity])
 	var q := 0
 	for i in range(_n):
-		q += (ctrls[i].body as DotFpsPhysicsBody).query_count if not flat else 0
+		q += (ctrls[i].body as GSFpsPhysicsBody).query_count if not flat else 0
 	# A second, shorter pass with the phase counters on (their timers cost a little, so the headline figure above is taken without).
 	var out := {"us": float(spent) / float(_n * _ticks), "q": float(q) / float(_n * _ticks), "digest": digest}
 	root.queue_free()
@@ -196,7 +196,7 @@ func _variant(full: bool, idle_fraction: float, legacy: bool, motor_only: bool, 
 func _phases(full: bool, idle_fraction: float, flat: bool = false) -> void:
 	var root := Node3D.new()
 	add_child(root)
-	var ctrls: Array[DotFpsController] = []
+	var ctrls: Array[GSFpsController] = []
 	if flat:
 		_make_flat_boxes()
 		_flat_ctrls = ctrls
@@ -210,19 +210,19 @@ func _phases(full: bool, idle_fraction: float, flat: bool = false) -> void:
 		if not ctrls[i]._started:
 			ctrls[i].setup()
 		ctrls[i].teleport(Vector3(-40.0 + float(i % 8) * 10.0, 0.05, -30.0 + float(i / 8) * 10.0))
-	DotFpsPhysicsBody.profile = true
-	DotFpsPhysicsBody.prof.fill(0)
-	DotFpsMotor.profile = true
-	DotFpsMotor.phase_us.fill(0)
-	DotFpsController.phase_us.fill(0)
+	GSFpsPhysicsBody.profile = true
+	GSFpsPhysicsBody.prof.fill(0)
+	GSFpsMotor.profile = true
+	GSFpsMotor.phase_us.fill(0)
+	GSFpsController.phase_us.fill(0)
 	for tick in range(_ticks):
 		for i in range(_n):
 			ctrls[i].apply_command(command_for(tick, i, float(i) < float(_n) * idle_fraction))
 			ctrls[i].simulate_tick(tick, STEP)
-	var p := DotFpsPhysicsBody.prof
+	var p := GSFpsPhysicsBody.prof
 	var ph := ""
 	for k in range(9):
-		ph += " %s %.1f" % [DotFpsMotor.PHASES[k], float(DotFpsMotor.phase_us[k]) / float(_n * _ticks)]
+		ph += " %s %.1f" % [GSFpsMotor.PHASES[k], float(GSFpsMotor.phase_us[k]) / float(_n * _ticks)]
 	print("   engine calls/tick cast %.2f rest %.2f ray %.2f; engine us/tick cast %.1f rest %.1f ray %.1f" % [
 		float(p[0]) / (_n * _ticks), float(p[2]) / (_n * _ticks), float(p[6]) / (_n * _ticks),
 		float(p[1]) / (_n * _ticks), float(p[3]) / (_n * _ticks), float(p[7]) / (_n * _ticks)])
@@ -230,10 +230,10 @@ func _phases(full: bool, idle_fraction: float, flat: bool = false) -> void:
 	var cp := ""
 	var names := ["pre", "pre-motor", "motor", "publish", "report", "stats+post", "signal", "(global_position set)"]
 	for k in range(8):
-		cp += " %s %.1f" % [names[k], float(DotFpsController.phase_us[k]) / float(_n * _ticks)]
+		cp += " %s %.1f" % [names[k], float(GSFpsController.phase_us[k]) / float(_n * _ticks)]
 	print("   controller phases us/tick:" + cp)
-	DotFpsMotor.profile = false
-	DotFpsPhysicsBody.profile = false
+	GSFpsMotor.profile = false
+	GSFpsPhysicsBody.profile = false
 	root.queue_free()
 	await get_tree().physics_frame
 	await get_tree().physics_frame

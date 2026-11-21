@@ -1,4 +1,4 @@
-class_name DotFpsSprintRules
+class_name GSFpsSprintRules
 extends RefCounted
 
 ## The sprint and stamina cvars (`sv_sprint*`, `sv_stamina*`) as one replicated group for players that each hold their own tunables.
@@ -15,8 +15,8 @@ const CVARS: PackedStringArray = [
 	"sv_sprint_noaim", "sv_sprint_shoot", "sv_sprint_barrel", "sv_sprint_toggle", "sv_unscope_hit", "sv_unscope_hittime",
 ]
 
-## Holds the values; a [DotFpsTunables] already knows every unit and clamp.
-var _held := DotFpsTunables.new()
+## Holds the values; a [GSFpsTunables] already knows every unit and clamp.
+var _held := GSFpsTunables.new()
 
 
 func cvar_specs() -> Array[Dictionary]:
@@ -40,7 +40,7 @@ func set_cvar(cvar_name: String, value: String) -> bool:
 
 
 ## Takes the sprint and stamina members of [param source] as the current values.
-func apply_from(source: DotFpsTunables) -> void:
+func apply_from(source: GSFpsTunables) -> void:
 	var before := _snapshot()
 	for member in _members():
 		_held.set(member, source.get(member))
@@ -49,7 +49,7 @@ func apply_from(source: DotFpsTunables) -> void:
 
 
 ## Copies the current values onto [param target].
-func apply_to(target: DotFpsTunables) -> void:
+func apply_to(target: GSFpsTunables) -> void:
 	for member in _members():
 		target.set(member, _held.get(member))
 

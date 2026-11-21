@@ -1,6 +1,6 @@
 extends "res://examples/motor_native_tick_parity.gd"
 
-## Holds [DotFpsMotorBatch] (several players' motor ticks in runs of one dot-sim call) to the players' loop it replaces, [method DotFpsMotor.simulate] one player after another, to the bit: eight players walking into each other on random streams, six in dot-sim's hull world, one with no hulls and one gathering by script, at two rates under two tunable sets. A push between the add and a player's turn, a teleport after its tick and a death during another player's turn take the rows after them back; every tick's state and the counters stay identical. One player ticks every other tick two ticks long ([method DotFpsMotorBatch.add]'s delta), as a server's far bot does. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_batch_parity.tscn[/code]
+## Holds [GSFpsMotorBatch] (several players' motor ticks in runs of one dot-sim call) to the players' loop it replaces, [method GSFpsMotor.simulate] one player after another, to the bit: eight players walking into each other on random streams, six in dot-sim's hull world, one with no hulls and one gathering by script, at two rates under two tunable sets. A push between the add and a player's turn, a teleport after its tick and a death during another player's turn take the rows after them back; every tick's state and the counters stay identical. One player ticks every other tick two ticks long ([method GSFpsMotorBatch.add]'s delta), as a server's far bot does. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_batch_parity.tscn[/code]
 
 const PLAYERS := 8
 const BATCH_TICKS := 1500
@@ -16,7 +16,7 @@ func _start(i: int) -> Vector3:
 	return Vector3(-3.2 + 0.9 * float(i), 0.05, 0.4 * float(i % 3))
 
 
-func _snap(s: DotFpsState, motor: DotFpsMotor) -> PackedByteArray:
+func _snap(s: GSFpsState, motor: GSFpsMotor) -> PackedByteArray:
 	return var_to_bytes([s.position, s.velocity, s.mode, s.move_flags(), s.ground_normal, s.ground_id, s.surface,
 		s.crouch_held, s.wall_jump_count, s.time_since_grounded, s.time_since_jump_pressed, s.time_since_jump, s.slide_time,
 		s.slide_cooldown_left, s.launch_cooldown_left, s.dash_cooldown_left, s.wall_run_cooldown_left, s.wall_run_time,
@@ -24,28 +24,28 @@ func _snap(s: DotFpsState, motor: DotFpsMotor) -> PackedByteArray:
 
 
 func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dictionary:
-	DotFpsPhysicsBody.native_enabled = true
-	DotFpsMotor.native_tick = true
-	DotFpsMotor.native_full = true
+	GSFpsPhysicsBody.native_enabled = true
+	GSFpsMotor.native_tick = true
+	GSFpsMotor.native_full = true
 	var step := 1.0 / float(hz)
 	var tun := _tick_tunables(variant)
-	var world: Object = ClassDB.instantiate(&"DotSimHullWorld")
-	var motors: Array[DotFpsMotor] = []
-	var states: Array[DotFpsState] = []
+	var world: Object = ClassDB.instantiate(&"GSSimHullWorld")
+	var motors: Array[GSFpsMotor] = []
+	var states: Array[GSFpsState] = []
 	var alive: Array[bool] = []
 	var ids := PackedInt64Array()
 	var script_gathers: Array[int] = [0]
 	var wired := _batch_players(tun, world, motors, states, alive, script_gathers)
 	for i in range(PLAYERS):
 		ids.append(100 + i)
-	var batch := DotFpsMotorBatch.new()
+	var batch := GSFpsMotorBatch.new()
 	var ticks: Array[PackedByteArray] = []
 	var rows: Array[int] = []
 	rows.resize(PLAYERS)
-	var before := DotFpsPhysicsBody.native_ticks
+	var before := GSFpsPhysicsBody.native_ticks
 	# post_row against the state it describes: [rows from the batch's answer, rows that differ].
 	var post := PackedFloat64Array()
-	post.resize(DotFpsMotorBatch.POST)
+	post.resize(GSFpsMotorBatch.POST)
 	var posts := [0, 0]
 	for tick in range(BATCH_TICKS):
 		world.begin(ids, _hull_rows(tun, states, alive), Callable(), 1.0e9)
@@ -96,10 +96,10 @@ func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dict
 				all.append_array(_snap(states[i], motors[i]))
 		ticks.append(all)
 	return {"ticks": ticks, "counters": _counters(motors), "wired": wired, "script_gathers": script_gathers[0],
-		"native_ticks": DotFpsPhysicsBody.native_ticks - before, "batch": batch, "posts": posts, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
+		"native_ticks": GSFpsPhysicsBody.native_ticks - before, "batch": batch, "posts": posts, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
 
 ## The hull world's per-player rows for one tick: position, radius, height and the flags.
-func _hull_rows(tun: Object, states: Array[DotFpsState], alive: Array[bool]) -> PackedFloat64Array:
+func _hull_rows(tun: Object, states: Array[GSFpsState], alive: Array[bool]) -> PackedFloat64Array:
 	var data := PackedFloat64Array()
 	for i in range(PLAYERS):
 		var p := states[i].position
@@ -110,7 +110,7 @@ func _hull_rows(tun: Object, states: Array[DotFpsState], alive: Array[bool]) -> 
 	return data
 
 
-func _counters(motors: Array[DotFpsMotor]) -> Array:
+func _counters(motors: Array[GSFpsMotor]) -> Array:
 	var counters := []
 	for m in motors:
 		counters.append_array([m.body.hull_blocks, m.body.world_touches, m.stuck_ticks, m.depenetrated_ticks, m.slides,
@@ -118,8 +118,8 @@ func _counters(motors: Array[DotFpsMotor]) -> Array:
 	return counters
 
 
-## Whether [method DotFpsMotorBatch.post_row]'s [param post] is [param s]'s (the velocity as the float32 it is stored as).
-func _post_matches(post: PackedFloat64Array, s: DotFpsState) -> bool:
+## Whether [method GSFpsMotorBatch.post_row]'s [param post] is [param s]'s (the velocity as the float32 it is stored as).
+func _post_matches(post: PackedFloat64Array, s: GSFpsState) -> bool:
 	var v := Vector3(post[0], 0.0, post[1])
 	return (v.x == s.velocity.x and v.z == s.velocity.z and post[2] == s.mode and post[3] == s.crouch_fraction
 		and post[4] == s.slide_time and post[5] == s.wall_run_time and post[6] == (1.0 if s.sprinting else 0.0))
@@ -128,17 +128,17 @@ func _post_matches(post: PackedFloat64Array, s: DotFpsState) -> bool:
 ## [method _batch_replay]'s players: a motor and a state each, every player but PLAIN behind a hull body
 ## that sees the others (counting its gathers in [param script_gathers]). False when a hull world did not wire.
 func _batch_players(
-	tun: DotFpsTunables, world: Object, motors: Array[DotFpsMotor], states: Array[DotFpsState],
+	tun: GSFpsTunables, world: Object, motors: Array[GSFpsMotor], states: Array[GSFpsState],
 	alive: Array[bool], script_gathers: Array[int]
 ) -> bool:
 	var wired := true
 	for i in range(PLAYERS):
-		var physics := DotFpsPhysicsBody.for_node(self)
+		var physics := GSFpsPhysicsBody.for_node(self)
 		physics.pass_out_mask = 1 << 3
-		var body: DotFpsBody = physics
+		var body: GSFpsBody = physics
 		if i != PLAIN:
 			var me := i
-			body = DotFpsHullBody.new().wrap(physics, func() -> Array:
+			body = GSFpsHullBody.new().wrap(physics, func() -> Array:
 				script_gathers[0] += 1
 				var boxes := []
 				for j in range(PLAYERS):
@@ -148,10 +148,10 @@ func _batch_players(
 				return boxes)
 			if i != SCRIPTED:
 				wired = body.set_hull_world(world, i) and wired
-		motors.append(DotFpsMotor.new(tun, body))
-		var s := DotFpsState.new()
+		motors.append(GSFpsMotor.new(tun, body))
+		var s := GSFpsState.new()
 		s.position = _start(i)
-		s.mode = DotFpsState.Mode.AIR
+		s.mode = GSFpsState.Mode.AIR
 		states.append(s)
 		alive.append(true)
 	return wired
@@ -171,7 +171,7 @@ func _batch_runs() -> void:
 				if a["ticks"][i] != b["ticks"][i]:
 					first = i
 					break
-			var batch: DotFpsMotorBatch = b["batch"]
+			var batch: GSFpsMotorBatch = b["batch"]
 			print("  %-28s rows %d in %d runs, %d retakes, %d stale, hull blocks %d, script gathers %d" % [
 				label, batch.rows, batch.runs, batch.retakes, batch.stale, a["blocks"], a["script_gathers"]])
 			_check(a["wired"] and b["wired"], label + ": the hull world and the batch are there")
@@ -190,9 +190,9 @@ func _batch_runs() -> void:
 func _run() -> void:
 	print("dot-player-controller motor batch parity")
 	var expected := 1
-	if not DotFpsPhysicsBody.native_available() or not DotFpsMotorBatch.available() or not ClassDB.class_exists(&"DotSimHullWorld"):
+	if not GSFpsPhysicsBody.native_available() or not GSFpsMotorBatch.available() or not ClassDB.class_exists(&"GSSimHullWorld"):
 		print("  dot-sim's motor batch is not loaded: skipped")
-		if (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) == "1" and not DotFpsPhysicsBody.native_available():
+		if (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) == "1" and not GSFpsPhysicsBody.native_available():
 			_check(false, "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		expected = 0
 	else:
@@ -200,9 +200,9 @@ func _run() -> void:
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		_batch_runs()
-	DotFpsPhysicsBody.native_enabled = true
-	DotFpsMotor.native_tick = false
-	DotFpsMotor.native_full = true
+	GSFpsPhysicsBody.native_enabled = true
+	GSFpsMotor.native_tick = false
+	GSFpsMotor.native_full = true
 	print("%d passed, %d failed" % [_passed, _failed])
 	print("%d of %d sections ran to their last line" % [_sections, expected])
 	get_tree().quit(1 if _failed > 0 or _sections != expected else 0)

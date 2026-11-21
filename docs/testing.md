@@ -9,8 +9,8 @@ The family's method is in [docs/testing.md](../../../docs/testing.md); this is w
 | `controller_selftest` | the base contract and the switch. The main scene, so the one a careless check runs alone |
 | `movement_selftest` | the first-person motor: determinism, slopes, kerbs, steep faces, seams, jump reach, modifiers, admin, slide/launch/dash replays, wall run/jump/slide and their replays, the walls-off golden hash, swimming, the physics-body sweep sections, the idle fast path parity run, `FakeWire` |
 | `feel_pin_selftest` | what a body-size change must not move: walk, run and crouch speed, jump apex and time, air speed and which step heights are climbed, against real physics (`-- --record` prints the numbers) |
-| `surf_selftest` | surf and hop properties against `DotFpsFlatBody` |
-| `surf_physics_selftest` | the same properties against real `StaticBody3D` geometry and `DotFpsPhysicsBody`, plus ramp ends and reversed normals |
+| `surf_selftest` | surf and hop properties against `GSFpsFlatBody` |
+| `surf_physics_selftest` | the same properties against real `StaticBody3D` geometry and `GSFpsPhysicsBody`, plus ramp ends and reversed normals |
 | `fps_controller_selftest` | the node: drives, `render_state`, the collision mask, `extra_modes` surviving a style, the wall-run camera roll |
 | `classic_selftest` | the default (classic) profile against closed forms: run speed, stopping distance, jump apex and time, strafe gain, the cvar units, the legacy profile, ladder and swim speeds, attach and detach |
 | `tps_selftest` | the third-person motor and rig (no physics world) |
@@ -19,7 +19,7 @@ All exit non-zero on failure. Run every one; then, for a motor change, the first
 
 ## Flat body and physics body
 
-`surf_selftest` runs against `DotFpsFlatBody`: analytic geometry, one possible cause per failure, no scene, no physics step, and every one of those reasons is still good. It proved every surf property while the games were visibly broken, because the bug was never in the motor: it was in the one component that suite **replaces**. A suite that substitutes the component under suspicion cannot see a bug in it, and nothing about a green run tells you which component that is. `surf_physics_selftest` is the same properties against the collision backend the games run on. **Run both.** A collision bug is reproduced in the physics-body sections, with the geometry carried to the digits it was found at (rounding a displacement's triangles to five digits made one freeze disappear).
+`surf_selftest` runs against `GSFpsFlatBody`: analytic geometry, one possible cause per failure, no scene, no physics step, and every one of those reasons is still good. It proved every surf property while the games were visibly broken, because the bug was never in the motor: it was in the one component that suite **replaces**. A suite that substitutes the component under suspicion cannot see a bug in it, and nothing about a green run tells you which component that is. `surf_physics_selftest` is the same properties against the collision backend the games run on. **Run both.** A collision bug is reproduced in the physics-body sections, with the geometry carried to the digits it was found at (rounding a displacement's triangles to five digits made one freeze disappear).
 
 ## Negative controls
 

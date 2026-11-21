@@ -1,15 +1,15 @@
-class_name DotPlayerControllerSwitch
-extends DotPlayerComponent
+class_name GSPlayerControllerSwitch
+extends GSPlayerComponent
 
 ## Exactly one controller drives the player, and the handover carries what matters.
 ## Without it, two controllers both read input and write the body's transform, and the result depends on child order.
 ## Position, velocity and look angles are carried across a switch; the state is not, so leaving a vehicle does not restore a mid-air strafe.
 ##
 ## [codeblock]
-## DotPlayer
-##   DotPlayerControllerSwitch     default_controller = &"fp"
-##   DotFpsController              controller_id = &"fp"
-##   DotTpsController              controller_id = &"tp"
+## GSPlayer
+##   GSPlayerControllerSwitch     default_controller = &"fp"
+##   GSFpsController              controller_id = &"fp"
+##   GSTpsController              controller_id = &"tp"
 ## [/codeblock]
 
 ## Not [code]CHANNEL[/code]: the first-person controller declares its own, and a constant that shadows a parent's is a parse error.
@@ -59,12 +59,12 @@ func refresh() -> void:
 	if include_siblings and get_parent() != null:
 		_collect(get_parent())
 
-	DotLog.debug(CONTROLLER_CHANNEL, "controllers", {"count": _controllers.size()})
+	GSLog.debug(CONTROLLER_CHANNEL, "controllers", {"count": _controllers.size()})
 
 
 func _collect(root: Node) -> void:
 	for child in root.get_children():
-		var c := child as DotPlayerController
+		var c := child as GSPlayerController
 
 		if c == null:
 			continue
@@ -76,10 +76,10 @@ func _collect(root: Node) -> void:
 			# a game wondering why activate("tp") does nothing. Named after its class,
 			# which is at least askable.
 			key = StringName(c.component_name())
-			DotLog.warn(CONTROLLER_CHANNEL, "controller has no id", {"node": c.name, "using": String(key)})
+			GSLog.warn(CONTROLLER_CHANNEL, "controller has no id", {"node": c.name, "using": String(key)})
 
 		if _controllers.has(key):
-			DotLog.warn(CONTROLLER_CHANNEL, "two controllers share an id", {"id": String(key)})
+			GSLog.warn(CONTROLLER_CHANNEL, "two controllers share an id", {"id": String(key)})
 			continue
 
 		_controllers[key] = c
@@ -102,19 +102,19 @@ func _activate_default() -> void:
 
 
 ## Hands the player to a controller, carrying position, velocity and look.
-func activate(id: StringName) -> DotResult:
+func activate(id: StringName) -> GSResult:
 	if not _controllers.has(id):
 		var why := "There is no controller called '%s'. Known: %s." % [
 			String(id), ", ".join(_names())
 		]
 		switch_refused.emit(id, why)
-		return DotResult.fail(DotError.CODE_INVALID, why)
+		return GSResult.fail(GSError.CODE_INVALID, why)
 
 	if _active == id:
-		return DotResult.success(id)
+		return GSResult.success(id)
 
-	var incoming: DotPlayerController = _controllers[id]
-	var outgoing: DotPlayerController = _controllers.get(_active, null)
+	var incoming: GSPlayerController = _controllers[id]
+	var outgoing: GSPlayerController = _controllers.get(_active, null)
 	var state: Dictionary = {}
 
 	if outgoing != null and is_instance_valid(outgoing):
@@ -139,26 +139,26 @@ func activate(id: StringName) -> DotResult:
 
 		incoming.adopt_state(carried)
 
-	DotLog.debug(CONTROLLER_CHANNEL, "controller changed", {"from": String(was), "to": String(id)})
+	GSLog.debug(CONTROLLER_CHANNEL, "controller changed", {"from": String(was), "to": String(id)})
 	controller_changed.emit(was, id)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
 ## The next controller in declared order. For a key that cycles the view.
-func cycle() -> DotResult:
+func cycle() -> GSResult:
 	var names := available()
 
 	if names.size() < 2:
-		return DotResult.fail(
-			DotError.CODE_STATE, "There is nothing to cycle to."
+		return GSResult.fail(
+			GSError.CODE_STATE, "There is nothing to cycle to."
 		)
 
 	var index := names.find(_active)
 	return activate(names[(index + 1) % names.size()])
 
 
-## Feeds the active controller. Once a tick. See [method DotPlayerController.simulate].
-func simulate(intent: DotPlayerIntent, delta: float) -> bool:
+## Feeds the active controller. Once a tick. See [method GSPlayerController.simulate].
+func simulate(intent: GSPlayerIntent, delta: float) -> bool:
 	var c := active_controller()
 	return c.simulate(intent, delta) if c != null else false
 
@@ -167,7 +167,7 @@ func simulate(intent: DotPlayerIntent, delta: float) -> bool:
 ## Every one, so a player who switches view while frozen is still frozen.
 func set_input_enabled(enabled: bool) -> void:
 	for key: Variant in _controllers.keys():
-		var c: DotPlayerController = _controllers[key]
+		var c: GSPlayerController = _controllers[key]
 		if is_instance_valid(c):
 			c.input_enabled = enabled
 
@@ -175,13 +175,13 @@ func set_input_enabled(enabled: bool) -> void:
 ## Applies a class's movement multipliers to every controller.
 func set_scales(speed: float, jump: float) -> void:
 	for key: Variant in _controllers.keys():
-		var c: DotPlayerController = _controllers[key]
+		var c: GSPlayerController = _controllers[key]
 		if is_instance_valid(c):
 			c.speed_scale = speed
 			c.jump_scale = jump
 
 
-## Moves the player, through whichever controller is driving. See [method DotPlayerController.place].
+## Moves the player, through whichever controller is driving. See [method GSPlayerController.place].
 func place(to: Transform3D, keep_velocity: bool = false) -> void:
 	var c := active_controller()
 
@@ -194,8 +194,8 @@ func active_id() -> StringName:
 	return _active
 
 
-func active_controller() -> DotPlayerController:
-	var c: DotPlayerController = _controllers.get(_active, null)
+func active_controller() -> GSPlayerController:
+	var c: GSPlayerController = _controllers.get(_active, null)
 	return c if c != null and is_instance_valid(c) else null
 
 
@@ -203,7 +203,7 @@ func has_controller(id: StringName) -> bool:
 	return _controllers.has(id)
 
 
-func controller(id: StringName) -> DotPlayerController:
+func controller(id: StringName) -> GSPlayerController:
 	return _controllers.get(id, null)
 
 
@@ -227,7 +227,7 @@ func describe_lines() -> PackedStringArray:
 	out.append("controllers: %d, active '%s'" % [_controllers.size(), String(_active)])
 
 	for id in available():
-		var c: DotPlayerController = _controllers[id]
+		var c: GSPlayerController = _controllers[id]
 		if is_instance_valid(c):
 			out.append_array(c.describe_lines())
 
@@ -235,7 +235,7 @@ func describe_lines() -> PackedStringArray:
 
 
 func describe() -> String:
-	return "DotPlayerControllerSwitch(%d, active '%s')" % [_controllers.size(), String(_active)]
+	return "GSPlayerControllerSwitch(%d, active '%s')" % [_controllers.size(), String(_active)]
 
 
 func _names() -> PackedStringArray:

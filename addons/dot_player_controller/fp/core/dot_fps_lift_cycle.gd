@@ -1,4 +1,4 @@
-class_name DotFpsLiftCycle
+class_name GSFpsLiftCycle
 extends RefCounted
 
 ## A lift car's travel as a pure function of time: rest at the bottom, rise, rest at the top, descend, and again. Nothing is stored between ticks, so the server and a predicting client that agree on the tick agree on the car to the bit, and a replay reads the same height. The game poses its car (a kinematic body) from [method fraction] and carries riders by [method carry]; the motor itself does not move a person with the ground.

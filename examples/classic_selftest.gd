@@ -16,7 +16,7 @@ var _completed := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.WARN)
+	GSLog.set_level(GSLog.Level.WARN)
 	_run.call_deferred()
 
 
@@ -65,21 +65,21 @@ func _near(value: float, expected: float, tol: float, what: String) -> void:
 	_check(absf(value - expected) <= tol, what, "got %.4f expected %.4f +-%.4f" % [value, expected, tol])
 
 
-func _motor(t: DotFpsTunables) -> DotFpsMotor:
-	return DotFpsMotor.new(t, DotFpsFlatBody.with_floor(0.0))
+func _motor(t: GSFpsTunables) -> GSFpsMotor:
+	return GSFpsMotor.new(t, GSFpsFlatBody.with_floor(0.0))
 
 
-func _standing(motor: DotFpsMotor, height: float = 0.0, mode := DotFpsState.Mode.GROUND) -> DotFpsState:
-	var s := DotFpsState.new()
+func _standing(motor: GSFpsMotor, height: float = 0.0, mode := GSFpsState.Mode.GROUND) -> GSFpsState:
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, height, 0.0)
 	s.mode = mode
 	for _i in range(4):
-		motor.simulate(s, DotFpsCommand.new(), STEP)
+		motor.simulate(s, GSFpsCommand.new(), STEP)
 	return s
 
 
-func _cmd(forward: float = 0.0, yaw: float = 0.0, buttons: int = 0) -> DotFpsCommand:
-	var c := DotFpsCommand.new()
+func _cmd(forward: float = 0.0, yaw: float = 0.0, buttons: int = 0) -> GSFpsCommand:
+	var c := GSFpsCommand.new()
 	c.move = Vector2(0.0, forward)
 	c.yaw = yaw
 	c.buttons = buttons
@@ -88,9 +88,9 @@ func _cmd(forward: float = 0.0, yaw: float = 0.0, buttons: int = 0) -> DotFpsCom
 
 func _test_profiles() -> void:
 	_section("profiles")
-	var fresh := DotFpsTunables.new()
-	var classic := DotFpsTunables.with_profile("classic")
-	var legacy := DotFpsTunables.with_profile("legacy")
+	var fresh := GSFpsTunables.new()
+	var classic := GSFpsTunables.with_profile("classic")
+	var legacy := GSFpsTunables.with_profile("legacy")
 	_check(fresh.fingerprint() == classic.fingerprint(), "the defaults are the classic profile")
 	_check(fresh.fingerprint() != legacy.fingerprint(), "the legacy profile is a different set")
 	_near(legacy.max_speed, 7.0, 1e-6, "legacy keeps the old 7 m/s run")
@@ -102,14 +102,14 @@ func _test_profiles() -> void:
 
 func _test_cvars() -> void:
 	_section("cvars in source units")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	_check(t.set_cvar("sv_gravity", "800"), "sv_gravity accepts 800")
 	_near(t.gravity, 800.0 * U, 1e-4, "800 units/s^2 is 15.24 m/s^2")
 	_check(t.set_cvar("sv_stepsize", "18") and absf(t.step_height - 18.0 * U) < 1e-4, "sv_stepsize 18 is 0.343 m")
 	_check(t.set_cvar("sv_autohop", "1") and t.auto_hop, "sv_autohop turns auto-hop on")
 	_check(not t.set_cvar("sv_gravity", "fast") and not t.set_cvar("sv_nothing", "1"), "a bad value or name is refused")
 	_check(t.set_cvar("sv_movement_profile", "legacy") and t.accelerate == 10.0, "the profile cvar swaps the set")
-	var specs := DotFpsTunables.new().cvar_specs()
+	var specs := GSFpsTunables.new().cvar_specs()
 	var seen := {}
 	for spec in specs:
 		seen[spec["name"]] = spec["value"]
@@ -121,7 +121,7 @@ func _test_cvars() -> void:
 
 func _test_ground() -> void:
 	_section("ground: top speed and stopping")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	var motor := _motor(t)
 	var s := _standing(motor)
 	for _i in range(120):
@@ -157,13 +157,13 @@ func _test_ground() -> void:
 
 func _test_jump() -> void:
 	_section("jump apex")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	var motor := _motor(t)
 	var s := _standing(motor)
 	var peak := 0.0
 	var apex_tick := 0
 	for i in range(120):
-		motor.simulate(s, _cmd(0.0, 0.0, DotFpsCommand.BUTTON_JUMP if i == 0 else 0), STEP)
+		motor.simulate(s, _cmd(0.0, 0.0, GSFpsCommand.BUTTON_JUMP if i == 0 else 0), STEP)
 		if s.position.y > peak:
 			peak = s.position.y
 			apex_tick = i
@@ -177,9 +177,9 @@ func _test_jump() -> void:
 
 func _test_strafe_jump() -> void:
 	_section("air strafe gain")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	var motor := _motor(t)
-	var s := _standing(motor, 200.0, DotFpsState.Mode.AIR)
+	var s := _standing(motor, 200.0, GSFpsState.Mode.AIR)
 	s.velocity = Vector3(0.0, 0.0, -250.0 * U)
 	var v0 := s.velocity.length()
 	var cap := 30.0 * U
@@ -192,7 +192,7 @@ func _test_strafe_jump() -> void:
 		if n == 20 or n == 60:
 			var expected := sqrt(v0 * v0 + float(n) * cap * cap)
 			_near(s.horizontal_speed(), expected, expected * 0.015, "after %d perpendicular ticks speed is sqrt(v0^2 + n cap^2)" % n)
-	var plain := _standing(motor, 200.0, DotFpsState.Mode.AIR)
+	var plain := _standing(motor, 200.0, GSFpsState.Mode.AIR)
 	plain.velocity = Vector3(0.0, 0.0, -250.0 * U)
 	for _i in range(60):
 		motor.simulate(plain, _cmd(1.0, 0.0), STEP)
@@ -202,10 +202,10 @@ func _test_strafe_jump() -> void:
 
 
 func _run_into_box(box_height_units: float) -> Vector2:
-	var t := DotFpsTunables.new()
-	var body := DotFpsFlatBody.with_floor(0.0)
+	var t := GSFpsTunables.new()
+	var body := GSFpsFlatBody.with_floor(0.0)
 	body.add_box(AABB(Vector3(-2.0, 0.0, -30.0), Vector3(4.0, box_height_units * U, 30.0)))
-	var motor := DotFpsMotor.new(t, body)
+	var motor := GSFpsMotor.new(t, body)
 	var s := _standing(motor, 0.0)
 	s.position.z = 1.0
 	for _i in range(120):
@@ -219,21 +219,21 @@ func _test_steps() -> void:
 	_check(up.x > 17.0 * U and up.x < 18.5 * U and up.y < -0.5, "an 18 unit step is climbed and stood on", "y %.3f z %.2f" % [up.x, up.y])
 	var wall := _run_into_box(19.0)
 	_check(wall.x < 0.01 and wall.y > 0.0, "a 19 unit kerb is a wall", "y %.3f z %.2f" % [wall.x, wall.y])
-	var low := DotFpsTunables.new()
+	var low := GSFpsTunables.new()
 	_check(low.set_cvar("sv_stepsize", "30") and absf(low.step_height - 30.0 * U) < 1e-4, "sv_stepsize reshapes the limit")
 	_done()
 
 
 func _crouch_jump_peak(crouch_in_air: bool, crouch_time: float) -> float:
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	t.crouch_transition_time = crouch_time
 	var motor := _motor(t)
 	var s := _standing(motor)
 	var peak := 0.0
 	for i in range(120):
-		var buttons := DotFpsCommand.BUTTON_JUMP if i == 0 else 0
+		var buttons := GSFpsCommand.BUTTON_JUMP if i == 0 else 0
 		if crouch_in_air and i >= 3:
-			buttons |= DotFpsCommand.BUTTON_CROUCH
+			buttons |= GSFpsCommand.BUTTON_CROUCH
 		motor.simulate(s, _cmd(0.0, 0.0, buttons), STEP)
 		peak = maxf(peak, s.position.y)
 	return peak
@@ -241,7 +241,7 @@ func _crouch_jump_peak(crouch_in_air: bool, crouch_time: float) -> float:
 
 func _test_crouch_jump() -> void:
 	_section("crouch-jump and duck timing")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	var plain := _crouch_jump_peak(false, t.crouch_transition_time)
 	var ducked := _crouch_jump_peak(true, t.crouch_transition_time)
 	_near(ducked - plain, t.stand_height - t.crouch_height, 0.05, "a crouch in the air lifts the feet by the hull difference")
@@ -250,41 +250,41 @@ func _test_crouch_jump() -> void:
 	_near(slow - plain, t.stand_height - t.crouch_height, 0.05, "the air duck is instant whatever the duck time")
 	_check(t.set_cvar("sv_ducktime", "0.4") and t.crouch_transition_time == 0.4, "sv_ducktime sets the duck time")
 	_check(t.set_cvar("sv_airduck", "0") and not t.instant_air_crouch, "sv_airduck switches the air duck off")
-	var off := DotFpsTunables.new()
+	var off := GSFpsTunables.new()
 	off.instant_air_crouch = false
 	off.crouch_transition_time = 0.4
 	var m := _motor(off)
 	var s := _standing(m)
-	m.simulate(s, _cmd(0.0, 0.0, DotFpsCommand.BUTTON_JUMP), STEP)
-	m.simulate(s, _cmd(0.0, 0.0, DotFpsCommand.BUTTON_CROUCH), STEP)
+	m.simulate(s, _cmd(0.0, 0.0, GSFpsCommand.BUTTON_JUMP), STEP)
+	m.simulate(s, _cmd(0.0, 0.0, GSFpsCommand.BUTTON_CROUCH), STEP)
 	_check(s.crouch_fraction < 0.5, "with the air duck off a crouch in the air is gradual", "%.2f" % s.crouch_fraction)
 	_done()
 
 
 func _test_water_ladder() -> void:
 	_section("water and ladder cvars")
-	var swim := DotFpsSwimMode.new()
+	var swim := GSFpsSwimMode.new()
 	_check(swim.set_cvar("sv_wateraccelerate", "10") and swim.accelerate == 10.0, "sv_wateraccelerate sets the water acceleration")
 	_check(swim.set_cvar("sv_waterfriction", "1") and swim.friction == 1.0, "sv_waterfriction sets the water friction")
 	_check(not swim.set_cvar("sv_waterfriction", "x") and not swim.set_cvar("sv_gravity", "1"), "a bad water value or name is refused")
 	_check(swim.cvar_specs().size() == 2, "two water cvars are listed")
-	var ladder := DotFpsLadderMode.new()
+	var ladder := GSFpsLadderMode.new()
 	_check(ladder.set_cvar("sv_ladder_dampen", "0.5") and ladder.dampen == 0.5, "sv_ladder_dampen sets the dampening")
 	_check(not ladder.set_cvar("sv_ladder_dampen", "x") and not ladder.set_cvar("sv_x", "1"), "a bad ladder value or name is refused")
-	_check(DotFpsLadderMode.new().dampen == 0.0 and DotFpsSwimMode.new().friction == 1.0, "ladder dampen defaults off, water friction to the classic 1")
+	_check(GSFpsLadderMode.new().dampen == 0.0 and GSFpsSwimMode.new().friction == 1.0, "ladder dampen defaults off, water friction to the classic 1")
 	_check(ladder.cvar_specs()[0]["name"] == "sv_ladder_dampen", "the ladder cvar is listed")
 	_done()
 
 
 func _ladder_rig() -> Array:
-	var motor := _motor(DotFpsTunables.new())
-	var ladder := DotFpsLadderMode.new()
+	var motor := _motor(GSFpsTunables.new())
+	var ladder := GSFpsLadderMode.new()
 	# A ladder face on the x = 2 plane, 8 m tall, floor at y 0; the player stands west of it facing +x.
 	ladder.volumes = [AABB(Vector3(2.0, 0.0, -1.0), Vector3(0.1, 8.0, 2.0))]
 	ladder.mode_id = motor.register_mode(ladder)
 	var yaw := 0.0
 	for candidate in [0.0, 90.0, 180.0, 270.0]:
-		if DotFpsMotor._view_basis(candidate, 0.0).forward.x > 0.9:
+		if GSFpsMotor._view_basis(candidate, 0.0).forward.x > 0.9:
 			yaw = candidate
 	return [motor, ladder, yaw]
 
@@ -292,15 +292,15 @@ func _ladder_rig() -> Array:
 func _test_ladder_motion() -> void:
 	_section("ladder: attach, climb speed, descent, detach (200 and 270 units/s)")
 	var rig := _ladder_rig()
-	var motor: DotFpsMotor = rig[0]
-	var ladder: DotFpsLadderMode = rig[1]
+	var motor: GSFpsMotor = rig[0]
+	var ladder: GSFpsLadderMode = rig[1]
 	var yaw: float = rig[2]
 	_near(ladder.climb_speed, 200.0 * U, 0.01, "the climb speed is the classic 200 units/s")
 	_near(ladder.jump_off_speed, 270.0 * U, 0.01, "the ladder jump pushes off at the classic 270 units/s")
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(1.75, 3.0, 0.0)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	s.velocity = Vector3(0.0, -1.0, 0.0)
 	s.time_since_jump = 10.0
 	ladder.update(motor, s)
@@ -330,7 +330,7 @@ func _test_ladder_motion() -> void:
 	_check(absf(s.position.z - z0) > 0.3 and absf(s.velocity.y) < 0.05, "strafing moves along the wall, not up it")
 
 	ladder.set_cvar("sv_ladder_dampen", "1")
-	var d := DotFpsState.new()
+	var d := GSFpsState.new()
 	d.position = Vector3(1.75, 3.0, 0.0)
 	d.mode = ladder.mode_id
 	for _i in range(10):
@@ -343,57 +343,57 @@ func _test_ladder_motion() -> void:
 
 
 ## Attaching: falling past it, walking into it, flush against it, and a stale intent.
-func _ladder_attach_checks(motor: DotFpsMotor, ladder: DotFpsLadderMode, yaw: float) -> void:
-	var walker := DotFpsState.new()
+func _ladder_attach_checks(motor: GSFpsMotor, ladder: GSFpsLadderMode, yaw: float) -> void:
+	var walker := GSFpsState.new()
 	walker.position = Vector3(1.75, 0.0, 0.0)
 	walker.time_since_jump = 10.0
 	walker.velocity = Vector3(3.0, 0.0, 0.0)
-	walker.mode = DotFpsState.Mode.GROUND
+	walker.mode = GSFpsState.Mode.GROUND
 	ladder.update(motor, walker)
 	_check(walker.mode == ladder.mode_id, "a player on the ground walking into the face attaches")
-	var idle := DotFpsState.new()
+	var idle := GSFpsState.new()
 	idle.position = Vector3(1.75, 0.0, 0.0)
 	idle.time_since_jump = 10.0
-	idle.mode = DotFpsState.Mode.GROUND
+	idle.mode = GSFpsState.Mode.GROUND
 	ladder.update(motor, idle)
 	_check(idle.mode != ladder.mode_id, "a player standing against it without pushing does not")
 
-	var flush := DotFpsState.new()
+	var flush := GSFpsState.new()
 	flush.position = Vector3(1.75, 0.0, 0.0)
 	flush.time_since_jump = 10.0
-	flush.mode = DotFpsState.Mode.GROUND
+	flush.mode = GSFpsState.Mode.GROUND
 	flush.velocity = Vector3.ZERO
-	ladder.wish = DotFpsMotor._view_basis(yaw, 0.0).forward
+	ladder.wish = GSFpsMotor._view_basis(yaw, 0.0).forward
 	ladder.update(motor, flush)
 	_check(flush.mode == ladder.mode_id, "flush against a wall (velocity zeroed) but commanding into the face attaches")
 	ladder.wish = -ladder.wish
-	var back := DotFpsState.new()
+	var back := GSFpsState.new()
 	back.position = Vector3(1.75, 0.0, 0.0)
 	back.time_since_jump = 10.0
-	back.mode = DotFpsState.Mode.GROUND
+	back.mode = GSFpsState.Mode.GROUND
 	ladder.update(motor, back)
 	_check(back.mode != ladder.mode_id, "commanding away from the face does not attach")
-	ladder.wish = DotFpsMotor._view_basis(yaw, 0.0).forward
+	ladder.wish = GSFpsMotor._view_basis(yaw, 0.0).forward
 	ladder.update(motor, back)
-	var stale := DotFpsState.new()
+	var stale := GSFpsState.new()
 	stale.position = Vector3(1.75, 0.0, 0.0)
 	stale.time_since_jump = 10.0
-	stale.mode = DotFpsState.Mode.GROUND
+	stale.mode = GSFpsState.Mode.GROUND
 	ladder.update(motor, stale)
 	_check(stale.mode != ladder.mode_id, "an intent is spent by one update, a stale one grabs nothing")
 	ladder.wish = Vector3.ZERO
 
 
 ## Leaving a ladder: the foot, the top and a jump off.
-func _ladder_exit_checks(motor: DotFpsMotor, ladder: DotFpsLadderMode, up: DotFpsCommand, down: DotFpsCommand, yaw: float) -> void:
-	var low := DotFpsState.new()
+func _ladder_exit_checks(motor: GSFpsMotor, ladder: GSFpsLadderMode, up: GSFpsCommand, down: GSFpsCommand, yaw: float) -> void:
+	var low := GSFpsState.new()
 	low.position = Vector3(1.75, 0.6, 0.0)
 	low.mode = ladder.mode_id
 	for _i in range(60):
 		motor.simulate(low, down, STEP)
 	_check(low.is_grounded() and low.position.y < 0.02, "descending to the foot ends on the floor, walking")
 
-	var top := DotFpsState.new()
+	var top := GSFpsState.new()
 	top.position = Vector3(1.75, 7.0, 0.0)
 	top.mode = ladder.mode_id
 	var left := -1
@@ -405,10 +405,10 @@ func _ladder_exit_checks(motor: DotFpsMotor, ladder: DotFpsLadderMode, up: DotFp
 	_check(left > 0, "climbing past the top of the ladder leaves it", "ticks %d" % left)
 	_check(top.position.y > 8.0 and top.position.y < 10.0, "head over the top, not flung", "y %.2f" % top.position.y)
 
-	var j := DotFpsState.new()
+	var j := GSFpsState.new()
 	j.position = Vector3(1.75, 3.0, 0.0)
 	j.mode = ladder.mode_id
-	motor.simulate(j, _cmd(0.0, yaw, DotFpsCommand.BUTTON_JUMP), STEP)
+	motor.simulate(j, _cmd(0.0, yaw, GSFpsCommand.BUTTON_JUMP), STEP)
 	_check(j.mode != ladder.mode_id and j.velocity.x < 0.0, "a jump lets go and pushes away from the face")
 	_near(j.velocity.length(), 270.0 * U, 0.4, "at the classic 270 units/s (less one tick of gravity)")
 	ladder.update(motor, j)
@@ -417,8 +417,8 @@ func _ladder_exit_checks(motor: DotFpsMotor, ladder: DotFpsLadderMode, up: DotFp
 
 ## Friction is off here so each check isolates one quantity; the default 1 has its own check below.
 func _water_rig() -> Array:
-	var motor := DotFpsMotor.new(DotFpsTunables.new(), DotFpsFlatBody.with_floor(-6.0))
-	var swim := DotFpsSwimMode.new()
+	var motor := GSFpsMotor.new(GSFpsTunables.new(), GSFpsFlatBody.with_floor(-6.0))
+	var swim := GSFpsSwimMode.new()
 	swim.friction = 0.0
 	swim.volumes = [AABB(Vector3(-20.0, -5.0, -20.0), Vector3(40.0, 5.0, 40.0))]
 	swim.mode_id = motor.register_mode(swim)
@@ -428,24 +428,24 @@ func _water_rig() -> Array:
 func _test_water_motion() -> void:
 	_section("water: wade, swim speed, surface, jump out (200 / 10 / 60 units)")
 	var rig := _water_rig()
-	var motor: DotFpsMotor = rig[0]
-	var swim: DotFpsSwimMode = rig[1]
+	var motor: GSFpsMotor = rig[0]
+	var swim: GSFpsSwimMode = rig[1]
 	_near(swim.swim_speed, 0.8 * 250.0 * U, 0.01, "swim speed is 0.8 of the run speed, 200 units/s")
 	_check(swim.accelerate == 10.0, "water accelerate defaults to the classic 10")
 
 	var shallow := _water_rig()
-	var smotor: DotFpsMotor = shallow[0]
-	var sswim: DotFpsSwimMode = shallow[1]
+	var smotor: GSFpsMotor = shallow[0]
+	var sswim: GSFpsSwimMode = shallow[1]
 	sswim.volumes = [AABB(Vector3(-20.0, -0.2, -20.0), Vector3(40.0, 0.5, 40.0))]
-	var w := DotFpsState.new()
+	var w := GSFpsState.new()
 	w.position = Vector3(0.0, -0.2, 0.0)
-	w.mode = DotFpsState.Mode.GROUND
+	w.mode = GSFpsState.Mode.GROUND
 	sswim.update(smotor, w)
 	_check(w.mode != sswim.mode_id, "knee-deep water is waded: the ground movement stays")
 
-	var s := DotFpsState.new()
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, -3.0, 0.0)
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	swim.update(motor, s)
 	_check(s.mode == swim.mode_id, "a waist in the water swims")
 	var fwd := _cmd(1.0, 0.0)
@@ -455,30 +455,30 @@ func _test_water_motion() -> void:
 		n += 1
 	_near(s.velocity.length(), swim.swim_speed, 0.05, "forward swims at 200 units/s")
 	_check(n >= 4 and n <= 40, "reached in a fraction of a second, as accelerate 10 does", "%d ticks" % n)
-	var dive := _cmd(0.0, 0.0, DotFpsCommand.BUTTON_CROUCH)
+	var dive := _cmd(0.0, 0.0, GSFpsCommand.BUTTON_CROUCH)
 	for _i in range(25):
 		motor.simulate(s, dive, STEP)
 	_near(s.velocity.y, -swim.swim_speed, 0.1, "crouch dives at the swim speed")
 
-	var f := DotFpsState.new()
+	var f := GSFpsState.new()
 	f.position = Vector3(0.0, -3.0, 0.0)
 	f.mode = swim.mode_id
 	for _i in range(300):
-		motor.simulate(f, DotFpsCommand.new(), STEP)
+		motor.simulate(f, GSFpsCommand.new(), STEP)
 	_near(f.position.y + swim.float_depth, 0.0, 0.1, "letting go floats with the head just out")
 	swim.idle_sink_speed = 60.0 * U
-	var k := DotFpsState.new()
+	var k := GSFpsState.new()
 	k.position = Vector3(0.0, -1.0, 0.0)
 	k.mode = swim.mode_id
 	for _i in range(60):
-		motor.simulate(k, DotFpsCommand.new(), STEP)
+		motor.simulate(k, GSFpsCommand.new(), STEP)
 	_near(k.velocity.y, -60.0 * U, 0.05, "idle_sink_speed 60 units/s sinks as the classic water does")
 	swim.idle_sink_speed = 0.0
 
-	var u := DotFpsState.new()
+	var u := GSFpsState.new()
 	u.position = Vector3(0.0, -1.0, 0.0)
 	u.mode = swim.mode_id
-	var jump := _cmd(0.0, 0.0, DotFpsCommand.BUTTON_JUMP)
+	var jump := _cmd(0.0, 0.0, GSFpsCommand.BUTTON_JUMP)
 	var rise := -9.0
 	var out_tick := -1
 	for i in range(120):
@@ -492,8 +492,8 @@ func _test_water_motion() -> void:
 	_done()
 
 
-func _swim_speed_after(swim: DotFpsSwimMode, motor: DotFpsMotor, ticks: int) -> float:
-	var s := DotFpsState.new()
+func _swim_speed_after(swim: GSFpsSwimMode, motor: GSFpsMotor, ticks: int) -> float:
+	var s := GSFpsState.new()
 	s.position = Vector3(0.0, -3.0, 0.0)
 	s.mode = swim.mode_id
 	var fwd := _cmd(1.0, 0.0)
@@ -505,8 +505,8 @@ func _swim_speed_after(swim: DotFpsSwimMode, motor: DotFpsMotor, ticks: int) -> 
 func _test_water_ladder_reference() -> void:
 	_section("water and ladder measured against the reference (accelerate 10, friction 1, dampen 0 / 0.5)")
 	var rig := _water_rig()
-	var motor: DotFpsMotor = rig[0]
-	var swim: DotFpsSwimMode = rig[1]
+	var motor: GSFpsMotor = rig[0]
+	var swim: GSFpsSwimMode = rig[1]
 	var top := swim.swim_speed
 	# accelerate 10 closes 10/60 of the gap to the wish each 60 Hz tick: 1 - (5/6)^6 after 0.1 s.
 	var rise := _swim_speed_after(swim, motor, 6) / top
@@ -520,15 +520,15 @@ func _test_water_ladder_reference() -> void:
 	var steady := _swim_speed_after(swim, motor, 240) / top
 	var expect := (1.0 / 6.0) / (1.0 - (59.0 / 60.0) * (5.0 / 6.0))
 	_near(steady, expect, 0.01, "water friction 1 settles a held swim at 92.3% of the speed")
-	var dflt := DotFpsSwimMode.new()
+	var dflt := GSFpsSwimMode.new()
 	dflt.volumes = swim.volumes
 	dflt.mode_id = motor.register_mode(dflt)
 	_near(_swim_speed_after(dflt, motor, 240) / top, expect, 0.01, "an untouched swim mode uses the reference water friction 1")
 	swim.set_cvar("sv_waterfriction", "0")
 	_near(_swim_speed_after(swim, motor, 240) / top, 1.0, 0.01, "water friction 0 (off) reaches the full speed")
 
-	var ladder: DotFpsLadderMode = _ladder_rig()[1]
-	var lmotor: DotFpsMotor = _ladder_rig()[0]
+	var ladder: GSFpsLadderMode = _ladder_rig()[1]
+	var lmotor: GSFpsMotor = _ladder_rig()[0]
 	var yaw: float = _ladder_rig()[2]
 	var side := _cmd(0.0, yaw)
 	side.move = Vector2(1.0, 0.0)
@@ -538,7 +538,7 @@ func _test_water_ladder_reference() -> void:
 		lmotor = r[0]
 		ladder = r[1]
 		ladder.set_cvar("sv_ladder_dampen", damp)
-		var d := DotFpsState.new()
+		var d := GSFpsState.new()
 		d.position = Vector3(1.75, 3.0, 0.0)
 		d.mode = ladder.mode_id
 		for _i in range(10):
@@ -551,10 +551,10 @@ func _test_water_ladder_reference() -> void:
 
 func _test_cvar_binding() -> void:
 	_section("cvar binding: console, cfg layer, per-map override")
-	var t := DotFpsTunables.new()
-	var swim := DotFpsSwimMode.new()
-	var ladder := DotFpsLadderMode.new()
-	var cvars := DotFpsCvars.new().add_target(t).add_target(swim).add_target(ladder).add_target(RefCounted.new())
+	var t := GSFpsTunables.new()
+	var swim := GSFpsSwimMode.new()
+	var ladder := GSFpsLadderMode.new()
+	var cvars := GSFpsCvars.new().add_target(t).add_target(swim).add_target(ladder).add_target(RefCounted.new())
 	_check(cvars.targets.size() == 3, "an object without the two methods is not a target")
 	var made := {}
 	var add := func(cvar_name: String, value: String, _d: String, _f: int) -> Object:
@@ -577,7 +577,7 @@ func _test_cvar_binding() -> void:
 	var keys := cvars.map_config_keys()
 	_check(keys.has("sv_gravity") and not keys.has("sv_movement_profile") and keys["sv_autohop"]["type"] == "bool", "the map whitelist lists numeric cvars, bools as bool, not the profile")
 	_check(cvars.map_config_keys(PackedStringArray(["sv_gravity"]), {"sv_friction": {"max": 9.0}}).has("sv_gravity") == false, "a game can exclude keys and tighten limits")
-	# What DotGameMapConfig does: remember, set, then put back through the same cvar.
+	# What GSGameMapConfig does: remember, set, then put back through the same cvar.
 	var cv: FakeCvar = made["sv_gravity"]
 	var before := cv.value
 	cv.set_value("200")
@@ -590,21 +590,21 @@ func _test_cvar_binding() -> void:
 
 func _test_hops() -> void:
 	_section("bunny hops")
-	var t := DotFpsTunables.new()
+	var t := GSFpsTunables.new()
 	var motor := _motor(t)
 	var s := _standing(motor)
 	s.velocity = Vector3(0.0, 0.0, -10.0)
-	motor.simulate(s, _cmd(1.0, 0.0, DotFpsCommand.BUTTON_JUMP), STEP)
+	motor.simulate(s, _cmd(1.0, 0.0, GSFpsCommand.BUTTON_JUMP), STEP)
 	_check(s.horizontal_speed() > 9.5, "a jump at twice run speed is not capped", "%.2f" % s.horizontal_speed())
 	for auto in [false, true]:
-		var tt := DotFpsTunables.new()
+		var tt := GSFpsTunables.new()
 		tt.auto_hop = auto
 		var m := _motor(tt)
 		var st := _standing(m)
 		var takeoffs := 0
 		var was_ground := true
 		for _i in range(240):
-			m.simulate(st, _cmd(0.0, 0.0, DotFpsCommand.BUTTON_JUMP), STEP)
+			m.simulate(st, _cmd(0.0, 0.0, GSFpsCommand.BUTTON_JUMP), STEP)
 			if was_ground and not st.is_grounded():
 				takeoffs += 1
 			was_ground = st.is_grounded()
@@ -612,8 +612,8 @@ func _test_hops() -> void:
 			_check(takeoffs >= 3, "auto-hop re-jumps while jump is held", "%d takeoffs" % takeoffs)
 		else:
 			_check(takeoffs == 1, "without auto-hop a held jump is one jump", "%d takeoffs" % takeoffs)
-	var legacy_buffer := DotFpsTunables.with_profile("legacy")
-	_check(legacy_buffer.jump_buffer_time > 0.0 and DotFpsTunables.new().jump_buffer_time == 0.0, "the classic jump has no buffer, legacy keeps one")
+	var legacy_buffer := GSFpsTunables.with_profile("legacy")
+	_check(legacy_buffer.jump_buffer_time > 0.0 and GSFpsTunables.new().jump_buffer_time == 0.0, "the classic jump has no buffer, legacy keeps one")
 	_done()
 
 

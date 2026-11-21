@@ -1,12 +1,12 @@
 extends "res://examples/motor_native_parity.gd"
 
-## Holds [member DotFpsMotor.native_tick] (the tick's start and end in dot-sim) and [member DotFpsMotor.native_full] (the whole tick in one call, [code]DotSimFpsBody.motor_tick[/code]) to the all-script motor, to the bit: the determinism world's scenarios at 22, 33 and 66 Hz, with and without other players' hulls, under four tunable sets (default; wall slides and jumps; launch, dash, auto-hop and aimed walking; auto and jump-started wall runs that turn the view), the last two on long randomized streams. Every tick's state, timers, wall fields and view turn, and the motor's counters, are identical. With no library it says the native half was skipped and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_native_tick_parity.tscn[/code]
+## Holds [member GSFpsMotor.native_tick] (the tick's start and end in dot-sim) and [member GSFpsMotor.native_full] (the whole tick in one call, [code]GSSimFpsBody.motor_tick[/code]) to the all-script motor, to the bit: the determinism world's scenarios at 22, 33 and 66 Hz, with and without other players' hulls, under four tunable sets (default; wall slides and jumps; launch, dash, auto-hop and aimed walking; auto and jump-started wall runs that turn the view), the last two on long randomized streams. Every tick's state, timers, wall fields and view turn, and the motor's counters, are identical. With no library it says the native half was skipped and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/motor_native_tick_parity.tscn[/code]
 
 
 const RANDOM_TICKS := 3000
 
 
-func _tick_tunables(variant: int) -> DotFpsTunables:
+func _tick_tunables(variant: int) -> GSFpsTunables:
 	var t := _tunables()
 	if variant == 1:
 		t.wall_slide_speed = 2.5
@@ -14,16 +14,16 @@ func _tick_tunables(variant: int) -> DotFpsTunables:
 		t.air_friction = 0.2
 	elif variant == 2:
 		t.launch_enabled = true
-		t.launch_button = DotFpsCommand.BUTTON_USER_0
+		t.launch_button = GSFpsCommand.BUTTON_USER_0
 		t.dash_enabled = true
-		t.dash_button = DotFpsCommand.BUTTON_USER_1
+		t.dash_button = GSFpsCommand.BUTTON_USER_1
 		t.dash_from_air = false
 		t.auto_hop = true
 		t.jump_adds_to_velocity = true
 		t.bhop_speed_cap_scale = 1.4
 		t.slide_requires_sprint = true
 		t.wall_jump_enabled = true
-		t.aim_button = DotFpsCommand.BUTTON_USER_2
+		t.aim_button = GSFpsCommand.BUTTON_USER_2
 		t.aim_speed_scale = 0.45
 	elif variant == 3:
 		t.wall_run_auto = true
@@ -31,33 +31,33 @@ func _tick_tunables(variant: int) -> DotFpsTunables:
 		t.wall_run_turn_view = true
 		t.wall_jump_enabled = true
 		t.launch_enabled = true
-		t.launch_button = DotFpsCommand.BUTTON_USER_0
+		t.launch_button = GSFpsCommand.BUTTON_USER_0
 		t.launch_from_air = false
-		t.aim_button = DotFpsCommand.BUTTON_USER_2
+		t.aim_button = GSFpsCommand.BUTTON_USER_2
 		t.aim_speed_scale = 0.6
 		t.sprint_blocks_aim = true
 	return t
 
 
 ## A seeded stream that changes its inputs every few ticks: any move, sprint, crouch, jump and the three move buttons.
-func _random_stream(seed: int, ticks: int) -> Array[DotFpsCommand]:
+func _random_stream(seed: int, ticks: int) -> Array[GSFpsCommand]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
-	var out: Array[DotFpsCommand] = []
-	var c := DotFpsCommand.new()
+	var out: Array[GSFpsCommand] = []
+	var c := GSFpsCommand.new()
 	var yaw := 0.0
 	for tick in range(ticks):
 		if tick % 6 == 0 or rng.randf() < 0.08:
-			c = DotFpsCommand.new()
+			c = GSFpsCommand.new()
 			c.move = Vector2(rng.randi_range(-1, 1), -1.0 if rng.randf() < 0.6 else float(rng.randi_range(-1, 1)))
 			var b := 0
-			for bit: int in [DotFpsCommand.BUTTON_SPRINT, DotFpsCommand.BUTTON_CROUCH, DotFpsCommand.BUTTON_JUMP,
-					DotFpsCommand.BUTTON_USER_0, DotFpsCommand.BUTTON_USER_1, DotFpsCommand.BUTTON_USER_2]:
-				if rng.randf() < (0.5 if bit == DotFpsCommand.BUTTON_SPRINT else 0.18):
+			for bit: int in [GSFpsCommand.BUTTON_SPRINT, GSFpsCommand.BUTTON_CROUCH, GSFpsCommand.BUTTON_JUMP,
+					GSFpsCommand.BUTTON_USER_0, GSFpsCommand.BUTTON_USER_1, GSFpsCommand.BUTTON_USER_2]:
+				if rng.randf() < (0.5 if bit == GSFpsCommand.BUTTON_SPRINT else 0.18):
 					b |= bit
 			c.buttons = b
 		yaw = wrapf(yaw + rng.randf_range(-0.2, 0.2), -PI, PI)
-		var d := DotFpsCommand.new()
+		var d := GSFpsCommand.new()
 		d.move = c.move
 		d.buttons = c.buttons
 		d.yaw = yaw
@@ -66,23 +66,23 @@ func _random_stream(seed: int, ticks: int) -> Array[DotFpsCommand]:
 
 
 ## [param way] 0 is all script, 1 the native start and end, 2 the whole tick native.
-func _tick_replay(way: int, sc: Array, stream: Array[DotFpsCommand], step: float, hulls: bool, variant: int) -> Dictionary:
-	DotFpsPhysicsBody.native_enabled = way > 0
-	DotFpsMotor.native_tick = way > 0
-	DotFpsMotor.native_full = way == 2
-	var physics := DotFpsPhysicsBody.for_node(self)
+func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float, hulls: bool, variant: int) -> Dictionary:
+	GSFpsPhysicsBody.native_enabled = way > 0
+	GSFpsMotor.native_tick = way > 0
+	GSFpsMotor.native_full = way == 2
+	var physics := GSFpsPhysicsBody.for_node(self)
 	physics.pass_out_mask = 1 << 3
-	var body: DotFpsBody = physics
+	var body: GSFpsBody = physics
 	var boxes := _hull_boxes()
 	if hulls:
-		body = DotFpsHullBody.new().wrap(physics, func() -> Array: return boxes)
-	var motor := DotFpsMotor.new(_tick_tunables(variant), body)
-	var s := DotFpsState.new()
+		body = GSFpsHullBody.new().wrap(physics, func() -> Array: return boxes)
+	var motor := GSFpsMotor.new(_tick_tunables(variant), body)
+	var s := GSFpsState.new()
 	s.position = sc[1]
 	s.velocity = sc[2]
-	s.mode = DotFpsState.Mode.AIR
+	s.mode = GSFpsState.Mode.AIR
 	var ticks: Array[PackedByteArray] = []
-	var before := DotFpsPhysicsBody.native_ticks
+	var before := GSFpsPhysicsBody.native_ticks
 	var runs_after_jump := 0
 	for c in stream:
 		var after_jump := s.wall_jumps_in_air > 0 and not s.is_wall_running()
@@ -98,7 +98,7 @@ func _tick_replay(way: int, sc: Array, stream: Array[DotFpsCommand], step: float
 		motor.crease_leg_ticks, motor.split_leg_ticks, motor.depenetrated_ticks, motor.embedded_ticks, motor.lifted_ticks,
 		motor.settled_ground_ticks, motor.reused_ground_ticks, motor.slides, motor.launches, motor.dashes, motor.wall_runs,
 		motor.wall_jumps]
-	return {"ticks": ticks, "counters": counters, "end": s.position, "native_ticks": DotFpsPhysicsBody.native_ticks - before,
+	return {"ticks": ticks, "counters": counters, "end": s.position, "native_ticks": GSFpsPhysicsBody.native_ticks - before,
 		"script_ticks": motor.wall_jump_script_ticks, "runs_after_jump": runs_after_jump}
 
 
@@ -131,7 +131,7 @@ func _tick_runs() -> void:
 						print("  %-44s end %s  native %d  counters %s" % [lw, a["end"], b["native_ticks"], a["counters"]])
 						# With an older library, a tick a run after a wall jump may start in runs in script, its start and end still in the library: two calls.
 						var calls: int = stream.size() + b["script_ticks"]
-						if way == 2 and ClassDB.class_has_method(&"DotSimFpsBody", &"runs_after_wall_jump"):
+						if way == 2 and ClassDB.class_has_method(&"GSSimFpsBody", &"runs_after_wall_jump"):
 							_check(b["script_ticks"] == 0, lw + ": a library that slows a run after a wall jump runs every such tick itself (%d in script)" % b["script_ticks"])
 						var want: bool = b["native_ticks"] == calls if way == 2 else b["native_ticks"] > stream.size()
 						_check(want, lw + ": the native run ticked in the library, one call a tick when whole (%d of %d, %d after a wall jump in script)" % [b["native_ticks"], stream.size(), b["script_ticks"]])
@@ -144,12 +144,12 @@ func _tick_runs() -> void:
 
 ## The motor keeps its native tunables arrays between ticks; a changed value or a swapped resource must rebuild both.
 func _tun_cache_check() -> void:
-	var was := DotFpsMotor.native_tick
-	DotFpsMotor.native_tick = true
+	var was := GSFpsMotor.native_tick
+	GSFpsMotor.native_tick = true
 	var t := _tunables()
-	var motor := DotFpsMotor.new(t, DotFpsPhysicsBody.for_node(self))
-	var s := DotFpsState.new()
-	s.mode = DotFpsState.Mode.GROUND
+	var motor := GSFpsMotor.new(t, GSFpsPhysicsBody.for_node(self))
+	var s := GSFpsState.new()
+	s.mode = GSFpsState.Mode.GROUND
 	var tick := motor._native_tick_tun(s)
 	var full := motor._native_full_tun(tick)
 	_check(motor._native_tick_tun(s) == tick and motor._native_full_tun(tick) == full,
@@ -176,15 +176,15 @@ func _tun_cache_check() -> void:
 	other.max_speed = t.max_speed + 2.0
 	motor.tunables = other
 	_check(motor._native_tick_tun(s)[11] == other.max_speed, "swapped tunables rebuild the arrays")
-	DotFpsMotor.native_tick = was
+	GSFpsMotor.native_tick = was
 
 
 func _run() -> void:
 	print("dot-player-controller motor native tick parity")
 	_tun_cache_check()
-	var loaded := DotFpsPhysicsBody.native_available()
+	var loaded := GSFpsPhysicsBody.native_available()
 	var expected := 1
-	if not loaded or not ClassDB.class_has_method(DotFpsPhysicsBody.NATIVE_CLASS, &"motor_tick"):
+	if not loaded or not ClassDB.class_has_method(GSFpsPhysicsBody.NATIVE_CLASS, &"motor_tick"):
 		# A library from before the tick halves is a skip, not a failure: the slide's own suite still gates it.
 		print("  dot-sim's motor tick is not loaded: the native half is skipped")
 		if not loaded and (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("DOT_SIM_REQUIRE_NATIVE")) == "1":
@@ -195,9 +195,9 @@ func _run() -> void:
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		_tick_runs()
-	DotFpsPhysicsBody.native_enabled = true
-	DotFpsMotor.native_tick = false
-	DotFpsMotor.native_full = true
+	GSFpsPhysicsBody.native_enabled = true
+	GSFpsMotor.native_tick = false
+	GSFpsMotor.native_full = true
 	print("%d passed, %d failed" % [_passed, _failed])
 	print("%d of %d sections ran to their last line" % [_sections, expected])
 	get_tree().quit(1 if _failed > 0 or _sections != expected else 0)

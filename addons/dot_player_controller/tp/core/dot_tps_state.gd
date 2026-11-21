@@ -1,4 +1,4 @@
-class_name DotTpsState
+class_name GSTpsState
 extends RefCounted
 
 ## Everything the third-person simulation carries between ticks.
@@ -37,8 +37,8 @@ var yaw: float = 0.0
 var pitch: float = 0.0
 
 
-func copy_state() -> DotTpsState:
-	var s := DotTpsState.new()
+func copy_state() -> GSTpsState:
+	var s := GSTpsState.new()
 	s.velocity = velocity
 	s.facing = facing
 	s.target_facing = target_facing
@@ -55,7 +55,7 @@ func copy_state() -> DotTpsState:
 	return s
 
 
-func adopt(other: DotTpsState) -> void:
+func adopt(other: GSTpsState) -> void:
 	if other == null:
 		return
 
@@ -76,7 +76,7 @@ func adopt(other: DotTpsState) -> void:
 
 
 func forget_state() -> void:
-	adopt(DotTpsState.new())
+	adopt(GSTpsState.new())
 
 
 func speed() -> float:
@@ -93,4 +93,4 @@ func describe() -> String:
 
 
 func _to_string() -> String:
-	return "DotTpsState(%s)" % describe()
+	return "GSTpsState(%s)" % describe()

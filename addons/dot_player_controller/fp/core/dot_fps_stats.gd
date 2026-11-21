@@ -1,9 +1,9 @@
-class_name DotFpsStats
+class_name GSFpsStats
 extends RefCounted
 
 ## What a movement run looked like: jumps, strafes, sync, perfect hops, speed.
 ## Sync is the fraction of strafe ticks where the mouse turned the same way as the strafe key. Fed per simulated tick via [method observe], never per frame.
-## Not part of [DotFpsState]: it is no input to the simulation.
+## Not part of [GSFpsState]: it is no input to the simulation.
 
 ## Ticks observed.
 var ticks: int = 0
@@ -11,7 +11,7 @@ var ticks: int = 0
 ## Jumps that left the ground.
 var jumps: int = 0
 
-## Jumps taken on the tick the player landed, the definition of a perfect hop. Needs [member DotFpsState.ground_ticks].
+## Jumps taken on the tick the player landed, the definition of a perfect hop. Needs [member GSFpsState.ground_ticks].
 var perfect_jumps: int = 0
 
 ## Jumps close enough to a landing to have been aiming for a perfect one; the denominator, so a standing jump does not halve the score.
@@ -50,11 +50,11 @@ var _had_yaw: bool = false
 var _was_grounded: bool = false
 
 
-## Folds one simulated tick in. Call after [method DotFpsMotor.simulate]; [param previous] is null on the first tick.
+## Folds one simulated tick in. Call after [method GSFpsMotor.simulate]; [param previous] is null on the first tick.
 func observe(
-	state: DotFpsState,
-	command: DotFpsCommand,
-	previous: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
+	previous: GSFpsCommand,
 	_delta: float
 ) -> void:
 	ticks += 1
@@ -150,7 +150,7 @@ func reset() -> void:
 	_was_grounded = false
 
 
-func copy_from(other: DotFpsStats) -> void:
+func copy_from(other: GSFpsStats) -> void:
 	ticks = other.ticks
 	jumps = other.jumps
 	perfect_jumps = other.perfect_jumps
@@ -167,8 +167,8 @@ func copy_from(other: DotFpsStats) -> void:
 	_was_grounded = other._was_grounded
 
 
-func duplicate_stats() -> DotFpsStats:
-	var out := DotFpsStats.new()
+func duplicate_stats() -> GSFpsStats:
+	var out := GSFpsStats.new()
 	out.copy_from(self)
 	return out
 
@@ -205,4 +205,4 @@ func describe_lines() -> PackedStringArray:
 
 
 func _to_string() -> String:
-	return "DotFpsStats(%d jumps, %.0f%% sync)" % [jumps, sync() * 100.0]
+	return "GSFpsStats(%d jumps, %.0f%% sync)" % [jumps, sync() * 100.0]

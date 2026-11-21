@@ -1,15 +1,15 @@
 extends "res://examples/motor_bench.gd"
 
-## Micro-benchmark of the players' loop a dedicated server runs with [DotFpsMotorBatch] (game-fatal-contact's `_tick_players_batched`): N controllers in a collision world, their hulls in dot-sim's hull world, each tick begin_tick and add for every player, then finish and end_tick for every player. Prints microseconds per player per tick for each of the four steps, and a digest of every tick's states: one build prints one digest, and a change that keeps results identical prints the digest the tree before it printed. Also runs the one-by-one loop ([method DotFpsController.simulate_tick]) and says whether it ends in the same states. With no dot-sim library it says so and exits 0. Run: [code]godot --headless --path . res://examples/motor_batch_bench.tscn [-- --n=32 --ticks=1000][/code]
+## Micro-benchmark of the players' loop a dedicated server runs with [GSFpsMotorBatch] (game-fatal-contact's `_tick_players_batched`): N controllers in a collision world, their hulls in dot-sim's hull world, each tick begin_tick and add for every player, then finish and end_tick for every player. Prints microseconds per player per tick for each of the four steps, and a digest of every tick's states: one build prints one digest, and a change that keeps results identical prints the digest the tree before it printed. Also runs the one-by-one loop ([method GSFpsController.simulate_tick]) and says whether it ends in the same states. With no dot-sim library it says so and exits 0. Run: [code]godot --headless --path . res://examples/motor_batch_bench.tscn [-- --n=32 --ticks=1000][/code]
 
 
 ## A controller whose physics body is wrapped in a hull body, as game-fatal-contact's players are (FcSolidBody).
-class HullController extends DotFpsController:
-	func _make_body() -> DotFpsBody:
-		return DotFpsHullBody.new().wrap(super._make_body(), Callable())
+class HullController extends GSFpsController:
+	func _make_body() -> GSFpsBody:
+		return GSFpsHullBody.new().wrap(super._make_body(), Callable())
 
 
-func _hull_player(i: int, parent: Node) -> DotFpsController:
+func _hull_player(i: int, parent: Node) -> GSFpsController:
 	var player := CharacterBody3D.new()
 	player.name = "P%d" % i
 	player.collision_layer = 0
@@ -25,12 +25,12 @@ func _hull_player(i: int, parent: Node) -> DotFpsController:
 	var camera := Camera3D.new()
 	camera.name = "Camera"
 	head.add_child(camera)
-	var view := DotFpsView.new()
+	var view := GSFpsView.new()
 	view.name = "View"
 	player.add_child(view)
 	var c := HullController.new()
 	c.name = "Controller"
-	c.drive = DotFpsController.Drive.EXTERNAL
+	c.drive = GSFpsController.Drive.EXTERNAL
 	c.register_default_actions = false
 	c.register_service = false
 	player.add_child(c)
@@ -43,12 +43,12 @@ func _loop(batched: bool) -> Dictionary:
 	var root := Node3D.new()
 	add_child(root)
 	_world_into(root, true)
-	var ctrls: Array[DotFpsController] = []
+	var ctrls: Array[GSFpsController] = []
 	for i in range(_n):
 		ctrls.append(_hull_player(i, root))
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	var world: Object = ClassDB.instantiate(&"DotSimHullWorld")
+	var world: Object = ClassDB.instantiate(&"GSSimHullWorld")
 	var ids := PackedInt64Array()
 	var wired := true
 	for i in range(_n):
@@ -59,7 +59,7 @@ func _loop(batched: bool) -> Dictionary:
 		c.teleport(Vector3(-6.0 + float(i % 8) * 1.5, 0.05, -6.0 + float(i / 8) * 1.5))
 		wired = c.body.set_hull_world(world, i) and wired
 		ids.append(100 + i)
-	var batch := DotFpsMotorBatch.new()
+	var batch := GSFpsMotorBatch.new()
 	var rows := PackedInt64Array()
 	rows.resize(_n)
 	var us := PackedInt64Array([0, 0, 0, 0, 0])
@@ -123,12 +123,12 @@ func _loop(batched: bool) -> Dictionary:
 ## One more batched run with GameSpice Sim's query timers on (--profile): engine queries per row and their cost, split by
 ## where the motor asked them. The timers add their own cost, so the totals here are not the bench's numbers.
 func _profiled() -> void:
-	ClassDB.class_call_static(&"DotSimFpsBody", &"reset_profile")
-	ClassDB.class_call_static(&"DotSimFpsBody", &"set_profile", true)
+	ClassDB.class_call_static(&"GSSimFpsBody", &"reset_profile")
+	ClassDB.class_call_static(&"GSSimFpsBody", &"set_profile", true)
 	await _loop(true)
-	var c: PackedInt64Array = ClassDB.class_call_static(&"DotSimFpsBody", &"profile_counters")
-	var sites: String = ClassDB.class_call_static(&"DotSimFpsBody", &"profile_sites")
-	ClassDB.class_call_static(&"DotSimFpsBody", &"set_profile", false)
+	var c: PackedInt64Array = ClassDB.class_call_static(&"GSSimFpsBody", &"profile_counters")
+	var sites: String = ClassDB.class_call_static(&"GSSimFpsBody", &"profile_sites")
+	ClassDB.class_call_static(&"GSSimFpsBody", &"set_profile", false)
 	var rows := float(maxi(c[8], 1))
 	var line := "  profile per row:"
 	var names := ["cast", "rest", "overlap", "ray", "tick"]
@@ -140,14 +140,14 @@ func _profiled() -> void:
 
 func _run() -> void:
 	print("motor batch bench: n=%d ticks=%d" % [_n, _ticks])
-	if not DotFpsPhysicsBody.native_available() or not DotFpsMotorBatch.available() or not ClassDB.class_exists(&"DotSimHullWorld"):
+	if not GSFpsPhysicsBody.native_available() or not GSFpsMotorBatch.available() or not ClassDB.class_exists(&"GSSimHullWorld"):
 		print("  dot-sim's motor batch is not loaded: skipped")
 		get_tree().quit(0)
 		return
-	DotFpsPhysicsBody.native_enabled = true
-	DotFpsMotor.native_tick = true
-	DotFpsMotor.native_full = true
-	DotFpsMotor.profile = false
+	GSFpsPhysicsBody.native_enabled = true
+	GSFpsMotor.native_tick = true
+	GSFpsMotor.native_full = true
+	GSFpsMotor.profile = false
 	await get_tree().physics_frame
 	var best := {}
 	var one: Dictionary = {}

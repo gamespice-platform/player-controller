@@ -1,10 +1,10 @@
 extends "dot_fps_motor_base.gd"
 
 ## The motor's geometry helpers and its wall running and wall jumping, split out of
-## [DotFpsMotor] to keep that file under the size gate; it is the layer between them.
+## [GSFpsMotor] to keep that file under the size gate; it is the layer between them.
 
 
-## How finely a wall's heading is counted for [member DotFpsTunables.wall_jump_max_per_wall]: eighths of a turn, the replicated field's width.
+## How finely a wall's heading is counted for [member GSFpsTunables.wall_jump_max_per_wall]: eighths of a turn, the replicated field's width.
 ## Two walls at a right angle are always two headings apart, and one wall is never two.
 const WALL_HEADINGS := 8
 
@@ -17,7 +17,7 @@ const WALL_PROBE_MIN_SPEED := 0.5
 
 
 ## The probe directions for a wall: both sides of the velocity when moving, then the view's four flat directions.
-func _wall_probe_directions(state: DotFpsState) -> Array[Vector3]:
+func _wall_probe_directions(state: GSFpsState) -> Array[Vector3]:
 	var directions: Array[Vector3] = []
 	var flat := Vector3(state.velocity.x, 0.0, state.velocity.z)
 
@@ -34,10 +34,10 @@ func _wall_probe_directions(state: DotFpsState) -> Array[Vector3]:
 	return directions
 
 
-## The wall beside the player this tick, or null. Also writes [member DotFpsState.wall_normal].
+## The wall beside the player this tick, or null. Also writes [member GSFpsState.wall_normal].
 ## Asked fresh every tick: the world answers the same on both machines, and a remembered normal is one more thing a rewind must restore.
 ## Probed only when the answer will be used (a run, a possible start, or a wall-jump press): a short sideways sweep (`wall_reach`) to each side of the velocity, then the view's four flat directions; the nearest steep enough wall wins.
-func _wall_contact(state: DotFpsState, command: DotFpsCommand) -> DotFpsBody.Hit:
+func _wall_contact(state: GSFpsState, command: GSFpsCommand) -> GSFpsBody.Hit:
 	if (
 		not tunables.wall_run_enabled
 		and not tunables.wall_jump_enabled
@@ -47,7 +47,7 @@ func _wall_contact(state: DotFpsState, command: DotFpsCommand) -> DotFpsBody.Hit
 
 	state.wall_normal = Vector3.ZERO
 
-	if state.mode != DotFpsState.Mode.AIR:
+	if state.mode != GSFpsState.Mode.AIR:
 		return null
 
 	var wants_run := (
@@ -78,11 +78,11 @@ func _wall_contact(state: DotFpsState, command: DotFpsCommand) -> DotFpsBody.Hit
 	var height := _height(state)
 	var centre := _capsule_centre(state.position, height)
 	var steepest := cos(deg_to_rad(90.0 - tunables.wall_max_angle_from_vertical))
-	var best: DotFpsBody.Hit = null
+	var best: GSFpsBody.Hit = null
 
 	# A run keeps the wall beside it: while running, the two sideways probes win over anything nearer, since a ledge's end face has no "along" speed and ended runs under nearest-wins.
 	var sideways := 2 if state.is_wall_running() and directions.size() == 6 else 0
-	var beside: DotFpsBody.Hit = null
+	var beside: GSFpsBody.Hit = null
 
 	for index in range(directions.size()):
 		var direction := directions[index]
@@ -126,18 +126,18 @@ static func _same_wall(a: int, b: int) -> bool:
 	return apart <= 1 or apart >= WALL_HEADINGS - 1
 
 
-## Slack, in seconds, on the run's time cap. A cap that is a whole number of ticks (1 s at 66 Hz) is reached by a sum of tick lengths on the server, which lands a hair under it, and by the exactly decoded value ([constant DotFpsNetSync.timer_scale]) on a client that has just rewound, which lands on it; the run then ended a tick apart. With the slack both end on the cap's tick. Far under a tick at any rate; a cap that is not a whole number of ticks moves by nothing.
+## Slack, in seconds, on the run's time cap. A cap that is a whole number of ticks (1 s at 66 Hz) is reached by a sum of tick lengths on the server, which lands a hair under it, and by the exactly decoded value ([constant GSFpsNetSync.timer_scale]) on a client that has just rewound, which lands on it; the run then ended a tick apart. With the slack both end on the cap's tick. Far under a tick at any rate; a cap that is not a whole number of ticks moves by nothing.
 const WALL_RUN_TIME_SLACK := 1e-4
 
 
 ## Starts, carries and ends a wall run.
-## Entered only from the air, beside a steep enough wall, moving along it at [member DotFpsTunables.wall_run_min_speed] or more, not falling fast, forward held when required, and not after a run already ended this airborne stretch.
+## Entered only from the air, beside a steep enough wall, moving along it at [member GSFpsTunables.wall_run_min_speed] or more, not falling fast, forward held when required, and not after a run already ended this airborne stretch.
 ## Speed along the wall is left alone and gravity reduced ([method _wall_run_vertical]). Ends on the time cap, losing the wall, slowing, releasing forward, landing, or any jump or launch.
 func _update_wall_run(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float,
-	wall: DotFpsBody.Hit,
+	wall: GSFpsBody.Hit,
 	left_this_tick: bool
 ) -> void:
 	if not tunables.wall_run_enabled and not tunables.wall_jump_enabled:
@@ -146,7 +146,7 @@ func _update_wall_run(
 	# Touching the ground resets both wall moves, whichever of them is on. Also done in
 	# [method _advance_timers], because a jump off the ground has put the player in AIR by
 	# the time this runs, and that tick started on the ground all the same.
-	if state.mode == DotFpsState.Mode.GROUND:
+	if state.mode == GSFpsState.Mode.GROUND:
 		_reset_walls(state)
 		return
 
@@ -163,7 +163,7 @@ func _update_wall_run(
 			left_this_tick
 			or wall == null
 			or _effects.deny_move
-			or state.wall_run_time >= minf(tunables.wall_run_max_time, DotFpsTunables.WALL_RUN_TIME_LIMIT) - WALL_RUN_TIME_SLACK
+			or state.wall_run_time >= minf(tunables.wall_run_max_time, GSFpsTunables.WALL_RUN_TIME_LIMIT) - WALL_RUN_TIME_SLACK
 			or _speed_along_wall(state, wall) < tunables.wall_run_end_speed
 			or (tunables.wall_run_requires_forward and command.move.y <= 0.0)
 			or (
@@ -179,7 +179,7 @@ func _update_wall_run(
 	if left_this_tick or wall == null or state.wall_run_spent or _effects.deny_move:
 		return
 
-	if state.mode != DotFpsState.Mode.AIR or state.wall_run_cooldown_left > 0.0:
+	if state.mode != GSFpsState.Mode.AIR or state.wall_run_cooldown_left > 0.0:
 		return
 
 	if state.time_since_grounded < WALL_ENTRY_MIN_AIR:
@@ -227,7 +227,7 @@ const WALL_PROBE_HEIGHT := 0.12
 ## Whether [param wall] is big enough to START a run on: tall enough around the contact (and
 ## reaching above the hip) and long enough ahead. Probes only the world, so both peers agree.
 ## A wall jump never asks: a ledge is still a thing to push off.
-func _wall_runnable(state: DotFpsState, wall: DotFpsBody.Hit) -> bool:
+func _wall_runnable(state: GSFpsState, wall: GSFpsBody.Hit) -> bool:
 	var min_height := tunables.wall_run_min_height
 	var min_length := tunables.wall_run_min_length
 	if min_height <= 0.0 and min_length <= 0.0:
@@ -305,14 +305,14 @@ func _wall_extent_along(base: Vector3, normal: Vector3, tangent: Vector3, y: flo
 	return reached
 
 
-func _reset_walls(state: DotFpsState) -> void:
+func _reset_walls(state: GSFpsState) -> void:
 	state.wall_run_time = -1.0
 	state.wall_run_spent = false
 	state.wall_jump_count = 0
 	state.wall_jumps_in_air = 0
 
 
-func _end_wall_run(state: DotFpsState) -> void:
+func _end_wall_run(state: GSFpsState) -> void:
 	state.wall_run_time = -1.0
 	state.wall_run_spent = true
 	state.wall_run_cooldown_left = tunables.wall_run_cooldown
@@ -320,14 +320,14 @@ func _end_wall_run(state: DotFpsState) -> void:
 
 ## A jump press in the air beside a wall starts a run: the heading is turned along the wall at
 ## the horizontal speed the player had, and the press is spent. Returns whether it started one.
-func _try_jump_run(state: DotFpsState, wall: DotFpsBody.Hit) -> bool:
+func _try_jump_run(state: GSFpsState, wall: GSFpsBody.Hit) -> bool:
 	if not (tunables.wall_run_enabled and tunables.wall_run_on_jump) or wall == null:
 		return false
 
 	if tunables.wall_run_auto:
 		return false
 
-	if state.mode != DotFpsState.Mode.AIR or state.is_wall_running() or state.wall_run_spent:
+	if state.mode != GSFpsState.Mode.AIR or state.is_wall_running() or state.wall_run_spent:
 		return false
 
 	if state.wall_run_cooldown_left > 0.0 or _effects.deny_move or _effects.deny_jump:
@@ -366,11 +366,11 @@ func _try_jump_run(state: DotFpsState, wall: DotFpsBody.Hit) -> bool:
 
 ## Starts a run with no press: airborne, moving into a wall within the jump-run limits.
 ## A press in the air takes the wall jump first, so a quick press during the run leaves it.
-func _try_auto_run(state: DotFpsState, command: DotFpsCommand, wall: DotFpsBody.Hit) -> void:
+func _try_auto_run(state: GSFpsState, command: GSFpsCommand, wall: GSFpsBody.Hit) -> void:
 	if not (tunables.wall_run_enabled and tunables.wall_run_auto) or wall == null:
 		return
 
-	if state.mode != DotFpsState.Mode.AIR or state.is_wall_running() or state.wall_run_spent:
+	if state.mode != GSFpsState.Mode.AIR or state.is_wall_running() or state.wall_run_spent:
 		return
 
 	if state.wall_run_cooldown_left > 0.0 or _effects.deny_move:
@@ -410,39 +410,39 @@ func _try_auto_run(state: DotFpsState, command: DotFpsCommand, wall: DotFpsBody.
 
 ## The speed a run starts at: all of the horizontal speed, except after a wall jump in this air, where the part going into the new wall is dropped as [method _try_wall_jump] drops it.
 ## Otherwise a jump across to a facing wall turns the whole push along that wall, and each bounce down a corridor adds the push again.
-func _run_speed(state: DotFpsState, flat: Vector3, normal: Vector3) -> float:
+func _run_speed(state: GSFpsState, flat: Vector3, normal: Vector3) -> float:
 	if state.wall_jumps_in_air <= 0:
 		return flat.length()
 	return (flat - normal * minf(flat.dot(normal), 0.0)).length()
 
 
-## -1 not asked yet, else whether GameSpice Sim's whole tick slows a run after a wall jump as [method _run_speed] does ([code]DotSimFpsBody.runs_after_wall_jump[/code]).
+## -1 not asked yet, else whether GameSpice Sim's whole tick slows a run after a wall jump as [method _run_speed] does ([code]GSSimFpsBody.runs_after_wall_jump[/code]).
 static var _native_runs_after_wall_jump: int = -1
 
 
 ## Whether this tick must run in script rather than in GameSpice Sim's whole tick because of [method _may_run_after_wall_jump]: never with a library that slows such a run itself.
-func _wall_jump_run_in_script(state: DotFpsState) -> bool:
+func _wall_jump_run_in_script(state: GSFpsState) -> bool:
 	if _native_runs_after_wall_jump < 0:
 		_native_runs_after_wall_jump = 1 if (
-			ClassDB.class_exists(&"DotSimFpsBody") and ClassDB.class_has_method(&"DotSimFpsBody", &"runs_after_wall_jump")
+			ClassDB.class_exists(&"GSSimFpsBody") and ClassDB.class_has_method(&"GSSimFpsBody", &"runs_after_wall_jump")
 		) else 0
-		if _native_runs_after_wall_jump == 0 and ClassDB.class_exists(&"DotSimFpsBody"):
+		if _native_runs_after_wall_jump == 0 and ClassDB.class_exists(&"GSSimFpsBody"):
 			# Said once, loudly: every air tick after a wall jump then leaves GameSpice Sim's batch for the script tail, about a third of a 32-bot server's motor time on GameSpice Sim v0.2.7.
-			DotLog.warn(CHANNEL, "dot-sim has no DotSimFpsBody.runs_after_wall_jump (older than v0.2.8): ticks after a wall jump run in script; update dot-sim")
+			GSLog.warn(CHANNEL, "dot-sim has no GSSimFpsBody.runs_after_wall_jump (older than v0.2.8): ticks after a wall jump run in script; update dot-sim")
 	return _native_runs_after_wall_jump == 0 and _may_run_after_wall_jump(state)
 
 
 ## Whether a run may start this tick from a wall jump earlier in this air, which an older GameSpice Sim's whole tick does not know to slow: such a tick runs in script (see [method _wall_jump_run_in_script]).
-func _may_run_after_wall_jump(state: DotFpsState) -> bool:
+func _may_run_after_wall_jump(state: GSFpsState) -> bool:
 	return (
 		tunables.wall_run_enabled and (tunables.wall_run_auto or tunables.wall_run_on_jump)
-		and state.mode == DotFpsState.Mode.AIR and state.wall_jumps_in_air > 0
+		and state.mode == GSFpsState.Mode.AIR and state.wall_jumps_in_air > 0
 		and not state.is_wall_running() and not state.wall_run_spent
 	)
 
 
 ## Begins a run with the horizontal velocity [param turned] (along the wall).
-func _turn_along(state: DotFpsState, turned: Vector3) -> void:
+func _turn_along(state: GSFpsState, turned: Vector3) -> void:
 	state.velocity.x = turned.x
 	state.velocity.z = turned.z
 	state.wall_run_time = 0.0
@@ -455,31 +455,31 @@ func _turn_along(state: DotFpsState, turned: Vector3) -> void:
 
 
 ## Horizontal speed along the wall's face.
-func _speed_along_wall(state: DotFpsState, wall: DotFpsBody.Hit) -> float:
+func _speed_along_wall(state: GSFpsState, wall: GSFpsBody.Hit) -> float:
 	var normal := _flat_normal(wall.normal)
 	var flat := Vector3(state.velocity.x, 0.0, state.velocity.z)
 	return (flat - normal * flat.dot(normal)).length()
 
 
-## The vertical half of a wall run, in place of gravity: scaled by [member DotFpsTunables.wall_run_gravity_scale] and eased toward zero at [member DotFpsTunables.wall_run_vertical_damping] per second.
+## The vertical half of a wall run, in place of gravity: scaled by [member GSFpsTunables.wall_run_gravity_scale] and eased toward zero at [member GSFpsTunables.wall_run_vertical_damping] per second.
 ## Eased, never set, so nothing changes by more than a tick's gravity at the start, during, or at the end.
-func _wall_run_vertical(state: DotFpsState, delta: float) -> void:
+func _wall_run_vertical(state: GSFpsState, delta: float) -> void:
 	state.velocity.y -= tunables.gravity * tunables.wall_run_gravity_scale * _effects.gravity * delta
 	state.velocity.y *= exp(-tunables.wall_run_vertical_damping * delta)
 
 
 ## Whether an airborne player is sliding down a wall this tick: falling, beside a wall, and
 ## either pushing into it or done running on it (so a run that ends decays into a slide).
-func _wall_slides(state: DotFpsState, command: DotFpsCommand, wall: DotFpsBody.Hit) -> bool:
+func _wall_slides(state: GSFpsState, command: GSFpsCommand, wall: GSFpsBody.Hit) -> bool:
 	return state.velocity.y < 0.0 and _wall_slide_ok(state, command, wall)
 
 
 ## [method _wall_slides] without the falling test, which the native tick end makes after gravity itself.
-func _wall_slide_ok(state: DotFpsState, command: DotFpsCommand, wall: DotFpsBody.Hit) -> bool:
+func _wall_slide_ok(state: GSFpsState, command: GSFpsCommand, wall: GSFpsBody.Hit) -> bool:
 	if tunables.wall_slide_speed <= 0.0 or wall == null:
 		return false
 
-	if state.mode != DotFpsState.Mode.AIR or state.is_wall_running():
+	if state.mode != GSFpsState.Mode.AIR or state.is_wall_running():
 		return false
 
 	if state.wall_run_spent:
@@ -495,9 +495,9 @@ func _wall_slide_ok(state: DotFpsState, command: DotFpsCommand, wall: DotFpsBody
 	return wish.normalized().dot(-_flat_normal(wall.normal)) > 0.5
 
 
-## The wall slide, after gravity: a fall reaching [member DotFpsTunables.wall_slide_speed] stops gaining speed, and a faster one eases down to it exponentially at [member DotFpsTunables.wall_run_vertical_damping].
+## The wall slide, after gravity: a fall reaching [member GSFpsTunables.wall_slide_speed] stops gaining speed, and a faster one eases down to it exponentially at [member GSFpsTunables.wall_run_vertical_damping].
 ## Never cut to the cap in one tick. [param falling_at] is the vertical speed before this tick's gravity.
-func _wall_slide_vertical(state: DotFpsState, falling_at: float, delta: float) -> void:
+func _wall_slide_vertical(state: GSFpsState, falling_at: float, delta: float) -> void:
 	var cap := -tunables.wall_slide_speed
 	if state.velocity.y >= cap:
 		return
@@ -509,12 +509,12 @@ func _wall_slide_vertical(state: DotFpsState, falling_at: float, delta: float) -
 
 
 ## A jump off a wall the player is touching or running on. Returns whether it fired.
-## On the buffered jump press, never held (holding with [member DotFpsTunables.auto_hop] would wall-jump the instant a wall came in reach), in the air, beside a steep enough wall, under [member DotFpsTunables.wall_jump_max_per_wall].
-## Speed along the wall is kept and the push added; the push leans from the normal toward the view by [member DotFpsTunables.wall_jump_look_blend] with the into-wall part dropped, so it always leaves the wall. Upward speed replaces a lower one, like the launch's.
+## On the buffered jump press, never held (holding with [member GSFpsTunables.auto_hop] would wall-jump the instant a wall came in reach), in the air, beside a steep enough wall, under [member GSFpsTunables.wall_jump_max_per_wall].
+## Speed along the wall is kept and the push added; the push leans from the normal toward the view by [member GSFpsTunables.wall_jump_look_blend] with the into-wall part dropped, so it always leaves the wall. Upward speed replaces a lower one, like the launch's.
 func _try_wall_jump(
-	state: DotFpsState,
-	command: DotFpsCommand,
-	wall: DotFpsBody.Hit
+	state: GSFpsState,
+	command: GSFpsCommand,
+	wall: GSFpsBody.Hit
 ) -> bool:
 	if not tunables.wall_jump_enabled or wall == null:
 		return false
@@ -522,7 +522,7 @@ func _try_wall_jump(
 	if not tunables.can_jump or _effects.deny_jump or _effects.deny_move or _effects.jump <= 0.0:
 		return false
 
-	if state.mode != DotFpsState.Mode.AIR:
+	if state.mode != GSFpsState.Mode.AIR:
 		return false
 
 	if state.time_since_jump_pressed > tunables.jump_buffer_time:
@@ -589,7 +589,7 @@ func _try_wall_jump(
 	return true
 
 
-## A sweep that always leaves [member DotFpsTunables.skin_width] between the player and whatever it hit.
+## A sweep that always leaves [member GSFpsTunables.skin_width] between the player and whatever it hit.
 ## [method PhysicsDirectSpaceState3D.cast_motion] reports no collision when a move ends exactly touching, so a player resting at precisely the floor height is never grounded again and sinks at a constant rate (within seconds at 60 Hz).
 ## Every query therefore sweeps skin_width further and gives it back; the returned fraction is rescaled to the asked motion, so call sites read as if none of this happened.
 func _sweep(
@@ -597,11 +597,11 @@ func _sweep(
 	motion: Vector3,
 	height: float,
 	radius: float = -1.0
-) -> DotFpsBody.Hit:
+) -> GSFpsBody.Hit:
 	var length := motion.length()
 
 	if length <= 0.0:
-		return DotFpsBody.Hit.miss()
+		return GSFpsBody.Hit.miss()
 
 	var direction := motion / length
 
@@ -633,12 +633,12 @@ class ViewBasis extends RefCounted:
 	var up: Vector3
 
 
-## [param state].position is the player's feet, not the capsule's centre: that is where a scene places a character's origin, so the node transform and simulated position are the same number. Everything talking to [DotFpsBody] converts here.
+## [param state].position is the player's feet, not the capsule's centre: that is where a scene places a character's origin, so the node transform and simulated position are the same number. Everything talking to [GSFpsBody] converts here.
 func _capsule_centre(feet: Vector3, height: float) -> Vector3:
 	return feet + Vector3.UP * (height * 0.5)
 
 
-func _height(state: DotFpsState) -> float:
+func _height(state: GSFpsState) -> float:
 	return tunables.height_at(state.crouch_fraction)
 
 

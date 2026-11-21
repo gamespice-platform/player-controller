@@ -1,9 +1,9 @@
-class_name DotFpsCvars
+class_name GSFpsCvars
 extends RefCounted
 
 ## Binds the movement cvars (`sv_gravity`, `sv_waterfriction` and the rest) of any number of targets to a console.
 ## A target is anything with `cvar_specs()` and `set_cvar(name, value)`: tunables, swim, ladder.
-## Use `DotFpsCvars.new().add_target(tunables)`, then `bind_cvars(add_cvar, flags)`; a per-map override arrives by `changed`.
+## Use `GSFpsCvars.new().add_target(tunables)`, then `bind_cvars(add_cvar, flags)`; a per-map override arrives by `changed`.
 
 ## A cvar was applied to at least one target.
 signal applied(cvar_name: String, value: String)
@@ -15,7 +15,7 @@ var _defaults: Dictionary = {}
 
 
 ## Adds a target; chainable. Null and objects without the two methods are ignored.
-func add_target(target: Object) -> DotFpsCvars:
+func add_target(target: Object) -> GSFpsCvars:
 	if target != null and target.has_method(&"cvar_specs") and target.has_method(&"set_cvar"):
 		targets.append(target)
 	return self
@@ -67,12 +67,12 @@ func bind_cvars(add: Callable, flags: int = 0) -> Array:
 	return made
 
 
-## The whitelist for `DotGameMapConfig` (`key -> {type, min, max}`): every numeric cvar of the targets except the profile (it replaces members a map did not mean to touch), minus [param exclude]. Merge a game's own limits over it with [param limits] (`name -> {min, max}`).
+## The whitelist for `GSGameMapConfig` (`key -> {type, min, max}`): every numeric cvar of the targets except the profile (it replaces members a map did not mean to touch), minus [param exclude]. Merge a game's own limits over it with [param limits] (`name -> {min, max}`).
 func map_config_keys(exclude: PackedStringArray = PackedStringArray(), limits: Dictionary = {}) -> Dictionary:
 	var out := {}
 	for spec in cvar_specs():
 		var cvar_name: String = spec["name"]
-		if cvar_name == DotFpsTunables.CVAR_PROFILE or exclude.has(cvar_name):
+		if cvar_name == GSFpsTunables.CVAR_PROFILE or exclude.has(cvar_name):
 			continue
 		var entry := {"type": "bool" if _is_bool(spec) else "float"}
 		if entry["type"] == "float":

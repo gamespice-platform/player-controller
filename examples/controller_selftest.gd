@@ -8,7 +8,7 @@ const CHECKS := 161
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_run()
 
 
@@ -47,7 +47,7 @@ func _run() -> void:
 
 
 ## A worked example of what a controller subclass implements: five methods.
-class StubController extends DotPlayerController:
+class StubController extends GSPlayerController:
 	var position: Vector3 = Vector3.ZERO
 	var vel: Vector3 = Vector3.ZERO
 	var yaw: float = 0.0
@@ -55,7 +55,7 @@ class StubController extends DotPlayerController:
 	var ticks: int = 0
 	var resets: int = 0
 
-	func _apply_intent(intent: DotPlayerIntent, delta: float) -> void:
+	func _apply_intent(intent: GSPlayerIntent, delta: float) -> void:
 		ticks += 1
 		vel = Vector3(intent.move.x, 0.0, -intent.move.y) * 10.0 * speed_scale
 		position += vel * delta
@@ -92,7 +92,7 @@ class StubController extends DotPlayerController:
 		vel = Vector3.ZERO
 
 
-## A server cvar as GameSpice Server's DotConVar looks to the rules: a changed signal and a value.
+## A server cvar as GameSpice Server's GSConVar looks to the rules: a changed signal and a value.
 class FakeCvar:
 	extends RefCounted
 	signal changed(old_value: String, new_value: String)
@@ -105,7 +105,7 @@ class FakeCvar:
 		changed.emit(old, v)
 
 
-## A client link as GameSpice Server's DotClientLink looks to the rules.
+## A client link as GameSpice Server's GSClientLink looks to the rules.
 class FakeLink:
 	extends RefCounted
 	signal replicated_cvar_changed(cvar_name: String, value: String)
@@ -114,8 +114,8 @@ class FakeLink:
 		return String(held.get(cvar_name, fallback))
 
 
-func _player() -> DotPlayer:
-	var p := DotPlayer.new()
+func _player() -> GSPlayer:
+	var p := GSPlayer.new()
 	p.is_local = true
 	add_child(p)
 	return p
@@ -129,14 +129,14 @@ func _stub(id: StringName, under: Node) -> StubController:
 
 
 func _test_slide_preset() -> void:
-	_section("DotFpsSlidePreset matches what the games carried")
+	_section("GSFpsSlidePreset matches what the games carried")
 
-	var d := DotFpsTunables.new()
+	var d := GSFpsTunables.new()
 	_check(not d.slide_enabled, "a slide is off until a game asks")
 
 	# FC's fc_player_tunables.gd, as it was before the preset moved here.
-	var a := DotFpsTunables.new()
-	DotFpsSlidePreset.apply_run(a)
+	var a := GSFpsTunables.new()
+	GSFpsSlidePreset.apply_run(a)
 	_check(a.slide_enabled and not a.slide_requires_sprint, "the run preset slides with no sprint")
 	_check(is_equal_approx(a.slide_min_speed, 4.1) and is_equal_approx(a.slide_boost, 3.5), "min speed 4.1, boost 3.5")
 	_check(is_equal_approx(a.slide_max_speed, 14.0) and is_equal_approx(a.slide_friction, 0.9), "max speed 14, friction 0.9")
@@ -144,43 +144,43 @@ func _test_slide_preset() -> void:
 	_check(is_equal_approx(a.slide_accelerate, d.slide_accelerate), "steering stays at the default")
 
 	# Zombie Zone's ZzPlayer.apply_slide, with its ZzConfig defaults (1.5, 10.5, 0.9, 1.0).
-	var z := DotFpsTunables.new()
+	var z := GSFpsTunables.new()
 	z.max_speed = 6.0
-	DotFpsSlidePreset.apply_sprint(z, true, 1.5, 10.5, 0.9, 1.0)
+	GSFpsSlidePreset.apply_sprint(z, true, 1.5, 10.5, 0.9, 1.0)
 	_check(z.slide_enabled and z.slide_requires_sprint, "the sprint preset needs the sprint button")
 	_check(is_equal_approx(z.slide_min_speed, 6.0 * 1.05), "its minimum speed is 5 percent over max_speed")
 	_check(is_equal_approx(z.slide_boost, 1.5) and is_equal_approx(z.slide_max_speed, 10.5), "boost and max speed are the game's")
 	_check(is_equal_approx(z.slide_duration, 0.9) and is_equal_approx(z.slide_cooldown, 1.0), "duration and cooldown too")
 	_check(is_equal_approx(z.slide_friction, d.slide_friction), "friction stays at the default")
-	DotFpsSlidePreset.apply_sprint(z, false, 1.5, 10.5, 0.9, 1.0)
+	GSFpsSlidePreset.apply_sprint(z, false, 1.5, 10.5, 0.9, 1.0)
 	_check(not z.slide_enabled, "the game's switch turns it off")
 
-	var cv := DotFpsSlidePreset.cvar_table("fc_slide")
+	var cv := GSFpsSlidePreset.cvar_table("fc_slide")
 	_check(cv.size() == 6 and cv["fc_slide"][0] == "slide_enabled", "the cvar table names the switch under the bare prefix")
 	_check(cv["fc_slide_min_speed"][0] == "slide_min_speed" and cv["fc_slide_cooldown"][0] == "slide_cooldown", "and each number under its suffix")
 	var all_members := true
 	for key: String in cv:
-		all_members = all_members and DotFpsTunables.new().get(cv[key][0]) != null
+		all_members = all_members and GSFpsTunables.new().get(cv[key][0]) != null
 	_check(all_members, "every cvar names a real tunables member")
 
 
 func _test_rules() -> void:
 	_section("mp_forceview and mp_solidplayers")
 
-	var view := DotPlayerViewRules.new()
-	_check(view.may_toggle() and view.force_view == DotPlayerViewRules.ANY, "the view is the player's choice by default")
+	var view := GSPlayerViewRules.new()
+	_check(view.may_toggle() and view.force_view == GSPlayerViewRules.ANY, "the view is the player's choice by default")
 	_check(view.toggled(false) == true and view.toggled(true) == false, "and the key swaps it")
 	_check(view.refusal() == "", "with nothing to refuse")
 
-	view.force_view = DotPlayerViewRules.FIRST_ONLY
+	view.force_view = GSPlayerViewRules.FIRST_ONLY
 	_check(not view.may_toggle() and not view.allows_third(), "first person only forbids the swap")
 	_check(view.toggled(false) == false and view.resolve(true) == false, "and a player in third person is put back in first")
 	_check(view.refusal() != "", "with a line saying why")
 
-	view.force_view = DotPlayerViewRules.THIRD_ONLY
+	view.force_view = GSPlayerViewRules.THIRD_ONLY
 	_check(view.resolve(false) == true and view.toggled(true) == true, "third person only holds third person")
 	view.force_view = 7
-	_check(view.force_view == DotPlayerViewRules.THIRD_ONLY, "an out-of-range value is clamped, not stored")
+	_check(view.force_view == GSPlayerViewRules.THIRD_ONLY, "an out-of-range value is clamped, not stored")
 
 	var made: Array = []
 	var cvar := FakeCvar.new()
@@ -188,32 +188,32 @@ func _test_rules() -> void:
 	var add := func(cvar_name: String, value: String, _description: String, _flags: int) -> Object:
 		made.append(cvar_name)
 		return cvar
-	var fresh := DotPlayerViewRules.new()
+	var fresh := GSPlayerViewRules.new()
 	var _bound := fresh.bind_cvars(add)
 	_check(made == ["mp_forceview", "mp_viewcycle", "mp_fp_body", "cl_landing_kick"], "bind_cvars registers mp_forceview, mp_viewcycle, mp_fp_body and cl_landing_kick")
-	_check(fresh.first_person_body == DotPlayerViewRules.BODY_LEGS and fresh.first_person_legs, "mp_fp_body reads back the operator's 1 (legs)")
-	_check(fresh.shows_own_legs() and DotPlayerViewRules.new().shows_own_legs() and DotPlayerViewRules.new().first_person_body == DotPlayerViewRules.BODY_LEGS, "legs and feet show by default")
-	_check(not fresh.set_cvar("mp_fp_body", "3") and fresh.set_cvar("mp_firstperson_legs", "0") and fresh.first_person_body == DotPlayerViewRules.BODY_OFF and fresh.set_cvar("mp_fp_body", "1"), "a value out of 0 to 2 is refused; the older 0/1 name still turns it off")
-	var own := DotPlayerViewRules.new()
-	own.first_person_body = DotPlayerViewRules.BODY_OFF
-	_check(own.own_body() == DotPlayerViewRules.BODY_OFF and own.own_body(DotPlayerViewRules.BODY_FULL) == DotPlayerViewRules.BODY_FULL and fresh.own_body(DotPlayerViewRules.BODY_OFF) == DotPlayerViewRules.BODY_OFF, "a player's own setting overrides the server's, -1 follows it")
-	_check(fresh.force_view == DotPlayerViewRules.FIRST_ONLY, "and reads back a value the operator set first")
+	_check(fresh.first_person_body == GSPlayerViewRules.BODY_LEGS and fresh.first_person_legs, "mp_fp_body reads back the operator's 1 (legs)")
+	_check(fresh.shows_own_legs() and GSPlayerViewRules.new().shows_own_legs() and GSPlayerViewRules.new().first_person_body == GSPlayerViewRules.BODY_LEGS, "legs and feet show by default")
+	_check(not fresh.set_cvar("mp_fp_body", "3") and fresh.set_cvar("mp_firstperson_legs", "0") and fresh.first_person_body == GSPlayerViewRules.BODY_OFF and fresh.set_cvar("mp_fp_body", "1"), "a value out of 0 to 2 is refused; the older 0/1 name still turns it off")
+	var own := GSPlayerViewRules.new()
+	own.first_person_body = GSPlayerViewRules.BODY_OFF
+	_check(own.own_body() == GSPlayerViewRules.BODY_OFF and own.own_body(GSPlayerViewRules.BODY_FULL) == GSPlayerViewRules.BODY_FULL and fresh.own_body(GSPlayerViewRules.BODY_OFF) == GSPlayerViewRules.BODY_OFF, "a player's own setting overrides the server's, -1 follows it")
+	_check(fresh.force_view == GSPlayerViewRules.FIRST_ONLY, "and reads back a value the operator set first")
 	var heard := [0]
 	fresh.changed.connect(func() -> void: heard[0] += 1)
 	cvar.set_value("2")
-	_check(fresh.force_view == DotPlayerViewRules.THIRD_ONLY and heard[0] == 1, "a cvar change applies and is announced once")
-	_check(not fresh.set_cvar("mp_forceview", "nonsense") and fresh.force_view == DotPlayerViewRules.THIRD_ONLY, "a value that is not 0, 1 or 2 is refused")
+	_check(fresh.force_view == GSPlayerViewRules.THIRD_ONLY and heard[0] == 1, "a cvar change applies and is announced once")
+	_check(not fresh.set_cvar("mp_forceview", "nonsense") and fresh.force_view == GSPlayerViewRules.THIRD_ONLY, "a value that is not 0, 1 or 2 is refused")
 
 	var link := FakeLink.new()
 	link.held["mp_forceview"] = "1"
 	link.held["mp_fp_body"] = "2"
-	var client := DotPlayerViewRules.new()
-	_check(client.follow_cvars(link) and client.force_view == DotPlayerViewRules.FIRST_ONLY and client.first_person_body == DotPlayerViewRules.BODY_FULL, "a client follows the server's view and body through its link")
+	var client := GSPlayerViewRules.new()
+	_check(client.follow_cvars(link) and client.force_view == GSPlayerViewRules.FIRST_ONLY and client.first_person_body == GSPlayerViewRules.BODY_FULL, "a client follows the server's view and body through its link")
 	link.replicated_cvar_changed.emit("mp_forceview", "0")
 	_check(client.may_toggle(), "and every change to it")
 	_check(not client.follow_cvars(RefCounted.new()), "an older link that cannot say leaves the rules alone")
 
-	var body := DotPlayerBodyRules.new()
+	var body := GSPlayerBodyRules.new()
 	_check(body.solid and body.mask(0b0101, 0b0010) == 0b0111, "players are solid by default: the player layer joins the mask")
 	body.solid = false
 	_check(body.mask(0b0111, 0b0010) == 0b0101, "mp_solidplayers 0 takes it out")
@@ -237,42 +237,42 @@ func _test_rules() -> void:
 func _test_intent() -> void:
 	_section("intent")
 
-	var i := DotPlayerIntent.make(Vector2(1, 1), DotPlayerIntent.Btn.JUMP, 7)
+	var i := GSPlayerIntent.make(Vector2(1, 1), GSPlayerIntent.Btn.JUMP, 7)
 	_check(i.tick == 7, "carries a tick")
-	_check(i.holding(DotPlayerIntent.Btn.JUMP), "and what is held")
-	_check(not i.holding(DotPlayerIntent.Btn.CROUCH), "and what is not")
+	_check(i.holding(GSPlayerIntent.Btn.JUMP), "and what is held")
+	_check(not i.holding(GSPlayerIntent.Btn.CROUCH), "and what is not")
 	_check(
 		i.move == Vector2(1, 1),
 		"and does not normalise the move vector — some movement models want the raw "
 		+ "one, so the decision belongs to the controller"
 	)
 	_check(not i.is_idle(), "and is not idle")
-	_check(DotPlayerIntent.new().is_idle(), "while an empty one is")
+	_check(GSPlayerIntent.new().is_idle(), "while an empty one is")
 
 	i.diff_from(0)
-	_check(i.just_pressed(DotPlayerIntent.Btn.JUMP), "a new button reads as pressed")
-	_check(not i.just_released(DotPlayerIntent.Btn.JUMP), "and not as released")
+	_check(i.just_pressed(GSPlayerIntent.Btn.JUMP), "a new button reads as pressed")
+	_check(not i.just_released(GSPlayerIntent.Btn.JUMP), "and not as released")
 
-	i.diff_from(DotPlayerIntent.Btn.JUMP)
+	i.diff_from(GSPlayerIntent.Btn.JUMP)
 	_check(
-		not i.just_pressed(DotPlayerIntent.Btn.JUMP),
+		not i.just_pressed(GSPlayerIntent.Btn.JUMP),
 		"a held button is not pressed again — a jump is an edge and a sprint is a level"
 	)
 
-	var released := DotPlayerIntent.make(Vector2.ZERO, 0, 8)
-	released.diff_from(DotPlayerIntent.Btn.JUMP)
-	_check(released.just_released(DotPlayerIntent.Btn.JUMP), "and letting go reads as released")
-	_check(not released.just_pressed(DotPlayerIntent.Btn.JUMP), "and not as pressed")
+	var released := GSPlayerIntent.make(Vector2.ZERO, 0, 8)
+	released.diff_from(GSPlayerIntent.Btn.JUMP)
+	_check(released.just_released(GSPlayerIntent.Btn.JUMP), "and letting go reads as released")
+	_check(not released.just_pressed(GSPlayerIntent.Btn.JUMP), "and not as pressed")
 
-	i.buttons = DotPlayerIntent.Btn.ATTACK | DotPlayerIntent.Btn.SPRINT
+	i.buttons = GSPlayerIntent.Btn.ATTACK | GSPlayerIntent.Btn.SPRINT
 	var names := i.button_names()
 	_check(names.size() == 2, "the held buttons have names")
 	_check(names.has("attack") and names.has("sprint"), "which are the right ones")
 	_check(
-		DotPlayerIntent.button_of("reload") == DotPlayerIntent.Btn.RELOAD,
+		GSPlayerIntent.button_of("reload") == GSPlayerIntent.Btn.RELOAD,
 		"and a name resolves back to a bit, which is what a rebinder needs"
 	)
-	_check(DotPlayerIntent.button_of("nonsense") == 0, "an unknown name resolves to none")
+	_check(GSPlayerIntent.button_of("nonsense") == 0, "an unknown name resolves to none")
 
 	var copy := i.copy_intent()
 	copy.buttons = 0
@@ -283,13 +283,13 @@ func _test_intent() -> void:
 func _test_wire() -> void:
 	_section("the wire form")
 
-	var i := DotPlayerIntent.make(Vector2(0.5, -0.25), DotPlayerIntent.Btn.ATTACK, 99)
+	var i := GSPlayerIntent.make(Vector2(0.5, -0.25), GSPlayerIntent.Btn.ATTACK, 99)
 	i.view_yaw = 1.0
 	i.view_pitch = -0.5
 	i.look = Vector2(0.01, 0.02)
 
 	var d := i.to_dict()
-	var back := DotPlayerIntent.from_dict(d)
+	var back := GSPlayerIntent.from_dict(d)
 
 	_check(back.tick == 99, "a tick survives the wire")
 	_check(back.move.is_equal_approx(i.move), "and the move vector")
@@ -305,13 +305,13 @@ func _test_wire() -> void:
 		not d.has("look"),
 		"so the delta is not even sent, rather than being sent and ignored"
 	)
-	_check(DotPlayerIntent.from_dict({}).tick == 0, "and an empty payload decodes to nothing")
+	_check(GSPlayerIntent.from_dict({}).tick == 0, "and an empty payload decodes to nothing")
 
 
 func _test_look() -> void:
 	_section("looking")
 
-	var look := DotPlayerLook.new(1.0)
+	var look := GSPlayerLook.new(1.0)
 	_check(is_zero_approx(look.yaw), "starts level")
 
 	look.apply(Vector2(0.0, 10.0))
@@ -366,7 +366,7 @@ func _test_look() -> void:
 	_check_look_vectors(look)
 
 
-func _check_look_vectors(look: DotPlayerLook) -> void:
+func _check_look_vectors(look: GSPlayerLook) -> void:
 	look.set_angles(0.0, 0.0)
 	_check(
 		look.forward().is_equal_approx(Vector3(0, 0, -1)),
@@ -417,7 +417,7 @@ func _check_look_vectors(look: DotPlayerLook) -> void:
 	look.set_angles(0.0, 0.0)
 	_check(look.direction_2d().is_equal_approx(Vector2(1, 0)), "and 2D has its own direction")
 	_check(
-		is_equal_approx(DotPlayerLook.angle_to(Vector2.ZERO, Vector2(0, 1)), PI * 0.5),
+		is_equal_approx(GSPlayerLook.angle_to(Vector2.ZERO, Vector2(0, 1)), PI * 0.5),
 		"with an angle-to helper that wraps to the same range a 3D yaw does"
 	)
 
@@ -437,7 +437,7 @@ func _test_controller() -> void:
 	_check(c.is_bound(), "a controller is a component and binds by walking up")
 	_check(not c.is_active(), "and starts idle")
 
-	var driven := c.simulate(DotPlayerIntent.make(Vector2(0, 1), 0, 1), 0.1)
+	var driven := c.simulate(GSPlayerIntent.make(Vector2(0, 1), 0, 1), 0.1)
 	_check(not driven, "an idle controller ignores intent")
 	_check(c.ticks == 0, "entirely")
 
@@ -445,13 +445,13 @@ func _test_controller() -> void:
 	_check(c.is_active(), "activating takes over")
 	_check(c.resets == 1, "and the subclass is told")
 
-	_check(c.simulate(DotPlayerIntent.make(Vector2(0, 1), 0, 2), 0.1), "and then it drives")
+	_check(c.simulate(GSPlayerIntent.make(Vector2(0, 1), 0, 2), 0.1), "and then it drives")
 	_check(c.ticks == 1, "one tick at a time")
 	_check(c.position.z < 0.0, "moving the player forward")
 
 	var before := c.position
 	c.input_enabled = false
-	var frozen := c.simulate(DotPlayerIntent.make(Vector2(0, 1), 0, 3), 0.1)
+	var frozen := c.simulate(GSPlayerIntent.make(Vector2(0, 1), 0, 3), 0.1)
 	_check(not frozen, "a frozen controller reports that it did not apply the intent")
 	_check(
 		c.ticks == 2,
@@ -463,7 +463,7 @@ func _test_controller() -> void:
 
 	c.speed_scale = 2.0
 	c.position = Vector3.ZERO
-	var _d := c.simulate(DotPlayerIntent.make(Vector2(0, 1), 0, 4), 0.1)
+	var _d := c.simulate(GSPlayerIntent.make(Vector2(0, 1), 0, 4), 0.1)
 	_check(
 		c.position.z < -0.19,
 		"a speed multiplier reaches the movement, which is how a class changes it"
@@ -492,7 +492,7 @@ func _test_controller() -> void:
 
 	c.deactivate()
 	_check(not c.is_active(), "and hands back")
-	_check(not c.simulate(DotPlayerIntent.new(), 0.1), "driving nothing afterwards")
+	_check(not c.simulate(GSPlayerIntent.new(), 0.1), "driving nothing afterwards")
 
 	player.queue_free()
 
@@ -503,7 +503,7 @@ func _test_switch() -> void:
 	var player := _player()
 	var fp := _stub(&"fp", player)
 	var tp := _stub(&"tp", player)
-	var sw := DotPlayerControllerSwitch.new()
+	var sw := GSPlayerControllerSwitch.new()
 	sw.default_controller = &"fp"
 	player.add_child(sw)
 
@@ -545,7 +545,7 @@ func _test_switch() -> void:
 	_check(sw.cycle().ok, "and round")
 	_check(sw.active_id() == &"tp", "again")
 
-	sw.simulate(DotPlayerIntent.make(Vector2(0, 1), 0, 1), 0.1)
+	sw.simulate(GSPlayerIntent.make(Vector2(0, 1), 0, 1), 0.1)
 	_check(tp.ticks > 0, "the switch drives the active controller")
 	_check(fp.ticks == 0, "and only that one")
 
@@ -576,7 +576,7 @@ func _test_switch() -> void:
 func _check_lone_controller(player: Node) -> void:
 	var lone := _player()
 	var only := _stub(&"only", lone)
-	var sw2 := DotPlayerControllerSwitch.new()
+	var sw2 := GSPlayerControllerSwitch.new()
 	lone.add_child(sw2)
 	await get_tree().process_frame
 	await get_tree().process_frame
@@ -598,7 +598,7 @@ func _test_handover() -> void:
 	var player := _player()
 	var fp := _stub(&"fp", player)
 	var tp := _stub(&"tp", player)
-	var sw := DotPlayerControllerSwitch.new()
+	var sw := GSPlayerControllerSwitch.new()
 	sw.default_controller = &"fp"
 	player.add_child(sw)
 
@@ -676,12 +676,12 @@ func _hulls() -> Array:
 
 
 func _test_hull_body() -> void:
-	_section("DotFpsHullBody")
-	var body := DotFpsHullBody.new()
-	var _wrapped := body.wrap(DotFpsFlatBody.with_floor(0.0), _hulls)
+	_section("GSFpsHullBody")
+	var body := GSFpsHullBody.new()
+	var _wrapped := body.wrap(GSFpsFlatBody.with_floor(0.0), _hulls)
 	var from := Vector3(0, 1, 0)
 	var hit := body.sweep(from, Vector3(4, 0, 0), 2.0, 0.4)
-	_check(hit.hit and hit.collider_id == DotFpsHullBody.HULL_ID_BASE + 1, "a hull stops the sweep, under its index in the full list")
+	_check(hit.hit and hit.collider_id == GSFpsHullBody.HULL_ID_BASE + 1, "a hull stops the sweep, under its index in the full list")
 	_check(is_equal_approx(hit.fraction, (2.0 - 0.4) / 4.0), "at its face")
 	_check(not body.sweep(from, Vector3(0, 0, -4), 2.0, 0.4).hit, "a hull off the swept path is ignored")
 	_gathers = 0

@@ -1,6 +1,6 @@
 extends RefCounted
 
-## State and the modifier, mode and surface registries of [DotFpsMotor], kept apart so the simulation file stays small.
+## State and the modifier, mode and surface registries of [GSFpsMotor], kept apart so the simulation file stays small.
 
 const CHANNEL := "fps.motor"
 
@@ -16,10 +16,10 @@ const SWEEP_TOLERANCE := 0.02
 const LEAVING_SPEED := 0.1
 
 
-var tunables: DotFpsTunables
+var tunables: GSFpsTunables
 
 
-var body: DotFpsBody
+var body: GSFpsBody
 
 
 ## Carried load, 0 empty to 1 at capacity. The game sets it on both machines (the server from its
@@ -28,7 +28,7 @@ var load_fraction: float = 0.0
 
 
 ## Surfaces this motor knows about. Null means every surface behaves the same.
-var surfaces: DotFpsSurfaceSet = null
+var surfaces: GSFpsSurfaceSet = null
 
 
 ## Maps the collider a ground probe hit to a surface id.
@@ -37,7 +37,7 @@ var surfaces: DotFpsSurfaceSet = null
 var surface_resolver: Callable = Callable()
 
 
-## Modifier definitions by id. The active set lives in [DotFpsState].
+## Modifier definitions by id. The active set lives in [GSFpsState].
 var modifier_defs: Dictionary = {}
 
 
@@ -45,17 +45,17 @@ var modifier_defs: Dictionary = {}
 var _modifier_order: Array[StringName] = []
 
 
-## Custom modes by id, from [constant DotFpsState.FIRST_CUSTOM_MODE] up.
+## Custom modes by id, from [constant GSFpsState.FIRST_CUSTOM_MODE] up.
 var _modes: Dictionary = {}
 
 
 ## The combined effect of the active modifiers, recomputed once per tick.
 ## Reused rather than allocated: read several times per tick per player.
-var _effects := DotFpsModifier.Aggregate.new()
+var _effects := GSFpsModifier.Aggregate.new()
 
 
 ## The surface under the player this tick. Never null after [method simulate] starts.
-var _surface: DotFpsSurface = null
+var _surface: GSFpsSurface = null
 
 
 ## Ticks simulated by this motor. Diagnostic.
@@ -145,14 +145,14 @@ var perf_caches: bool = true:
 		if body != null:
 			body.perf_caches = value
 
-## Whether a plain GROUND or AIR tick runs its start (depenetrate, ground check) and its end (friction, wish move, gravity or push, clamp, slide, ground check) in GameSpice Sim's native motor ([code]DotSimFpsBody.motor_pre/motor_post[/code]), when the body can ([method DotFpsBody.native_tick]); the jump, wall and slide moves between stay here. Same bits as this script (examples/motor_native_tick_parity.gd). On by default (API 27); a game's operator switch may turn it off, and a body with no library answers in script. Not used with [member surfaces], edge friction above 1, or a wall run's end of tick. With [member profile] on, the native start is charged to the depenetrate phase and the native end to the move phase.
+## Whether a plain GROUND or AIR tick runs its start (depenetrate, ground check) and its end (friction, wish move, gravity or push, clamp, slide, ground check) in GameSpice Sim's native motor ([code]GSSimFpsBody.motor_pre/motor_post[/code]), when the body can ([method GSFpsBody.native_tick]); the jump, wall and slide moves between stay here. Same bits as this script (examples/motor_native_tick_parity.gd). On by default (API 27); a game's operator switch may turn it off, and a body with no library answers in script. Not used with [member surfaces], edge friction above 1, or a wall run's end of tick. With [member profile] on, the native start is charged to the depenetrate phase and the native end to the move phase.
 static var native_tick: bool = true
 
 ## With [member native_tick], run the whole tick from the start ground check to the end one in one native call when the
-## library has it ([method DotFpsPhysicsBody.native_full_available]); off runs only the two halves natively.
+## library has it ([method GSFpsPhysicsBody.native_full_available]); off runs only the two halves natively.
 static var native_full: bool = true
 
-## Per-phase microseconds of [method DotFpsMotor.simulate], filled only while [member profile] is on (a micro-benchmark and the server operator's debug flag). Index names are in [constant PHASES].
+## Per-phase microseconds of [method GSFpsMotor.simulate], filled only while [member profile] is on (a micro-benchmark and the server operator's debug flag). Index names are in [constant PHASES].
 static var profile: bool = false
 static var phase_us := PackedInt64Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 const PHASES: Array[String] = ["timers+mods", "crouch", "depenetrate", "ground-start", "jump", "walls", "forces", "move", "ground-end", "other", "", ""]
@@ -187,31 +187,31 @@ var _rest_surface: StringName
 
 ## Registers a custom movement mode and returns its id.
 ## Ids travel on the wire, so register in the same fixed order on every machine, not conditionally on being a client or server.
-## [param mode] is a [DotFpsMoveMode]; held untyped so the motor and the mode base do not keep each other's parsers alive.
+## [param mode] is a [GSFpsMoveMode]; held untyped so the motor and the mode base do not keep each other's parsers alive.
 func register_mode(mode: RefCounted) -> int:
 	if mode == null:
 		return -1
 	if not _is_move_mode(mode):
-		push_error("DotFpsMotor.register_mode: not a DotFpsMoveMode")
+		push_error("GSFpsMotor.register_mode: not a GSFpsMoveMode")
 		return -1
 
 	for existing_id in _modes:
 		var existing: RefCounted = _modes[existing_id]
 		if existing._name() == mode._name():
-			DotLog.warn(
+			GSLog.warn(
 				CHANNEL,
 				"a mode with this name is already registered; reusing its id",
 				{"name": String(mode._name()), "id": existing_id}
 			)
 			return existing_id
 
-	var id := DotFpsState.FIRST_CUSTOM_MODE + _modes.size()
+	var id := GSFpsState.FIRST_CUSTOM_MODE + _modes.size()
 
-	if id >= DotFpsState.MAX_MODES:
-		DotLog.error(
+	if id >= GSFpsState.MAX_MODES:
+		GSLog.error(
 			CHANNEL,
 			"too many movement modes; the wire format cannot carry this one",
-			{"max": DotFpsState.MAX_MODES, "name": String(mode._name())}
+			{"max": GSFpsState.MAX_MODES, "name": String(mode._name())}
 		)
 		return -1
 
@@ -221,7 +221,7 @@ func register_mode(mode: RefCounted) -> int:
 	return id
 
 
-## Whether [param o] is a [DotFpsMoveMode] (its script, or one it extends, is the mode base). Registration only.
+## Whether [param o] is a [GSFpsMoveMode] (its script, or one it extends, is the mode base). Registration only.
 static func _is_move_mode(o: Object) -> bool:
 	var base: Script = load("uid://cjd3om261ppfg")
 	var s: Script = o.get_script()
@@ -232,7 +232,7 @@ static func _is_move_mode(o: Object) -> bool:
 	return false
 
 
-## The [DotFpsMoveMode] registered under [param id], or null. Only [method register_mode] fills [member _modes], and it admits modes only.
+## The [GSFpsMoveMode] registered under [param id], or null. Only [method register_mode] fills [member _modes], and it admits modes only.
 func mode_for(id: int) -> RefCounted:
 	return _modes.get(id)
 
@@ -245,28 +245,28 @@ func mode_id_of(name: StringName) -> int:
 
 
 func mode_name(id: int) -> String:
-	return DotFpsState.mode_name(id, self)
+	return GSFpsState.mode_name(id, self)
 
 
 ## Registers a modifier definition. Returns its index, which is what replicates.
 ##
 ## Like modes, the registration order is part of the contract between machines.
-func register_modifier(modifier: DotFpsModifier) -> int:
+func register_modifier(modifier: GSFpsModifier) -> int:
 	if modifier == null or modifier.id == &"":
-		DotLog.warn(CHANNEL, "a modifier needs an id")
+		GSLog.warn(CHANNEL, "a modifier needs an id")
 		return -1
 
 	if modifier_defs.has(modifier.id):
 		modifier_defs[modifier.id] = modifier
 		return _modifier_order.find(modifier.id)
 
-	if _modifier_order.size() >= DotFpsNetSync.MODIFIER_BITS:
+	if _modifier_order.size() >= GSFpsNetSync.MODIFIER_BITS:
 		# The active set is replicated as a 48-bit mask, the 49th
 		# would make it apply on the server and not on the client, which is a
 		# divergence that only shows up for whoever picks up that one power-up.
-		DotLog.error(
+		GSLog.error(
 			CHANNEL,
-			"too many modifiers; the active set is a DotFpsNetSync.MODIFIER_BITS-bit mask",
+			"too many modifiers; the active set is a GSFpsNetSync.MODIFIER_BITS-bit mask",
 			{"id": String(modifier.id)}
 		)
 		return -1
@@ -281,7 +281,7 @@ func modifier_index(id: StringName) -> int:
 	return _modifier_order.find(id)
 
 
-func modifier_at(index: int) -> DotFpsModifier:
+func modifier_at(index: int) -> GSFpsModifier:
 	if index < 0 or index >= _modifier_order.size():
 		return null
 	return modifier_defs.get(_modifier_order[index])
@@ -289,12 +289,12 @@ func modifier_at(index: int) -> DotFpsModifier:
 
 ## Applies a modifier to a state. Returns whether anything changed.
 ## Server-side in a networked game; the replicated set lets the owner predict the effect.
-func add_modifier(state: DotFpsState, id: StringName) -> bool:
+func add_modifier(state: GSFpsState, id: StringName) -> bool:
 	var index := modifier_index(id)
-	var definition: DotFpsModifier = modifier_defs.get(id)
+	var definition: GSFpsModifier = modifier_defs.get(id)
 
 	if index < 0 or definition == null:
-		DotLog.warn(CHANNEL, "unknown modifier", {"id": String(id)})
+		GSLog.warn(CHANNEL, "unknown modifier", {"id": String(id)})
 		return false
 
 	var expiry := -1
@@ -302,7 +302,7 @@ func add_modifier(state: DotFpsState, id: StringName) -> bool:
 		expiry = state.tick + int(ceilf(definition.duration_sec * _tick_rate_hint))
 
 	# Sorted insert by index, so two machines that applied the same set in different
-	# orders still hold it in the same order — see DotFpsState.modifiers.
+	# orders still hold it in the same order — see GSFpsState.modifiers.
 	var slot := 0
 	while slot < state.modifiers.size() and state.modifiers[slot].x < index:
 		slot += 1
@@ -324,13 +324,13 @@ func add_modifier(state: DotFpsState, id: StringName) -> bool:
 		# at the end of the tick decide the player never left, and the impulse would
 		# be eaten by the ground snap.
 		if definition.impulse.y > 0.0:
-			state.mode = DotFpsState.Mode.AIR
+			state.mode = GSFpsState.Mode.AIR
 			state.time_since_grounded = 1000.0
 
 	return true
 
 
-func remove_modifier(state: DotFpsState, id: StringName) -> bool:
+func remove_modifier(state: GSFpsState, id: StringName) -> bool:
 	var index := modifier_index(id)
 
 	for i in range(state.modifiers.size()):
@@ -341,7 +341,7 @@ func remove_modifier(state: DotFpsState, id: StringName) -> bool:
 	return false
 
 
-func has_modifier(state: DotFpsState, id: StringName) -> bool:
+func has_modifier(state: GSFpsState, id: StringName) -> bool:
 	# Nearly every player nearly always has none, and the answer is then no for every id;
 	# the lookup below is a linear search of the registered ids, asked a dozen times a tick
 	# per player by the admin-modifier readers.
@@ -368,7 +368,7 @@ func set_tick_rate(rate: int) -> void:
 
 ## Drops modifiers whose expiry tick has passed.
 ## Compared against the simulated tick, not a clock, so a replay expires them on the original tick.
-func _expire_modifiers(state: DotFpsState) -> void:
+func _expire_modifiers(state: GSFpsState) -> void:
 	if state.modifiers.is_empty():
 		return
 
@@ -381,7 +381,7 @@ func _expire_modifiers(state: DotFpsState) -> void:
 		i -= 1
 
 
-func _rebuild_effects(state: DotFpsState) -> void:
+func _rebuild_effects(state: GSFpsState) -> void:
 	# No modifiers and an aggregate nobody has been handed since it was last reset: it is still all ones.
 	if perf_caches and _effects_clean and state.modifiers.is_empty():
 		return
@@ -395,8 +395,8 @@ func _rebuild_effects(state: DotFpsState) -> void:
 
 
 ## The combined modifier effect for the tick in progress.
-## Public so a [DotFpsMoveMode] scales by the same numbers; a ladder ignoring a slow field would escape it.
-func effects() -> DotFpsModifier.Aggregate:
+## Public so a [GSFpsMoveMode] scales by the same numbers; a ladder ignoring a slow field would escape it.
+func effects() -> GSFpsModifier.Aggregate:
 	# A caller may write to what it is handed, so the next tick resets it.
 	_effects_clean = false
 	return _effects
@@ -406,11 +406,11 @@ var _effects_clean: bool = false
 
 
 ## The surface under the player, or the default. Never null.
-func surface() -> DotFpsSurface:
+func surface() -> GSFpsSurface:
 	return _surface
 
 
-func _resolve_surface(state: DotFpsState) -> void:
+func _resolve_surface(state: GSFpsState) -> void:
 	if surfaces == null:
 		return
 

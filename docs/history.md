@@ -60,11 +60,11 @@ The slide and launch timers first stayed out of the snapshot "like the jump time
 
 ## The camera inside the character
 
-`DotTpsCameraRig`'s `SpringArm3D` excluded nothing, so it collided with the player body on its first millimetre and sat inside the character. `tps_selftest` has no physics world and passed; a screenshot found it. In the same game, a controller whose `controller_id` was set after the switch entered the tree made the game open in the wrong view.
+`GSTpsCameraRig`'s `SpringArm3D` excluded nothing, so it collided with the player body on its first millimetre and sat inside the character. `tps_selftest` has no physics world and passed; a screenshot found it. In the same game, a controller whose `controller_id` was set after the switch entered the tree made the game open in the wrong view.
 
 ## Jump reach copied five times
 
-Before `DotFpsTunables.jump_reach` existed, game-playlot, game-fatal-contact, game-airdrift, mg-buses-from-hell and mg-smash-copter each had their own copy of the arithmetic, and two of them sized courses with the airtime back to the height they left, which nobody could finish. They now delegate to the tunables.
+Before `GSFpsTunables.jump_reach` existed, game-playlot, game-fatal-contact, game-airdrift, mg-buses-from-hell and mg-smash-copter each had their own copy of the arithmetic, and two of them sized courses with the airtime back to the height they left, which nobody could finish. They now delegate to the tunables.
 
 ## A wall run that ended four ticks in
 
@@ -76,7 +76,7 @@ game-airdrift's `load_probe` (32 players on surf_mesa at 128 ticks) spends about
 
 ## A landing that set the eye (2026-10-11)
 
-`DotFpsView.note_landing` set the full dip (9 cm at 16 m/s) and a 6 degree upward pitch on the landing frame and wound them back linearly: one frame moved the eye 9 cm and the view 6 degrees, a snap on top of the corner the landing already is. game-fatal-contact, which writes its camera itself, had copied the wall-run lean from the view and had no landing dip, strafe roll or widening at all. The cues moved into `DotFpsViewMotion` (no nodes): the dip is a critically damped spring kicked in velocity (the eye goes on down and comes back), the strafe roll and widening are two exponential stages so they start gently, and the landing nod is 1.5 degrees down following the dip. `fps_controller_selftest`'s "camera motion" section fails with either old shape back.
+`GSFpsView.note_landing` set the full dip (9 cm at 16 m/s) and a 6 degree upward pitch on the landing frame and wound them back linearly: one frame moved the eye 9 cm and the view 6 degrees, a snap on top of the corner the landing already is. game-fatal-contact, which writes its camera itself, had copied the wall-run lean from the view and had no landing dip, strafe roll or widening at all. The cues moved into `GSFpsViewMotion` (no nodes): the dip is a critically damped spring kicked in velocity (the eye goes on down and comes back), the strafe roll and widening are two exponential stages so they start gently, and the landing nod is 1.5 degrees down following the dip. `fps_controller_selftest`'s "camera motion" section fails with either old shape back.
 
 ## The rewrite
 
@@ -85,7 +85,7 @@ game-airdrift's `load_probe` (32 players on surf_mesa at 128 ticks) spends about
 | Was | Now |
 | --- | --- |
 | Movement ran in `_process`, so the simulation was frame-rate dependent | Fixed-tick, accumulated from frame time, bounded against stalls |
-| `Input.is_action_pressed` read inside the controller | `DotFpsCommand`, sampled once per tick by `DotFpsSampler` |
+| `Input.is_action_pressed` read inside the controller | `GSFpsCommand`, sampled once per tick by `GSFpsSampler` |
 | `vel = settings.max_velocity` assigned a float to a `Vector3` | `limit_length`, with a NaN check that logs and resets |
 | Ground `accelerate` applied its increment three times in a loop | Once, as the model says |
 | Air jump used `mul * max(0, vel.y)`, so it was zero at rest | One jump path, `sqrt(2 * g * h)` |
@@ -96,11 +96,11 @@ game-airdrift's `load_probe` (32 players on surf_mesa at 128 ticks) spends about
 | No stair stepping | `step_height`, with the down-leg floor test |
 | Yaw applied to the camera, so the body never turned | Yaw on the body, pitch on the camera |
 | States loaded by building a path at runtime | Direct references |
-| `class_name Player`, `Player_Input` | `Dot`-prefixed throughout |
+| `class_name Player`, `Player_Input` | `GS`-prefixed throughout |
 
 ## Hanging in the corner behind an open door (`[hns-door-wedge-1]`)
 
-In game-hide-n-seek a seeker bot walked into the 80 degree corner between the school's outside wall and its open fire door, hopped to get unstuck, and hung 0.6 m up for the rest of the round: mode AIR, the fall speed growing without bound (-68 m/s), position fixed. The capsule touched the wall's face to 15 micrometres and pushed at the panel; the sweep stopped on the panel but the rest query at the contact named the wall, a normal square to the motion that clips nothing. The slide met "the wall" again at fraction zero, called it a duplicate, and the leg off it and `_leave_face`'s lift both ran into the panel, so every tick stopped with the velocity kept. Straight down was clear. Fixed by `_split_leg` (spend the vertical part alone, then the horizontal). Looking past a grazed face in `DotFpsPhysicsBody.sweep` for the face the motion goes into was tried first: it fixed the door and hung game-airdrift's surf bonus rider in the crease between its two slabs, so the fix stays in the motor's last resort. Holding every door of a map against it (headless_climb's door-corner section) found the second wedge, three planes with a way down between two of them, which `_resolve_planes` now finds. Without the split, at least six of the school's 36 doors held a hopper in the air.
+In game-hide-n-seek a seeker bot walked into the 80 degree corner between the school's outside wall and its open fire door, hopped to get unstuck, and hung 0.6 m up for the rest of the round: mode AIR, the fall speed growing without bound (-68 m/s), position fixed. The capsule touched the wall's face to 15 micrometres and pushed at the panel; the sweep stopped on the panel but the rest query at the contact named the wall, a normal square to the motion that clips nothing. The slide met "the wall" again at fraction zero, called it a duplicate, and the leg off it and `_leave_face`'s lift both ran into the panel, so every tick stopped with the velocity kept. Straight down was clear. Fixed by `_split_leg` (spend the vertical part alone, then the horizontal). Looking past a grazed face in `GSFpsPhysicsBody.sweep` for the face the motion goes into was tried first: it fixed the door and hung game-airdrift's surf bonus rider in the crease between its two slabs, so the fix stays in the motor's last resort. Holding every door of a map against it (headless_climb's door-corner section) found the second wedge, three planes with a way down between two of them, which `_resolve_planes` now finds. Without the split, at least six of the school's 36 doors held a hopper in the air.
 
 ## Frozen in the crease of two surf slabs (`g2gfast-surf-crease-hang-1`)
 

@@ -1,27 +1,27 @@
-class_name DotFpsMotor
+class_name GSFpsMotor
 extends "dot_fps_motor_native.gd"
 
 ## The movement simulation. Deterministic, engine-independent, and the only place movement rules live.
 ##
 ## [codeblock]
-## var motor := DotFpsMotor.new(tunables, body)
+## var motor := GSFpsMotor.new(tunables, body)
 ## motor.simulate(state, command, 1.0 / 60.0)
 ## [/codeblock]
 ##
-## The contract: the same [DotFpsState], [DotFpsCommand], delta and world give the same result on every machine, which is what lets a client predict and a server agree. Break it and reconciliation corrects every tick like packet loss.
-## So nothing here may read the keyboard, wall clock, unseeded random, frame rate or any node's transform: time is [param delta], intent is the command, the world is [DotFpsBody].
+## The contract: the same [GSFpsState], [GSFpsCommand], delta and world give the same result on every machine, which is what lets a client predict and a server agree. Break it and reconciliation corrects every tick like packet loss.
+## So nothing here may read the keyboard, wall clock, unseeded random, frame rate or any node's transform: time is [param delta], intent is the command, the world is [GSFpsBody].
 ## The model is the classic one: ground acceleration with friction, and air acceleration capped at a small absolute speed, which is what air-strafing and bunny-hopping are. See [method accelerate].
 
 
-func _init(p_tunables: DotFpsTunables, p_body: DotFpsBody) -> void:
+func _init(p_tunables: GSFpsTunables, p_body: GSFpsBody) -> void:
 	tunables = p_tunables
 	body = p_body
-	_surface = DotFpsSurface.make(&"default")
+	_surface = GSFpsSurface.make(&"default")
 
 
 ## Switches mode, running the exit and enter hooks.
-## The only supported way to change [member DotFpsState.mode]: assigning it skips the hooks, so a mode that allocated something in [method DotFpsMoveMode._enter] is never told to release it.
-func set_mode(state: DotFpsState, id: int) -> void:
+## The only supported way to change [member GSFpsState.mode]: assigning it skips the hooks, so a mode that allocated something in [method GSFpsMoveMode._enter] is never told to release it.
+func set_mode(state: GSFpsState, id: int) -> void:
 	if state.mode == id:
 		return
 
@@ -39,8 +39,8 @@ func set_mode(state: DotFpsState, id: int) -> void:
 ## Advances [param state] by one tick under [param command].
 ## The order is load-bearing: the ground is categorised before acceleration so friction fits the surface stood on, and again after the move for the next tick. Swapped, the first airborne tick uses ground friction and a jump gains no speed.
 func simulate(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float
 ) -> void:
 	if delta <= 0.0:
@@ -60,13 +60,13 @@ const BATCH_READY := 2
 var batch_body: Object = null
 var batch_tun := PackedFloat64Array()
 ## The clocks and cooldowns of the prepared tick left to GameSpice Sim's row (bit 0), the tick having begun on the ground
-## (bit 1): a fourth meta value for [code]DotSimMotorBatch.run_rows[/code]. Every end but [method batch_apply] runs them here.
+## (bit 1): a fourth meta value for [code]GSSimMotorBatch.run_rows[/code]. Every end but [method batch_apply] runs them here.
 var batch_clocks: int = 0
 
 
-## The start of [method simulate] for a tick that may run in GameSpice Sim's batch with other players' ([DotFpsMotorBatch]): everything before the first world query that depends on another player. On [constant BATCH_READY] row [param row] of [param input] (55 values) and [param meta] ([param meta_len] values, 3 or 4) is filled and [method batch_apply] ends the tick; on [constant BATCH_DEFER] [method batch_resume] does, the same way [method simulate] would have. With 4 the row may leave the clocks to GameSpice Sim ([member batch_clocks], API 31).
+## The start of [method simulate] for a tick that may run in GameSpice Sim's batch with other players' ([GSFpsMotorBatch]): everything before the first world query that depends on another player. On [constant BATCH_READY] row [param row] of [param input] (55 values) and [param meta] ([param meta_len] values, 3 or 4) is filled and [method batch_apply] ends the tick; on [constant BATCH_DEFER] [method batch_resume] does, the same way [method simulate] would have. With 4 the row may leave the clocks to GameSpice Sim ([member batch_clocks], API 31).
 func batch_prepare(
-	state: DotFpsState, command: DotFpsCommand, delta: float, input: PackedFloat64Array, meta: PackedInt64Array, row: int,
+	state: GSFpsState, command: GSFpsCommand, delta: float, input: PackedFloat64Array, meta: PackedInt64Array, row: int,
 	meta_len: int = 3
 ) -> int:
 	body.begin_tick()
@@ -103,7 +103,7 @@ func batch_prepare(
 ## Row [param row] again from the state as it is now (something moved the player after [method batch_prepare]). The
 ## clocks run here then ([member batch_clocks] is 0 after), on the values the row was filled with: a value the game
 ## wrote since stays, as it would have over clocks run at prepare.
-func batch_refill(state: DotFpsState, command: DotFpsCommand, delta: float, input: PackedFloat64Array, row: int) -> void:
+func batch_refill(state: GSFpsState, command: GSFpsCommand, delta: float, input: PackedFloat64Array, row: int) -> void:
 	if batch_clocks != 0:
 		var o := row * 55
 		var now := []
@@ -122,7 +122,7 @@ func batch_refill(state: DotFpsState, command: DotFpsCommand, delta: float, inpu
 
 
 ## Ends a [constant BATCH_READY] tick with the batch's answer, the 45 values at [param at] in [param out].
-func batch_apply(state: DotFpsState, command: DotFpsCommand, out: PackedFloat64Array, at: int) -> void:
+func batch_apply(state: GSFpsState, command: GSFpsCommand, out: PackedFloat64Array, at: int) -> void:
 	batch_clocks = 0
 	body.native_batch_done(int(out[at + 20]), int(out[at + 21]), int(out[at + 22]))
 	_native_full_apply(state, out, at)
@@ -131,7 +131,7 @@ func batch_apply(state: DotFpsState, command: DotFpsCommand, out: PackedFloat64A
 
 
 ## Ends a [constant BATCH_DEFER] tick, or a [constant BATCH_READY] one the batch had no answer for, in this motor.
-func batch_resume(state: DotFpsState, command: DotFpsCommand, delta: float) -> void:
+func batch_resume(state: GSFpsState, command: GSFpsCommand, delta: float) -> void:
 	_batch_settle(state, command, delta)
 	_simulate_tail(state, command, delta, true)
 	body.end_tick()
@@ -139,10 +139,10 @@ func batch_resume(state: DotFpsState, command: DotFpsCommand, delta: float) -> v
 
 ## Drops a prepared tick whose player will not tick after all. Its start stays run, clocks included, so a row that left
 ## them to GameSpice Sim needs the tick's [param state], [param command] and [param delta].
-func batch_cancel(state: DotFpsState = null, command: DotFpsCommand = null, delta: float = 0.0) -> void:
+func batch_cancel(state: GSFpsState = null, command: GSFpsCommand = null, delta: float = 0.0) -> void:
 	if batch_clocks != 0:
 		if state == null or command == null:
-			push_error("DotFpsMotor.batch_cancel: the prepared row left its clocks to dot-sim; pass its state, command and delta")
+			push_error("GSFpsMotor.batch_cancel: the prepared row left its clocks to dot-sim; pass its state, command and delta")
 		else:
 			_batch_settle(state, command, delta)
 	batch_clocks = 0
@@ -159,26 +159,26 @@ const _CLOCK_FIELDS := [
 
 
 ## Whether this tick's start is [method _batch_head]'s: a plain walker whose effects, noclip and stamina are all no-ops.
-func _clocks_may_wait(state: DotFpsState, command: DotFpsCommand) -> bool:
+func _clocks_may_wait(state: GSFpsState, command: GSFpsCommand) -> bool:
 	return (
 		perf_caches and not profile and _effects_clean and not tunables.stamina_enabled and state.modifiers.is_empty()
-		and (state.mode == DotFpsState.Mode.GROUND or state.mode == DotFpsState.Mode.AIR)
+		and (state.mode == GSFpsState.Mode.GROUND or state.mode == GSFpsState.Mode.AIR)
 		and not _modes.has(state.mode)
 		and not (
-			tunables.can_noclip and ((command.buttons & ~state.previous_buttons) & DotFpsCommand.BUTTON_NOCLIP) != 0
+			tunables.can_noclip and ((command.buttons & ~state.previous_buttons) & GSFpsCommand.BUTTON_NOCLIP) != 0
 		)
 	)
 
 
 ## [method _simulate_head] where [method _clocks_may_wait]: the same writes but the clocks, which GameSpice Sim's row runs
 ## ([member batch_clocks]). The modifiers, effects, noclip and mode calls would all return at once.
-func _batch_head(state: DotFpsState, command: DotFpsCommand) -> void:
+func _batch_head(state: GSFpsState, command: GSFpsCommand) -> void:
 	view_turn = 0.0
 	ticks_simulated += 1
 	state.tick += 1
 	state.yaw = command.yaw
 	state.pitch = clampf(command.pitch, tunables.pitch_min, tunables.pitch_max)
-	var grounded := state.mode == DotFpsState.Mode.GROUND
+	var grounded := state.mode == GSFpsState.Mode.GROUND
 	state.ground_ticks = state.ground_ticks + 1 if grounded else 0
 	state.sprinting = _wants_sprint(command)
 	state.stamina = 1.0
@@ -188,21 +188,21 @@ func _batch_head(state: DotFpsState, command: DotFpsCommand) -> void:
 	batch_clocks = 3 if grounded else 1
 
 
-func _batch_settle(state: DotFpsState, command: DotFpsCommand, delta: float) -> void:
+func _batch_settle(state: GSFpsState, command: GSFpsCommand, delta: float) -> void:
 	if batch_clocks != 0:
 		_advance_clocks(state, command, delta, batch_clocks == 3)
 		batch_clocks = 0
 
 
-func _batch_defer(state: DotFpsState, command: DotFpsCommand, delta: float) -> int:
+func _batch_defer(state: GSFpsState, command: GSFpsCommand, delta: float) -> int:
 	_batch_settle(state, command, delta)
 	return BATCH_DEFER
 
 
 ## The tick up to where a custom mode or noclip ends it (true) or the walker's tick starts (false).
 func _simulate_head(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float
 ) -> bool:
 	if profile:
@@ -228,13 +228,13 @@ func _simulate_head(
 
 	# Noclip or a game's own mode (water, a ladder) ends a wall run: those modes own their
 	# whole tick, and a run left on would keep the view rolled while swimming.
-	if state.is_wall_running() and state.mode >= DotFpsState.Mode.NOCLIP:
+	if state.is_wall_running() and state.mode >= GSFpsState.Mode.NOCLIP:
 		_end_wall_run(state)
 
 	# A custom mode owns its whole tick — gravity, acceleration, collision — because
 	# a ladder that had gravity applied behind its back would have to cancel a force
-	# it never asked for. See DotFpsMoveMode.
-	_rest_valid = _rest_valid and state.mode == DotFpsState.Mode.GROUND
+	# it never asked for. See GSFpsMoveMode.
+	_rest_valid = _rest_valid and state.mode == GSFpsState.Mode.GROUND
 	var custom := mode_for(state.mode)
 
 	if custom != null:
@@ -245,7 +245,7 @@ func _simulate_head(
 		state.previous_buttons = command.buttons
 		return true
 
-	if state.mode == DotFpsState.Mode.NOCLIP:
+	if state.mode == GSFpsState.Mode.NOCLIP:
 		_simulate_noclip(state, command, delta)
 		state.previous_buttons = command.buttons
 		return true
@@ -253,7 +253,7 @@ func _simulate_head(
 
 
 ## The walker's tick; [param crouched] when [method batch_prepare] has already run the crouch.
-func _simulate_tail(state: DotFpsState, command: DotFpsCommand, delta: float, crouched: bool) -> void:
+func _simulate_tail(state: GSFpsState, command: GSFpsCommand, delta: float, crouched: bool) -> void:
 	if not crouched:
 		if profile:
 			_lap(0)
@@ -338,10 +338,10 @@ func _simulate_tail(state: DotFpsState, command: DotFpsCommand, delta: float, cr
 ## The end of [method _simulate_tail] when GameSpice Sim did not run it: friction, the wish move, gravity or the surface push,
 ## the slide, and the end-of-tick ground check. [param left_ground] is a jump or a launch this tick.
 func _script_tick_end(
-	state: DotFpsState, command: DotFpsCommand, delta: float, wall: DotFpsBody.Hit, left_ground: bool,
+	state: GSFpsState, command: GSFpsCommand, delta: float, wall: GSFpsBody.Hit, left_ground: bool,
 	start_settled: bool, start_position: Vector3, start_velocity: Vector3, start_height: float
 ) -> void:
-	if state.mode == DotFpsState.Mode.GROUND and not left_ground:
+	if state.mode == GSFpsState.Mode.GROUND and not left_ground:
 		_apply_friction(state, delta)
 	elif tunables.air_friction > 0.0:
 		_apply_air_friction(state, delta)
@@ -349,7 +349,7 @@ func _script_tick_end(
 	_ground_cap = 0.0
 	_apply_wish_move(state, command, delta)
 
-	if state.mode == DotFpsState.Mode.GROUND:
+	if state.mode == GSFpsState.Mode.GROUND:
 		# A conveyor, a slick slope, a wind volume. Applied as an acceleration rather
 		# than as a velocity so it composes with friction instead of fighting it.
 		if _surface.push != Vector3.ZERO:
@@ -377,7 +377,7 @@ func _script_tick_end(
 	# a grounded walker's [method _move] categorises after the slide, and if that changed only the ground fields and left it GROUNDED, running it again repeats the same queries ([method _categorise_ground_settled]).
 	# Likewise a walker who did not move: the start's check was a fixed point. It saves one ground probe a tick per walker.
 	if settled or (
-		start_settled and state.mode == DotFpsState.Mode.GROUND
+		start_settled and state.mode == GSFpsState.Mode.GROUND
 		and state.position == start_position and state.velocity == start_velocity
 		and _height(state) == start_height
 	):
@@ -393,11 +393,11 @@ func _script_tick_end(
 
 
 func _advance_timers(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float
 ) -> void:
-	var grounded := state.mode == DotFpsState.Mode.GROUND
+	var grounded := state.mode == GSFpsState.Mode.GROUND
 	_advance_clocks(state, command, delta, grounded)
 	# Counted in TICKS, not seconds: "jumped on the tick the player landed" is a perfect
 	# bunny-hop, and a seconds counter answers that differently at 64 Hz and 128 Hz.
@@ -405,12 +405,12 @@ func _advance_timers(
 	_tick_stamina(state, command, delta)
 	# Without stamina the fields are written to their constants (1, false, 0) above, which are exactly on the wire grid: packing and unpacking them is the identity.
 	if tunables.stamina_enabled or not perf_caches:
-		DotFpsNetSync.snap_stamina(state)
+		GSFpsNetSync.snap_stamina(state)
 
 
 ## The clocks, cooldowns, landing crouch press and wall reset of [method _advance_timers]; GameSpice Sim's
 ## [code]full::advance_timers[/code] is the same for a batch row. [param grounded]: the tick began on the ground.
-func _advance_clocks(state: DotFpsState, command: DotFpsCommand, delta: float, grounded: bool) -> void:
+func _advance_clocks(state: GSFpsState, command: GSFpsCommand, delta: float, grounded: bool) -> void:
 	state.time_since_jump = minf(state.time_since_jump + delta, TIMER_CAP)
 
 	if grounded:
@@ -422,7 +422,7 @@ func _advance_clocks(state: DotFpsState, command: DotFpsCommand, delta: float, g
 		state.time_since_grounded = minf(state.time_since_grounded + delta, TIMER_CAP)
 
 	var jump_pressed := (
-		(command.buttons & ~state.previous_buttons) & DotFpsCommand.BUTTON_JUMP
+		(command.buttons & ~state.previous_buttons) & GSFpsCommand.BUTTON_JUMP
 	) != 0
 
 	if jump_pressed:
@@ -436,18 +436,18 @@ func _advance_clocks(state: DotFpsState, command: DotFpsCommand, delta: float, g
 	state.wall_run_cooldown_left = maxf(state.wall_run_cooldown_left - delta, 0.0)
 
 
-func _wants_sprint(command: DotFpsCommand) -> bool:
+func _wants_sprint(command: GSFpsCommand) -> bool:
 	var t := tunables
 	return (
-		t.can_sprint and (command.buttons & DotFpsCommand.BUTTON_SPRINT) != 0
+		t.can_sprint and (command.buttons & GSFpsCommand.BUTTON_SPRINT) != 0
 		and command.move.length_squared() > 0.0001 and not _effects.deny_move
-		and not (t.can_crouch and (command.buttons & DotFpsCommand.BUTTON_CROUCH))
-		and not (t.can_walk and (command.buttons & DotFpsCommand.BUTTON_WALK))
+		and not (t.can_crouch and (command.buttons & GSFpsCommand.BUTTON_CROUCH))
+		and not (t.can_walk and (command.buttons & GSFpsCommand.BUTTON_WALK))
 	)
 
 
 ## Decides whether this tick sprints and moves stamina. Crouch and walk win over sprint, as in speed_for.
-func _tick_stamina(state: DotFpsState, command: DotFpsCommand, delta: float) -> void:
+func _tick_stamina(state: GSFpsState, command: GSFpsCommand, delta: float) -> void:
 	var t := tunables
 	var wants := _wants_sprint(command)
 	if not t.stamina_enabled:
@@ -474,12 +474,12 @@ func _tick_stamina(state: DotFpsState, command: DotFpsCommand, delta: float) -> 
 		state.stamina_exhausted = false
 
 
-func _update_noclip(state: DotFpsState, command: DotFpsCommand) -> void:
+func _update_noclip(state: GSFpsState, command: GSFpsCommand) -> void:
 	# Before the ability gate, because here somebody else decided: an administrator's noclip arrives as a modifier ([code]forces_noclip[/code]) in replicated state,
 	# so this runs identically on the server and in a replay, and the held button is ignored while it is in force.
 	if _effects.force_noclip:
-		if state.mode != DotFpsState.Mode.NOCLIP:
-			state.mode = DotFpsState.Mode.NOCLIP
+		if state.mode != GSFpsState.Mode.NOCLIP:
+			state.mode = GSFpsState.Mode.NOCLIP
 			state.velocity = Vector3.ZERO
 		return
 
@@ -487,29 +487,29 @@ func _update_noclip(state: DotFpsState, command: DotFpsCommand) -> void:
 		# The bit may still be set — a client can put anything in a command. Leaving
 		# noclip on a state that entered it before the ability was revoked would let
 		# a player keep flying, so it is cleared here rather than only ignored.
-		if state.mode == DotFpsState.Mode.NOCLIP:
-			state.mode = DotFpsState.Mode.AIR
+		if state.mode == GSFpsState.Mode.NOCLIP:
+			state.mode = GSFpsState.Mode.AIR
 		return
 
 	var toggled := (
-		(command.buttons & ~state.previous_buttons) & DotFpsCommand.BUTTON_NOCLIP
+		(command.buttons & ~state.previous_buttons) & GSFpsCommand.BUTTON_NOCLIP
 	) != 0
 
 	if not toggled:
 		return
 
-	if state.mode == DotFpsState.Mode.NOCLIP:
-		state.mode = DotFpsState.Mode.AIR
+	if state.mode == GSFpsState.Mode.NOCLIP:
+		state.mode = GSFpsState.Mode.AIR
 		state.velocity = Vector3.ZERO
 	else:
-		state.mode = DotFpsState.Mode.NOCLIP
+		state.mode = GSFpsState.Mode.NOCLIP
 		state.velocity = Vector3.ZERO
 
 
 ## Free flight. No collision, no gravity, and the only mode where pitch moves you.
 func _simulate_noclip(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float
 ) -> void:
 	var basis := _view_basis(state.yaw, state.pitch)
@@ -518,9 +518,9 @@ func _simulate_noclip(
 		basis.right * command.move.x + basis.forward * command.move.y
 	).limit_length(1.0) * tunables.noclip_speed
 
-	if command.is_pressed(DotFpsCommand.BUTTON_JUMP):
+	if command.is_pressed(GSFpsCommand.BUTTON_JUMP):
 		wish.y += tunables.noclip_speed
-	if command.is_pressed(DotFpsCommand.BUTTON_CROUCH):
+	if command.is_pressed(GSFpsCommand.BUTTON_CROUCH):
 		wish.y -= tunables.noclip_speed
 
 	# A root holds in noclip too. Without this a frozen player who is also noclipped —
@@ -540,14 +540,14 @@ func _simulate_noclip(
 ## Moves the crouch fraction toward what the player is holding, if it fits.
 ## Standing up is attempted, tested and abandoned for this tick if it does not fit, so a player under a low ceiling stays crouched and stands once clear.
 func _update_crouch(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float
 ) -> void:
 	state.crouch_held = (
 		tunables.can_crouch
 		and not _effects.deny_crouch
-		and command.is_pressed(DotFpsCommand.BUTTON_CROUCH)
+		and command.is_pressed(GSFpsCommand.BUTTON_CROUCH)
 	)
 
 	var target := 1.0 if state.crouch_held else 0.0
@@ -556,7 +556,7 @@ func _update_crouch(
 		state.crouch_fraction = target
 		return
 
-	var airborne := state.mode != DotFpsState.Mode.GROUND
+	var airborne := state.mode != GSFpsState.Mode.GROUND
 	var instant := tunables.crouch_transition_time <= 0.0 or (
 		airborne and tunables.instant_air_crouch and state.crouch_held
 	)
@@ -585,13 +585,13 @@ func _update_crouch(
 
 ## Applies a new crouch fraction, moving the body to keep the right end fixed.
 ## On the ground the feet stay put and the head moves; airborne the head stays put and the feet come up (the crouch-jump, which clears a ledge a standing jump cannot).
-func _set_crouch(state: DotFpsState, fraction: float, airborne: bool) -> void:
+func _set_crouch(state: GSFpsState, fraction: float, airborne: bool) -> void:
 	state.position = _position_for_crouch(state, fraction, airborne)
 	state.crouch_fraction = fraction
 
 
 func _position_for_crouch(
-	state: DotFpsState,
+	state: GSFpsState,
 	fraction: float,
 	airborne: bool
 ) -> Vector3:
@@ -608,17 +608,17 @@ func _position_for_crouch(
 
 ## Decides whether the player is standing on something.
 ## A short downward sweep, not a contact list: contacts belong to the last physics step and this must answer mid-slide.
-func _categorise_ground(state: DotFpsState) -> void:
+func _categorise_ground(state: GSFpsState) -> void:
 	_categorise_ground_settled(state)
 
 
 ## [method _categorise_ground], answering whether this call was a fixed point: a second call on the state it leaves would make the same queries and write the same values.
 ## True only on the floor branch, for a player GROUNDED on entry whose position and velocity it did not touch (no [method _keep_skin] lift, no slide onto the floor); every other branch answers false and is run again.
-func _categorise_ground_settled(state: DotFpsState) -> bool:
-	if state.mode == DotFpsState.Mode.NOCLIP:
+func _categorise_ground_settled(state: GSFpsState) -> bool:
+	if state.mode == GSFpsState.Mode.NOCLIP:
 		return false
 
-	var was_grounded := state.mode == DotFpsState.Mode.GROUND
+	var was_grounded := state.mode == GSFpsState.Mode.GROUND
 	var position_in := state.position
 	var velocity_in := state.velocity
 	var rising := state.velocity.y > LEAVING_SPEED
@@ -629,7 +629,7 @@ func _categorise_ground_settled(state: DotFpsState) -> bool:
 	if rising and not was_grounded and (
 		state.velocity.y > maxf(tunables.jump_velocity() * 0.5, LEAVING_SPEED)
 	):
-		state.mode = DotFpsState.Mode.AIR
+		state.mode = GSFpsState.Mode.AIR
 		state.ground_normal = Vector3.UP
 		state.ground_id = 0
 		return false
@@ -663,7 +663,7 @@ func _categorise_ground_settled(state: DotFpsState) -> bool:
 		)
 
 		if not walking:
-			state.mode = DotFpsState.Mode.AIR
+			state.mode = GSFpsState.Mode.AIR
 			state.ground_normal = Vector3.UP
 			state.ground_id = 0
 			return false
@@ -679,14 +679,14 @@ func _categorise_ground_settled(state: DotFpsState) -> bool:
 		# handrail, a pane of glass, the top of a fence. Checked here rather than in
 		# the slide so the player still collides with it and simply cannot stand.
 		if surfaces != null and not surfaces.get_surface(found).standable:
-			state.mode = DotFpsState.Mode.AIR
+			state.mode = GSFpsState.Mode.AIR
 			state.ground_normal = Vector3.UP
 			state.ground_id = 0
 			state.surface = &""
 			_resolve_surface(state)
 			return false
 
-		state.mode = DotFpsState.Mode.GROUND
+		state.mode = GSFpsState.Mode.GROUND
 		state.ground_normal = floor_normal
 		state.ground_id = hit.collider_id
 		state.surface = found
@@ -699,33 +699,33 @@ func _categorise_ground_settled(state: DotFpsState) -> bool:
 	# One overlap test on the tick a player leaves the ground, against an occasional unreproducible fall through the world.
 	if was_grounded and body.overlaps(centre, height, tunables.radius):
 		embedded_ticks += 1
-		# Then get them out: staying grounded stops the fall, but the next probe still starts in geometry and [method _snap_to_ground] runs only when NOT grounded, so the stale [member DotFpsState.ground_normal] stood for ever. Lift clear first; keep the old answer only if that fails.
+		# Then get them out: staying grounded stops the fall, but the next probe still starts in geometry and [method _snap_to_ground] runs only when NOT grounded, so the stale [member GSFpsState.ground_normal] stood for ever. Lift clear first; keep the old answer only if that fails.
 		# Only when the probe saw nothing: a steep surface at fraction 0 is a wall the capsule is a hair inside, and straight up is not out of a wall (it lifted a walker 0.13 m over a 0.46 m kerb). [method _depenetrate] handles that next tick.
 		if not hit.hit and _lift_clear(state, height):
 			lifted_ticks += 1
-			DotLog.debug(
+			GSLog.debug(
 				CHANNEL,
 				"was embedded in geometry; lifted clear",
 				{"position": str(state.position)}
 			)
 			var recovered := _sweep(_capsule_centre(state.position, height), probe, height)
 			if recovered.hit and _is_floor(recovered.normal):
-				state.mode = DotFpsState.Mode.GROUND
+				state.mode = GSFpsState.Mode.GROUND
 				state.ground_normal = recovered.normal
 				state.ground_id = recovered.collider_id
 				_resolve_surface(state)
 				return false
 		else:
-			DotLog.debug(
+			GSLog.debug(
 				CHANNEL,
 				"ground probe missed while embedded; staying grounded",
 				{"position": str(state.position)}
 			)
 
-		state.mode = DotFpsState.Mode.GROUND
+		state.mode = GSFpsState.Mode.GROUND
 		return false
 
-	state.mode = DotFpsState.Mode.AIR
+	state.mode = GSFpsState.Mode.AIR
 	state.ground_normal = Vector3.UP
 	state.ground_id = 0
 	state.surface = &""
@@ -745,8 +745,8 @@ func _surface_id_for(collider_id: int) -> StringName:
 ## Applies a jump if one is owed. Returns whether it fired.
 ## Coyote time and jump buffering both cover a press landing slightly outside the legal window, which a player reads as the game dropping the input.
 func _try_jump(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	_delta: float
 ) -> bool:
 	if not tunables.can_jump or _effects.deny_jump:
@@ -755,7 +755,7 @@ func _try_jump(
 	var wants := false
 
 	if tunables.auto_hop:
-		wants = command.is_pressed(DotFpsCommand.BUTTON_JUMP)
+		wants = command.is_pressed(GSFpsCommand.BUTTON_JUMP)
 	else:
 		# Buffered: a press up to jump_buffer_time ago still counts, so pressing just
 		# before touching down jumps on landing rather than being swallowed.
@@ -769,7 +769,7 @@ func _try_jump(
 
 	# Coyote time: still jumpable shortly after walking off a ledge.
 	var can := (
-		state.mode == DotFpsState.Mode.GROUND
+		state.mode == GSFpsState.Mode.GROUND
 		or state.time_since_grounded <= tunables.coyote_time
 	)
 
@@ -778,7 +778,7 @@ func _try_jump(
 
 	# Only while descending or level, or a player under a ceiling jumps repeatedly on the way up and climbs it.
 	# Level with the ground stood on, not the horizon: `velocity.y` refused every jump on every uphill. Airborne (coyote time) the normal is UP.
-	var normal := state.ground_normal if state.mode == DotFpsState.Mode.GROUND else Vector3.UP
+	var normal := state.ground_normal if state.mode == GSFpsState.Mode.GROUND else Vector3.UP
 	if state.velocity.dot(normal) > LEAVING_SPEED:
 		return false
 
@@ -807,7 +807,7 @@ func _try_jump(
 	else:
 		state.velocity.y = launch
 
-	state.mode = DotFpsState.Mode.AIR
+	state.mode = GSFpsState.Mode.AIR
 	state.time_since_jump = 0.0
 
 	# Coyote time is spent, not refreshed, or the window stays open for another jump in mid-air.
@@ -820,10 +820,10 @@ func _try_jump(
 	return true
 
 
-## The launch ability: [member DotFpsTunables.launch_button] throws the player upward, on the press so a replay launches on the same tick.
+## The launch ability: [member GSFpsTunables.launch_button] throws the player upward, on the press so a replay launches on the same tick.
 ## The upward speed REPLACES a lower one instead of adding, or a launch at the top of a jump would go half again as high.
 ## A stun refuses it, as it refuses a jump: an ability that escapes a freeze is a way out of every freeze.
-func _try_launch(state: DotFpsState, command: DotFpsCommand) -> bool:
+func _try_launch(state: GSFpsState, command: GSFpsCommand) -> bool:
 	if not tunables.launch_enabled or tunables.launch_button <= 0:
 		return false
 
@@ -839,7 +839,7 @@ func _try_launch(state: DotFpsState, command: DotFpsCommand) -> bool:
 		return false
 
 	if not tunables.launch_from_air and not (
-		state.mode == DotFpsState.Mode.GROUND
+		state.mode == GSFpsState.Mode.GROUND
 		or state.time_since_grounded <= tunables.coyote_time
 	):
 		return false
@@ -856,7 +856,7 @@ func _try_launch(state: DotFpsState, command: DotFpsCommand) -> bool:
 	# What a jump does on leaving the ground, for the same reasons: AIR now so this tick's
 	# move does not snap the player back onto the floor, and coyote time spent so the
 	# ground they left cannot be jumped from again in mid-air.
-	state.mode = DotFpsState.Mode.AIR
+	state.mode = GSFpsState.Mode.AIR
 	state.time_since_grounded = 1000.0
 	state.launch_cooldown_left = tunables.launch_cooldown
 	launches += 1
@@ -864,10 +864,10 @@ func _try_launch(state: DotFpsState, command: DotFpsCommand) -> bool:
 	return true
 
 
-## The dash: [member DotFpsTunables.dash_button] throws the player along the way they
+## The dash: [member GSFpsTunables.dash_button] throws the player along the way they
 ## are steering, or along the view's heading with nothing held. On the press, refused by
 ## a stun, on a cooldown, the launch's shape exactly; returns whether it left the ground.
-func _try_dash(state: DotFpsState, command: DotFpsCommand) -> bool:
+func _try_dash(state: GSFpsState, command: GSFpsCommand) -> bool:
 	if not tunables.dash_enabled or tunables.dash_button <= 0:
 		return false
 
@@ -877,7 +877,7 @@ func _try_dash(state: DotFpsState, command: DotFpsCommand) -> bool:
 	if ((command.buttons & ~state.previous_buttons) & tunables.dash_button) == 0:
 		return false
 
-	var grounded := state.mode == DotFpsState.Mode.GROUND
+	var grounded := state.mode == GSFpsState.Mode.GROUND
 	if not tunables.dash_from_air and not grounded:
 		return false
 
@@ -901,7 +901,7 @@ func _try_dash(state: DotFpsState, command: DotFpsCommand) -> bool:
 
 	if tunables.dash_lift > 0.0:
 		state.velocity.y = maxf(state.velocity.y, tunables.dash_lift)
-		state.mode = DotFpsState.Mode.AIR
+		state.mode = GSFpsState.Mode.AIR
 		state.time_since_grounded = 1000.0
 		return true
 
@@ -910,10 +910,10 @@ func _try_dash(state: DotFpsState, command: DotFpsCommand) -> bool:
 
 ## Starts, carries and ends a slide: a crouch with different friction and steering, nothing else.
 ## The collider is the crouched one ([method _update_crouch] already did that), so a slide fits where a crouch fits.
-## It starts on the crouch PRESS, grounded, at [member DotFpsTunables.slide_min_speed] or more, and ends on release, leaving the ground, [member DotFpsTunables.slide_duration] or below [member DotFpsTunables.slide_end_speed].
+## It starts on the crouch PRESS, grounded, at [member GSFpsTunables.slide_min_speed] or more, and ends on release, leaving the ground, [member GSFpsTunables.slide_duration] or below [member GSFpsTunables.slide_end_speed].
 func _update_slide(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float,
 	left_ground: bool
 ) -> void:
@@ -929,8 +929,8 @@ func _update_slide(
 
 		if (
 			left_ground
-			or state.mode != DotFpsState.Mode.GROUND
-			or not command.is_pressed(DotFpsCommand.BUTTON_CROUCH)
+			or state.mode != GSFpsState.Mode.GROUND
+			or not command.is_pressed(GSFpsCommand.BUTTON_CROUCH)
 			or state.slide_time >= tunables.slide_duration
 			or state.horizontal_speed() < tunables.slide_end_speed
 			or _effects.deny_move
@@ -939,7 +939,7 @@ func _update_slide(
 
 		return
 
-	if left_ground or state.mode != DotFpsState.Mode.GROUND:
+	if left_ground or state.mode != GSFpsState.Mode.GROUND:
 		return
 
 	if state.slide_cooldown_left > 0.0:
@@ -948,13 +948,13 @@ func _update_slide(
 	if not tunables.can_crouch or _effects.deny_crouch or _effects.deny_move:
 		return
 
-	var pressed := ((command.buttons & ~state.previous_buttons) & DotFpsCommand.BUTTON_CROUCH) != 0
+	var pressed := ((command.buttons & ~state.previous_buttons) & GSFpsCommand.BUTTON_CROUCH) != 0
 
-	var landing := command.is_pressed(DotFpsCommand.BUTTON_CROUCH) and state.came_off_wall()
+	var landing := command.is_pressed(GSFpsCommand.BUTTON_CROUCH) and state.came_off_wall()
 
 	if not landing and (
 		not pressed
-		or (tunables.slide_requires_sprint and not command.is_pressed(DotFpsCommand.BUTTON_SPRINT))
+		or (tunables.slide_requires_sprint and not command.is_pressed(GSFpsCommand.BUTTON_SPRINT))
 	):
 		return
 
@@ -976,8 +976,8 @@ func _update_slide(
 ## The first tick on the ground after a real stretch in the air (time_since_grounded still holds it) with crouch held sees crouch as pressed again,
 ## so a crouch pressed in the air (off a wall run, after a jump) starts the slide its press would have on the ground.
 ## Done on the replicated previous buttons before anything reads them, so script, GameSpice Sim's whole tick and the batch all see the same press; [constant WALL_ENTRY_MIN_AIR] keeps a one-tick kerb bump at a crouched run from counting as a landing; a crouch that also launches or dashes is left alone.
-func _landing_counts_as_crouch_press(state: DotFpsState, command: DotFpsCommand) -> void:
-	var crouch := DotFpsCommand.BUTTON_CROUCH
+func _landing_counts_as_crouch_press(state: GSFpsState, command: GSFpsCommand) -> void:
+	var crouch := GSFpsCommand.BUTTON_CROUCH
 	if (
 		tunables.slide_enabled and not state.is_sliding()
 		and state.time_since_grounded >= WALL_ENTRY_MIN_AIR
@@ -987,12 +987,12 @@ func _landing_counts_as_crouch_press(state: DotFpsState, command: DotFpsCommand)
 		state.previous_buttons &= ~crouch
 
 
-func _end_slide(state: DotFpsState) -> void:
+func _end_slide(state: GSFpsState) -> void:
 	state.slide_time = -1.0
 	state.slide_cooldown_left = tunables.slide_cooldown
 
 
-func _apply_friction(state: DotFpsState, delta: float) -> void:
+func _apply_friction(state: GSFpsState, delta: float) -> void:
 	var speed := state.velocity.length()
 
 	if speed <= 0.0:
@@ -1023,7 +1023,7 @@ func _apply_friction(state: DotFpsState, delta: float) -> void:
 	state.velocity *= scale
 
 
-func _apply_air_friction(state: DotFpsState, delta: float) -> void:
+func _apply_air_friction(state: GSFpsState, delta: float) -> void:
 	var horizontal := Vector3(state.velocity.x, 0.0, state.velocity.z)
 	var speed := horizontal.length()
 
@@ -1036,8 +1036,8 @@ func _apply_air_friction(state: DotFpsState, delta: float) -> void:
 
 
 func _apply_wish_move(
-	state: DotFpsState,
-	command: DotFpsCommand,
+	state: GSFpsState,
+	command: GSFpsCommand,
 	delta: float
 ) -> void:
 	if _effects.deny_move:
@@ -1053,7 +1053,7 @@ func _apply_wish_move(
 	if magnitude <= 0.0:
 		return
 
-	var buttons := command.buttons if state.sprinting else command.buttons & ~DotFpsCommand.BUTTON_SPRINT
+	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
 	var target := tunables.speed_for(buttons, load_fraction) * magnitude * _effects.max_speed
 
 	if command.move.y < 0.0:
@@ -1061,7 +1061,7 @@ func _apply_wish_move(
 
 	var direction := wish.normalized()
 
-	if state.mode == DotFpsState.Mode.GROUND:
+	if state.mode == GSFpsState.Mode.GROUND:
 		# The surface scales the ground cap and acceleration but not the air ones:
 		# what you are standing on stops mattering the moment you are not.
 		target *= _surface.max_speed_scale
@@ -1095,7 +1095,7 @@ func _apply_wish_move(
 ## Speed is only added along [param direction], up to [param wish_speed] measured as the projection of current velocity onto it.
 ## Airborne, [param cap] clamps that target to about a metre per second while the constant stays large: turn the view while strafing and the projection of a fast velocity is near zero, so the full increment is added sideways and compounds.
 func accelerate(
-	state: DotFpsState,
+	state: GSFpsState,
 	direction: Vector3,
 	wish_speed: float,
 	accel: float,
@@ -1130,7 +1130,7 @@ func _project_on_slope(direction: Vector3, normal: Vector3) -> Vector3:
 	return projected.normalized()
 
 
-func _clamp_velocity(state: DotFpsState) -> void:
+func _clamp_velocity(state: GSFpsState) -> void:
 	# A NaN here is unrecoverable: it survives limit_length, propagates into the
 	# position, and from there into whatever the position is replicated as. Cheap to
 	# check once a tick, effectively impossible to trace back to afterwards.
@@ -1139,7 +1139,7 @@ func _clamp_velocity(state: DotFpsState) -> void:
 		and is_finite(state.velocity.y)
 		and is_finite(state.velocity.z)
 	):
-		DotLog.warn(CHANNEL, "velocity became non-finite; reset to zero")
+		GSLog.warn(CHANNEL, "velocity became non-finite; reset to zero")
 		state.velocity = Vector3.ZERO
 		return
 
@@ -1153,14 +1153,14 @@ const TIMER_CAP := 1000.0
 
 ## Returns whether the ground check it ran for the snap is already the end-of-tick answer
 ## (see [method _categorise_ground_settled]); false whenever it ran none.
-func _move(state: DotFpsState, delta: float, jumped: bool) -> bool:
+func _move(state: GSFpsState, delta: float, jumped: bool) -> bool:
 	var height := _height(state)
 	var motion := state.velocity * delta
 
 	if motion.length_squared() <= 0.0:
 		return false
 
-	var was_grounded := state.mode == DotFpsState.Mode.GROUND
+	var was_grounded := state.mode == GSFpsState.Mode.GROUND
 	var velocity_in := state.velocity
 	# The floor the tick started on. The snap below compares the velocity with THIS
 	# plane, because by the time it runs the categorise has already forgotten it.
@@ -1204,20 +1204,20 @@ func _move(state: DotFpsState, delta: float, jumped: bool) -> bool:
 		if _categorise_ground_settled(state):
 			return true
 
-		if state.mode != DotFpsState.Mode.GROUND:
+		if state.mode != GSFpsState.Mode.GROUND:
 			_snap_to_ground(state, height, stood_on)
 
 	return false
 
 
 ## Re-runs the ground check. For a mode deciding whether it should hand back.
-func categorise_ground(state: DotFpsState) -> void:
+func categorise_ground(state: GSFpsState) -> void:
 	_categorise_ground(state)
 
 
 ## Eye position for a state, for the camera and for anything tracing from the view.
 ## Slightly below the capsule's top so a ceiling the player touches does not intersect the near plane.
-func eye_position(state: DotFpsState) -> Vector3:
+func eye_position(state: GSFpsState) -> Vector3:
 	var height := _height(state)
 	return state.position + Vector3.UP * (height - tunables.radius * 0.5)
 

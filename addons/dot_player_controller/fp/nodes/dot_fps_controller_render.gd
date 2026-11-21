@@ -1,7 +1,7 @@
 @tool
 extends "dot_fps_controller_signals.gd"
 
-## How [DotFpsController] is drawn between ticks, kept apart so the controller file stays small.
+## How [GSFpsController] is drawn between ticks, kept apart so the controller file stays small.
 
 
 ## The position of the tick before this one: [code]render_state(0.0).position[/code] without the copied state, for a
@@ -13,8 +13,8 @@ func previous_position() -> Vector3:
 
 
 ## The state to render this frame, interpolated between the last two ticks. Rendering the tick state directly quantises motion to the tick rate. Purely cosmetic: the returned state is a copy and nothing writes it back. [param alpha] is how far this frame sits between the last two ticks; left at -1 it is derived from who drives:
-## - [constant Drive.LOCAL] ticks from its own accumulator, so that is the fraction. - [constant Drive.EXTERNAL] is stepped once per physics frame by its host, so the engine's interpolation fraction is it, but only while the physics rate equals the tick rate: at 60 against a 128-tick server the drawn position moved 74 mm on six frames in seven and 112 mm on the seventh. Put the engine on the server's rate ([method AirdriftNetBridge._adopt_tick_rate]). With a [member render_clock] set, its [code]render_alpha()[/code] replaces the fraction and runs from -1 to 2 after a frame with no tick or two. - [constant Drive.REMOTE] is not simulated here; its position arrives already interpolated by [DotNetInterpolator], and blending toward a [member _previous_state] nothing updates would drag it backwards.
-func render_state(alpha: float = -1.0) -> DotFpsState:
+## - [constant Drive.LOCAL] ticks from its own accumulator, so that is the fraction. - [constant Drive.EXTERNAL] is stepped once per physics frame by its host, so the engine's interpolation fraction is it, but only while the physics rate equals the tick rate: at 60 against a 128-tick server the drawn position moved 74 mm on six frames in seven and 112 mm on the seventh. Put the engine on the server's rate ([method AirdriftNetBridge._adopt_tick_rate]). With a [member render_clock] set, its [code]render_alpha()[/code] replaces the fraction and runs from -1 to 2 after a frame with no tick or two. - [constant Drive.REMOTE] is not simulated here; its position arrives already interpolated by [GSNetInterpolator], and blending toward a [member _previous_state] nothing updates would drag it backwards.
+func render_state(alpha: float = -1.0) -> GSFpsState:
 	if drive == Drive.REMOTE or tick_rate <= 0:
 		return state
 
@@ -51,7 +51,7 @@ func render_state(alpha: float = -1.0) -> DotFpsState:
 	)
 
 	# View angles are not interpolated: blending toward the previous tick adds a frame of latency to aiming.
-	# They are the last tick's, a frame behind the mouse on a frame with no tick; a renderer draws `DotFpsSampler.look_now()` over them for its own player.
+	# They are the last tick's, a frame behind the mouse on a frame with no tick; a renderer draws `GSFpsSampler.look_now()` over them for its own player.
 	return blended
 
 

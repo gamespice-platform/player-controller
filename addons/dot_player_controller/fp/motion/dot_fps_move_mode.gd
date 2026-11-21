@@ -1,11 +1,11 @@
-class_name DotFpsMoveMode
+class_name GSFpsMoveMode
 extends RefCounted
 
 ## A movement mode the game adds: a ladder, water, a grappling hook, a vehicle seat. Ground, air and noclip
-## are built into [DotFpsMotor]. Modes obey the motor's determinism contract (no input, clock or node reads;
-## per-player memory lives in [DotFpsState]). Example and rules: docs/extending.md and docs/rationale.md.
+## are built into [GSFpsMotor]. Modes obey the motor's determinism contract (no input, clock or node reads;
+## per-player memory lives in [GSFpsState]). Example and rules: docs/extending.md and docs/rationale.md.
 
-## Id assigned by [method DotFpsMotor.register_mode]. Do not set this yourself.
+## Id assigned by [method GSFpsMotor.register_mode]. Do not set this yourself.
 var mode_id: int = -1
 
 
@@ -16,23 +16,23 @@ func _name() -> StringName:
 
 ## Called once when the player enters this mode.
 ## [param state] is the only place to record anything: one mode object serves every player.
-func _enter(_state: DotFpsState, _motor: DotFpsMotor) -> void:
+func _enter(_state: GSFpsState, _motor: GSFpsMotor) -> void:
 	pass
 
 
-func _exit(_state: DotFpsState, _motor: DotFpsMotor) -> void:
+func _exit(_state: GSFpsState, _motor: GSFpsMotor) -> void:
 	pass
 
 
 ## One tick, replacing the built-in ground/air simulation entirely.
 ## The mode owns the whole tick, gravity included; nothing is applied behind its back.
 func _simulate(
-	_state: DotFpsState,
-	_command: DotFpsCommand,
+	_state: GSFpsState,
+	_command: GSFpsCommand,
 	_delta: float,
-	_motor: DotFpsMotor
+	_motor: GSFpsMotor
 ) -> void:
-	push_error("DotFpsMoveMode._simulate() was not overridden.")
+	push_error("GSFpsMoveMode._simulate() was not overridden.")
 
 
 ## Whether the crouch fraction is updated for this mode.
@@ -47,4 +47,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotFpsMoveMode(%s #%d)" % [_name(), mode_id]
+	return "GSFpsMoveMode(%s #%d)" % [_name(), mode_id]

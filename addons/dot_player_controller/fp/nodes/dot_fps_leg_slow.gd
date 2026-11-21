@@ -1,16 +1,16 @@
-class_name DotFpsLegSlow
+class_name GSFpsLegSlow
 extends Node
-## Slows a controller for a few seconds when something breaks the player's legs (GameSpice Combat's `DotFallDamage.legs_broken(seconds, speed_scale)`, or any source of the same shape).
+## Slows a controller for a few seconds when something breaks the player's legs (GameSpice Combat's `GSFallDamage.legs_broken(seconds, speed_scale)`, or any source of the same shape).
 ##
-## It is a [DotFpsModifier] added through the controller, so the slowdown is part of the replicated modifier set and survives prediction. Off by default: with no [member source] nothing is added, and a game that never sets fall damage never emits the signal. Register the definition on every machine ([method register], from `_ready`), add it on the server only.
+## It is a [GSFpsModifier] added through the controller, so the slowdown is part of the replicated modifier set and survives prediction. Off by default: with no [member source] nothing is added, and a game that never sets fall damage never emits the signal. Register the definition on every machine ([method register], from `_ready`), add it on the server only.
 
 const CHANNEL := "player.legslow"
 const MODIFIER_ID := &"legs_broken"
 
 ## The controller to slow.
-@export var controller: DotNodeRef = DotNodeRef.new()
+@export var controller: GSNodeRef = GSNodeRef.new()
 ## Anything with a `legs_broken(seconds, speed_scale)` signal; optional, a host may call [method on_legs_broken] itself.
-@export var source: DotNodeRef = DotNodeRef.new()
+@export var source: GSNodeRef = GSNodeRef.new()
 ## Definition used by [method register] before a signal supplies its own numbers.
 @export_range(0.1, 60.0, 0.1) var seconds: float = 4.0
 @export_range(0.0, 1.0, 0.01) var speed_scale: float = 0.6
@@ -27,7 +27,7 @@ func _ready() -> void:
 func attach() -> bool:
 	_controller = controller.resolve_or_null(self, CHANNEL)
 	if _controller == null or not _controller.has_method(&"add_modifier"):
-		DotLog.debug(CHANNEL, "no controller; leg slowdown is inert", {})
+		GSLog.debug(CHANNEL, "no controller; leg slowdown is inert", {})
 		_controller = null
 		return false
 	var motor: Variant = _controller.get(&"motor")
@@ -44,7 +44,7 @@ func register(p_seconds: float, p_scale: float) -> int:
 	var motor: Variant = _controller.get(&"motor") if _controller != null else null
 	if motor == null:
 		return -1
-	var m := DotFpsModifier.make(MODIFIER_ID)
+	var m := GSFpsModifier.make(MODIFIER_ID)
 	m.duration_sec = p_seconds
 	m.max_speed_scale = p_scale
 	m.refreshable = true

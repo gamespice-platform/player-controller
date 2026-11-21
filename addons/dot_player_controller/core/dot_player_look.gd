@@ -1,4 +1,4 @@
-class_name DotPlayerLook
+class_name GSPlayerLook
 extends RefCounted
 
 ## Where a player is looking, accumulated from deltas, clamped, and never wrapping.
@@ -98,8 +98,8 @@ static func angle_to(from: Vector2, to: Vector2) -> float:
 	return wrapf((to - from).angle(), -PI, PI)
 
 
-func copy_look() -> DotPlayerLook:
-	var l := DotPlayerLook.new(sensitivity)
+func copy_look() -> GSPlayerLook:
+	var l := GSPlayerLook.new(sensitivity)
 	l.yaw = yaw
 	l.pitch = pitch
 	l.zoom_sensitivity = zoom_sensitivity
@@ -117,4 +117,4 @@ func describe() -> String:
 
 
 func _to_string() -> String:
-	return "DotPlayerLook(%s)" % describe()
+	return "GSPlayerLook(%s)" % describe()

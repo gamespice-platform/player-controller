@@ -1,7 +1,7 @@
-class_name DotFpsBody
+class_name GSFpsBody
 extends RefCounted
 
-## The collision queries [DotFpsMotor] needs, and nothing else.
+## The collision queries [GSFpsMotor] needs, and nothing else.
 ## Not [method PhysicsBody3D.move_and_collide] or [method CharacterBody3D.move_and_slide]: tests need arithmetic without a physics world, a server may run a heightfield, and move_and_slide keeps state a rewind does not restore.
 ## Implementations must be pure: the same query on the same world gives the same answer, or prediction never converges.
 
@@ -23,7 +23,7 @@ class Hit extends RefCounted:
 	var collider_id: int = 0
 
 	## Metres the collider is ALREADY past this surface at the start of the sweep.
-	## Zero for swept contacts; non-zero only from [method DotFpsBody.rest_contact], where it is the push-back distance along [member normal] ([method DotFpsMotor._depenetrate]).
+	## Zero for swept contacts; non-zero only from [method GSFpsBody.rest_contact], where it is the push-back distance along [member normal] ([method GSFpsMotor._depenetrate]).
 	var depth: float = 0.0
 
 	static func miss() -> Hit:
@@ -47,12 +47,12 @@ func sweep(
 	_height: float,
 	_radius: float
 ) -> Hit:
-	push_error("DotFpsBody.sweep() was not overridden.")
+	push_error("GSFpsBody.sweep() was not overridden.")
 	return Hit.miss()
 
 
-## The motor's whole collide-and-slide in one native call, when this body can run one (see [DotFpsPhysicsBody]):
-## [code]DotSimFpsBody.move_slide[/code]'s answer, or empty to run it in script. [param hulls] are extra solid boxes when [param has_hulls].
+## The motor's whole collide-and-slide in one native call, when this body can run one (see [GSFpsPhysicsBody]):
+## [code]GSSimFpsBody.move_slide[/code]'s answer, or empty to run it in script. [param hulls] are extra solid boxes when [param has_hulls].
 func native_slide(
 	_from: Vector3, _velocity: Vector3, _motion: Vector3, _height: float,
 	_mode: int, _flag: bool, _tun: PackedFloat64Array, _has_hulls: bool = false, _hulls: Array = []
@@ -60,14 +60,14 @@ func native_slide(
 	return PackedFloat64Array()
 
 
-## Half of a motor tick in one native call (see [member DotFpsMotor.native_tick]): [param phase] 0 is [code]DotSimFpsBody.motor_pre[/code], 1 [code]motor_post[/code], 2 the whole tick [code]motor_tick[/code]; their answer, or empty to run it in script. [param hulls_mode] 0 none, 1 [param hulls] as boxes, 2 the boxes the last call this tick sent, 3 the ones GameSpice Sim's hull world gathers ([method set_hull_world]; empty when it has no answer).
+## Half of a motor tick in one native call (see [member GSFpsMotor.native_tick]): [param phase] 0 is [code]GSSimFpsBody.motor_pre[/code], 1 [code]motor_post[/code], 2 the whole tick [code]motor_tick[/code]; their answer, or empty to run it in script. [param hulls_mode] 0 none, 1 [param hulls] as boxes, 2 the boxes the last call this tick sent, 3 the ones GameSpice Sim's hull world gathers ([method set_hull_world]; empty when it has no answer).
 func native_tick(
 	_phase: int, _state: PackedFloat64Array, _tun: PackedFloat64Array, _hulls_mode: int = 0, _hulls: Array = []
 ) -> PackedFloat64Array:
 	return PackedFloat64Array()
 
 
-## This body's native body for a tick in GameSpice Sim's batch ([DotFpsMotorBatch]), with its hulls mode and masks written at [param at]
+## This body's native body for a tick in GameSpice Sim's batch ([GSFpsMotorBatch]), with its hulls mode and masks written at [param at]
 ## in [param meta]; null when the tick must run through [method native_tick] or in script. [param hulls_mode] is a wrapper's ask.
 func native_batch(_meta: PackedInt64Array, _at: int, _hulls_mode: int = 0) -> Object:
 	return null
@@ -78,13 +78,13 @@ func native_batch_done(_world_touches: int, _hull_blocks: int, _hull_stops: int)
 	pass
 
 
-## Declares that nothing this body queries moves between ticks ([member DotFpsMotor.static_world]), so a native body may remember
+## Declares that nothing this body queries moves between ticks ([member GSFpsMotor.static_world]), so a native body may remember
 ## its first rest query across ticks. Off by default; a body without a native one ignores it.
 func set_static_world(_on: bool) -> void:
 	pass
 
 
-## Lets [method native_tick]'s hulls mode 3 gather from GameSpice Sim's [code]DotSimHullWorld[/code] [param world] as roster slot [param slot] (null: none).
+## Lets [method native_tick]'s hulls mode 3 gather from GameSpice Sim's [code]GSSimHullWorld[/code] [param world] as roster slot [param slot] (null: none).
 ## False when this body cannot (no native body, or a library without the hull world).
 func set_hull_world(_world: Object, _slot: int) -> bool:
 	return false
@@ -98,7 +98,7 @@ func collider_node(_id: int) -> Node3D:
 ## Whether a capsule of this size at this position overlaps anything (the stand-up test).
 ## Separate from a zero-length [method sweep], which is worst at starting inside geometry.
 func overlaps(_at: Vector3, _height: float, _radius: float) -> bool:
-	push_error("DotFpsBody.overlaps() was not overridden.")
+	push_error("GSFpsBody.overlaps() was not overridden.")
 	return false
 
 
@@ -115,7 +115,7 @@ static func capsule_support(normal: Vector3, height: float, radius: float) -> fl
 	return maxf(height * 0.5 - radius, 0.0) * absf(normal.y) + radius
 
 
-## False runs the original query paths (no broad-phase rejection, no per-tick candidate lists). The motor sets it from [member DotFpsMotor.perf_caches] so the equivalence test can replay both and compare.
+## False runs the original query paths (no broad-phase rejection, no per-tick candidate lists). The motor sets it from [member GSFpsMotor.perf_caches] so the equivalence test can replay both and compare.
 var perf_caches: bool = true:
 	set(value):
 		perf_caches = value
@@ -132,7 +132,7 @@ var collision_mask: int = 1
 ## Bodies excluded from every query — the player's own collider, above all.
 var exclude: Array[RID] = []
 
-## Layers a player may walk out of when it starts inside them (other players' hulls, [DotPlayerBodyRules]): a sweep stops at them, questions about what is touched ignore them.
+## Layers a player may walk out of when it starts inside them (other players' hulls, [GSPlayerBodyRules]): a sweep stops at them, questions about what is touched ignore them.
 ## Two players spawned together walk apart instead of being held still.
 var pass_out_mask: int = 0
 
@@ -152,14 +152,14 @@ func end_tick() -> void:
 	pass
 
 
-## A body that answers every question this one does, for a [DotFpsSimulator]: same world, masks and exclusions, none of this one's counters. Null when it cannot copy itself.
+## A body that answers every question this one does, for a [GSFpsSimulator]: same world, masks and exclusions, none of this one's counters. Null when it cannot copy itself.
 ## A copy, so a simulation run between live ticks does not show in this body's counters or per-sweep caches. Override in a game's own body.
-func copy_for_simulation() -> DotFpsBody:
+func copy_for_simulation() -> GSFpsBody:
 	return null
 
 
 ## The masks and exclusions [param into] needs to ask what this body asks. For overrides.
-func copy_filters_to(into: DotFpsBody) -> DotFpsBody:
+func copy_filters_to(into: GSFpsBody) -> GSFpsBody:
 	into.collision_mask = collision_mask
 	into.exclude = exclude.duplicate()
 	into.pass_out_mask = pass_out_mask
