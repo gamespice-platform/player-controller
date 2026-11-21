@@ -48,14 +48,7 @@ func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dict
 	post.resize(DotFpsMotorBatch.POST)
 	var posts := [0, 0]
 	for tick in range(BATCH_TICKS):
-		var data := PackedFloat64Array()
-		for i in range(PLAYERS):
-			var p := states[i].position
-			var flags := 0 if i == PLAIN else (3 if i == SCRIPTED else 7)
-			if not alive[i]:
-				flags &= ~2
-			data.append_array(PackedFloat64Array([p.x, p.y, p.z, tun.radius, tun.stand_height, flags]))
-		world.begin(ids, data, Callable(), 1.0e9)
+		world.begin(ids, _hull_rows(tun, states, alive), Callable(), 1.0e9)
 		if batched:
 			wired = batch.start(step) and wired
 			for i in range(PLAYERS):
@@ -102,12 +95,28 @@ func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dict
 			if alive[i]:
 				all.append_array(_snap(states[i], motors[i]))
 		ticks.append(all)
+	return {"ticks": ticks, "counters": _counters(motors), "wired": wired, "script_gathers": script_gathers[0],
+		"native_ticks": DotFpsPhysicsBody.native_ticks - before, "batch": batch, "posts": posts, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
+
+## The hull world's per-player rows for one tick: position, radius, height and the flags.
+func _hull_rows(tun: Object, states: Array[DotFpsState], alive: Array[bool]) -> PackedFloat64Array:
+	var data := PackedFloat64Array()
+	for i in range(PLAYERS):
+		var p := states[i].position
+		var flags := 0 if i == PLAIN else (3 if i == SCRIPTED else 7)
+		if not alive[i]:
+			flags &= ~2
+		data.append_array(PackedFloat64Array([p.x, p.y, p.z, tun.radius, tun.stand_height, flags]))
+	return data
+
+
+func _counters(motors: Array[DotFpsMotor]) -> Array:
 	var counters := []
 	for m in motors:
 		counters.append_array([m.body.hull_blocks, m.body.world_touches, m.stuck_ticks, m.depenetrated_ticks, m.slides,
 			m.launches, m.dashes, m.wall_runs, m.wall_jumps, m.ticks_simulated])
-	return {"ticks": ticks, "counters": counters, "wired": wired, "script_gathers": script_gathers[0],
-		"native_ticks": DotFpsPhysicsBody.native_ticks - before, "batch": batch, "posts": posts, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
+	return counters
+
 
 ## Whether [method DotFpsMotorBatch.post_row]'s [param post] is [param s]'s (the velocity as the float32 it is stored as).
 func _post_matches(post: PackedFloat64Array, s: DotFpsState) -> bool:
