@@ -43,6 +43,10 @@ func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dict
 	var rows: Array[int] = []
 	rows.resize(PLAYERS)
 	var before := DotFpsPhysicsBody.native_ticks
+	# post_row against the state it describes: [rows from the batch's answer, rows that differ].
+	var post := PackedFloat64Array()
+	post.resize(DotFpsMotorBatch.POST)
+	var posts := [0, 0]
 	for tick in range(BATCH_TICKS):
 		var data := PackedFloat64Array()
 		for i in range(PLAYERS):
@@ -73,6 +77,9 @@ func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dict
 			var told := false
 			if batched:
 				told = batch.finish(rows[i])
+				if rows[i] >= 0:
+					posts[0] += 1 if batch.post_row(rows[i], post, 0) else 0
+					posts[1] += 0 if _post_matches(post, s) else 1
 			else:
 				motors[i].simulate(s, streams[i][tick], step * 2.0 if i == SKIPS else step)
 			if not told:
@@ -100,7 +107,14 @@ func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dict
 		counters.append_array([m.body.hull_blocks, m.body.world_touches, m.stuck_ticks, m.depenetrated_ticks, m.slides,
 			m.launches, m.dashes, m.wall_runs, m.wall_jumps, m.ticks_simulated])
 	return {"ticks": ticks, "counters": counters, "wired": wired, "script_gathers": script_gathers[0],
-		"native_ticks": DotFpsPhysicsBody.native_ticks - before, "batch": batch, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
+		"native_ticks": DotFpsPhysicsBody.native_ticks - before, "batch": batch, "posts": posts, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
+
+## Whether [method DotFpsMotorBatch.post_row]'s [param post] is [param s]'s (the velocity as the float32 it is stored as).
+func _post_matches(post: PackedFloat64Array, s: DotFpsState) -> bool:
+	var v := Vector3(post[0], 0.0, post[1])
+	return (v.x == s.velocity.x and v.z == s.velocity.z and post[2] == s.mode and post[3] == s.crouch_fraction
+		and post[4] == s.slide_time and post[5] == s.wall_run_time and post[6] == (1.0 if s.sprinting else 0.0))
+
 
 ## [method _batch_replay]'s players: a motor and a state each, every player but PLAIN behind a hull body
 ## that sees the others (counting its gathers in [param script_gathers]). False when a hull world did not wire.
@@ -159,6 +173,8 @@ func _batch_runs() -> void:
 			_check(a["blocks"] > 0, label + ": the players do walk into each other")
 			_check(batch.rows > BATCH_TICKS * 5 and batch.runs * 2 < batch.rows, label + ": most ticks ran in the batch, several a call")
 			_check(batch.stale > 0 and batch.retakes > batch.stale, label + ": the push, the teleport and the death took rows back")
+			var posts: Array = b["posts"]
+			_check(posts[1] == 0 and posts[0] > BATCH_TICKS, label + ": post_row is each row's state after its motor (%d from the batch's answer, %d differ)" % [posts[0], posts[1]])
 	_sections += 1
 
 

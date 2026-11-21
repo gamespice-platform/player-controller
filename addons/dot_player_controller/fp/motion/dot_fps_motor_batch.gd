@@ -6,6 +6,8 @@ extends RefCounted
 const NATIVE_CLASS := &"DotSimMotorBatch"
 const _IN := 55
 const _OUT := 45
+## Values [method post_row] writes per row (API 34).
+const POST := 7
 
 ## Rows ticked natively, native calls, rows taken back and rows found stale, since the game last cleared them.
 var rows: int = 0
@@ -34,6 +36,9 @@ var _out := PackedFloat64Array()
 ## [member _out] holds rows [member _out_from] up to [member _out_to].
 var _out_from: int = 0
 var _out_to: int = 0
+## The row [method finish] last ended with the batch's answer, at [member _applied_at] in [member _out]; -1 when none.
+var _applied_row: int = -1
+var _applied_at: int = 0
 
 
 ## Whether the loaded GameSpice Sim has the batch.
@@ -52,6 +57,7 @@ func start(delta: float) -> bool:
 	_count = 0
 	_out_from = 0
 	_out_to = 0
+	_applied_row = -1
 	_native.begin()
 	return true
 
@@ -91,6 +97,7 @@ func add(motor: DotFpsMotor, state: DotFpsState, command: DotFpsCommand, delta: 
 ## the game tells it ([method moved_after] is not needed then: no later row has run).
 func finish(row: int) -> bool:
 	var stage := _stage[row]
+	_applied_row = -1
 	if stage == DotFpsMotor.BATCH_DONE:
 		return false
 	var motor := _motors[row]
@@ -106,9 +113,36 @@ func finish(row: int) -> bool:
 		if row >= _out_to or row < _out_from:
 			_run(row)
 		if row < _out_to:
-			motor.batch_apply(state, _commands[row], _out, (row - _out_from) * _OUT)
+			_applied_row = row
+			_applied_at = (row - _out_from) * _OUT
+			motor.batch_apply(state, _commands[row], _out, _applied_at)
 			return _meta[row * _meta_len] == 3
 	motor.batch_resume(state, _commands[row], _deltas[row])
+	return false
+
+
+## Writes row [param row]'s state after its motor into [param into] at [param at], [constant POST] values: velocity x and z,
+## mode, crouch fraction, slide time, wall-run time, sprinting (1 or 0); GameSpice Sim's [code]DotSimPlayerPost[/code]
+## input columns. Call it after [method finish] of that row, before the next row's. True when they came from the batch's answer
+## (the velocity unrounded: as a float32 it is the state's), false when read from the state (a row the script ended).
+func post_row(row: int, into: PackedFloat64Array, at: int) -> bool:
+	var state := _states[row]
+	into[at + 3] = state.crouch_fraction
+	into[at + 6] = 1.0 if state.sprinting else 0.0
+	if row == _applied_row:
+		var o := _applied_at
+		into[at] = _out[o + 3]
+		into[at + 1] = _out[o + 5]
+		into[at + 2] = _out[o + 9]
+		into[at + 4] = _out[o + 26]
+		into[at + 5] = _out[o + 31]
+		return true
+	var v := state.velocity
+	into[at] = v.x
+	into[at + 1] = v.z
+	into[at + 2] = state.mode
+	into[at + 4] = state.slide_time
+	into[at + 5] = state.wall_run_time
 	return false
 
 
