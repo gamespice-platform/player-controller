@@ -187,7 +187,7 @@ func _run() -> void:
 	if not loaded or not ClassDB.class_has_method(GSFpsPhysicsBody.NATIVE_CLASS, &"motor_tick"):
 		# A library from before the tick halves is a skip, not a failure: the slide's own suite still gates it.
 		print("  gs-sim's motor tick is not loaded: the native half is skipped")
-		if not loaded and (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) == "1":
+		if not loaded and OS.get_environment("GS_SIM_REQUIRE_NATIVE") == "1":
 			_check(false, "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		expected = 0
 	else:

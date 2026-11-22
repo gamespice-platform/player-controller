@@ -192,7 +192,7 @@ func _run() -> void:
 	var expected := 1
 	if not GSFpsPhysicsBody.native_available() or not GSFpsMotorBatch.available() or not ClassDB.class_exists(&"GSSimHullWorld"):
 		print("  gs-sim's motor batch is not loaded: skipped")
-		if (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) == "1" and not GSFpsPhysicsBody.native_available():
+		if OS.get_environment("GS_SIM_REQUIRE_NATIVE") == "1" and not GSFpsPhysicsBody.native_available():
 			_check(false, "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		expected = 0
 	else:

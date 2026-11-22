@@ -248,7 +248,7 @@ func _run() -> void:
 	var expected := 3
 	if not loaded:
 		print("  gs-sim's motor module is not loaded: the native half is skipped")
-		if (OS.get_environment("GS_SIM_REQUIRE_NATIVE") if OS.has_environment("GS_SIM_REQUIRE_NATIVE") else OS.get_environment("GS_SIM_REQUIRE_NATIVE")) == "1":
+		if OS.get_environment("GS_SIM_REQUIRE_NATIVE") == "1":
 			_check(false, "the library is loaded (GS_SIM_REQUIRE_NATIVE=1)")
 		expected = 0
 	else:
