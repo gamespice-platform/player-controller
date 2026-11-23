@@ -24,3 +24,9 @@ Thumbs.db
 .vscode/
 /addons/gs_combat
 /addons/gs_weapon
+
+# Sibling addons linked for local suites (absolute links must never be tracked; CI resolves them from addons.lock):
+/addons/godot-sqlite
+/addons/gs_bot
+/addons/gs_bot_record
+/addons/gs_sql
