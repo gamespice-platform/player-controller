@@ -90,3 +90,18 @@ A game whose players block through `apply_hull` (a real capsule on every machine
 - **Cost:** N players each move N-1 bodies twice a tick, N² transform writes, and a broadphase update each time. Acceptable for a dozen players, not for a hundred; `reach` (a box around the mover's feet, then or now) bounds it.
 - **It only holds while a hull only stops the mover.** Once capsules push each other, or push rigid bodies through `move_and_slide`, the other player's response is part of the simulation and a rewound copy cannot answer for it.
 - Tested in `movement_selftest` ("hull rewind"): a sweep stops at the rewound hull, the hull and its node are back after, off and `mp_solidplayers 0` run against the present.
+
+### Sharing the view (`GSPlayerHullView`)
+
+The ring, the resolve rule and the client's fill are the same in every game, so they live in `GSPlayerHullView` (API 35); `view.rewind` is the `GSPlayerHullRewind` it feeds and `view.around(rules, mover, bodies, tick, work)` replaces `rewind.around`. A game supplies:
+
+| Piece | What |
+| --- | --- |
+| `snap_fn(feet) -> Vector3` | `GSNetVar.wire_value` of the replicated position (the ring and the rewound hulls are both snapped) |
+| `view_fn(mover) -> Array or null` | `[lag_q, command_tick, back, span]` from the mover's last command; null or `lag_q < 0` is "no view" (a bot) |
+| `client_fn(other, older, span, render)` | client only: `interpolator.value_between(id, &"net_position", older, older + span, render, view.teleport_cut)` when `older >= 0`, else `value_at(...)` |
+| the command fields | `view_lag_q`, `view_back`, `view_span` (presence-bit fields, appended so old packets decode) |
+
+Set `is_server` and `capacity` (`max_rewind_sec * tick_rate` plus a few ticks). Server: call `record(tick, {key: feet})` after each tick's moves. Client, when building a command for `tick`: `q = GSPlayerHullView.lag_q_for(tick, drawn, MAX_LAG_Q)` where `drawn` is the tick the interpolator draws (`received_tick + render_alpha + receive_slip - delay_ticks`), then `bracket = interpolator.bracket_at(tick - q / 4.0)` and `GSPlayerHullView.bracket_for(tick, bracket, BACK_BITS, SPAN_BITS)` gives `[back, span]` (`[-1, 0]` when it does not fit). Wrap each mover's `simulate_tick` (server loop and the client's predicted step) in `view.around`.
+
+Answers that cannot be given (no view, a tick the ring dropped, a teleport over `teleport_cut` inside the pair) return null, which leaves that hull where it stands; `counts` tallies each kind and a miss warns every 256th time. Tested in `movement_selftest` ("hull view").

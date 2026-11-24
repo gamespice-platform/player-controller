@@ -22,14 +22,14 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 
 | Path | What |
 | --- | --- |
-| `addons/gs_player_controller/core/` | `GSPlayerIntent` (one tick of intent and its wire form), `GSPlayerLook`, `GSPlayerViewRules` (`mp_forceview`, `mp_fp_body`), `GSPlayerBodyRules` (`mp_solidplayers`) |
+| `addons/gs_player_controller/core/` | `GSPlayerHullRewind` and `GSPlayerHullView` (lag-compensated physics-capsule hulls and the shared view/ring), `GSPlayerIntent` (one tick of intent and its wire form), `GSPlayerLook`, `GSPlayerViewRules` (`mp_forceview`, `mp_fp_body`), `GSPlayerBodyRules` (`mp_solidplayers`) |
 | `addons/gs_player_controller/nodes/` | `GSPlayerController` (abstract base, five methods), `GSPlayerControllerSwitch` |
 | `addons/gs_player_controller/fp/core/` | data: `GSFpsTunables`, `GSFpsCvars` (binds the `sv_*` movement cvars of tunables, swim and ladder to a console and `GSGameMapConfig`), `GSFpsSprintRules` (the sprint/stamina cvars as one replicated group), `GSFpsSlidePreset` (the shared slide setups), `GSFpsLiftCycle` (a lift car's height as a pure function of time, and the carry of a rider standing on it, and `gate_open`, when a landing barrier may be open; the motor does not carry riders, the game adds the carry after each move on every end that simulates; `lift_cycle_selftest`), `GSFpsState`, `GSFpsCommand`, styles, surfaces, modifiers, admin modifiers, stats |
 | `addons/gs_player_controller/fp/motion/` | the simulation: `GSFpsMotor`, `GSFpsBody` and its flat and physics implementations, `GSFpsMoveMode`, `GSFpsSwimMode`, `GSFpsLadderMode` (boxes as data; the game calls `update` each tick), `GSFpsSimulator` (a second motor a bot runs ahead) |
 | `addons/gs_player_controller/fp/nodes/` | `GSFpsController`, `GSFpsSampler`, `GSFpsTouchSampler`, `GSFpsView`, `GSFpsViewMotion` (its motion cues without nodes) |
 | `addons/gs_player_controller/fp/net/` | `GSFpsNetSync`: what replicates, at what precision |
 | `addons/gs_player_controller/tp/` | `core/` (motor, state, tunables) and `nodes/` (controller, `GSTpsCameraRig` on GameSpice Core's `GSCameraBoom` and `GSCameraFade`) |
-| `addons/gs_player_controller/gs_player_controller_api.gd` | the API level (22) |
+| `addons/gs_player_controller/gs_player_controller_api.gd` | the API level (35) |
 | `examples/` | ten self-test scenes, `sandbox.tscn` (a course to feel the movement out, not a test) |
 
 ## Running and testing

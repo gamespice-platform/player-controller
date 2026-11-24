@@ -1,4 +1,4 @@
-extends "res://examples/movement_selftest_physics.gd"
+extends "res://examples/movement_selftest_hull_view.gd"
 
 ## The wall-running and wall-jumping sections of the movement self-test.
 
