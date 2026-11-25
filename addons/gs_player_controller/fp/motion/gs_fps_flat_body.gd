@@ -39,6 +39,7 @@ static func with_floor(y: float = 0.0) -> GSFpsFlatBody:
 
 func add_box(box: AABB) -> GSFpsFlatBody:
 	boxes.append(box.abs())
+	_revision += 1
 	return self
 
 
@@ -54,6 +55,7 @@ static func plane_id(index: int) -> int:
 
 func add_plane(plane: Plane) -> GSFpsFlatBody:
 	planes.append(plane)
+	_revision += 1
 	return self
 
 
@@ -117,11 +119,15 @@ var _c_idx := PackedInt32Array()
 func begin_tick() -> void:
 	_in_tick = true
 	_c_valid = false
+	if _native != null:
+		_native.begin_tick()
 
 
 func end_tick() -> void:
 	_in_tick = false
 	_c_valid = false
+	if _native != null:
+		_native.end_tick()
 
 
 ## The capsule as an axis-aligned box. [param at] is the centre.
@@ -441,3 +447,152 @@ func describe() -> Dictionary:
 	out["boxes"] = boxes.size()
 	out["planes"] = planes.size()
 	return out
+
+
+# --- GameSpice Sim's native motor (S1: the world as data) ---
+
+const NATIVE_CLASS := &"GSSimFpsBody"
+
+## Whether the native motor answers this body's ticks when the library has it (a suite turns it off to compare with the script).
+static var use_native_world: bool = true
+
+## Native ticks and batches this class ran, for a suite's check.
+static var native_ticks: int = 0
+
+static var _flat_known: int = -1
+
+var _native: Object = null
+## Bumped by [method add_box] and [method add_plane]; with the counts and [member floor_y] it says the native copy is stale.
+var _revision: int = 0
+var _sent_revision: int = -1
+var _sent_boxes: int = -1
+var _sent_planes: int = -1
+var _sent_floor: float = 0.0
+var _hull_world: Object = null
+var _hull_slot: int = -1
+var _hull_world_sent: bool = false
+
+
+## Whether [member boxes] and [member planes] can be answered natively: the library has the motor tick, the hull world and
+## [code]set_flat_world[/code], and neither [member GSFpsPhysicsBody.native_enabled] nor [member use_native_world] is off.
+static func native_world_available() -> bool:
+	if _flat_known < 0:
+		_flat_known = 1 if ClassDB.class_exists(NATIVE_CLASS) and ClassDB.class_has_method(NATIVE_CLASS, &"set_flat_world") else 0
+	return use_native_world and _flat_known == 1 and GSFpsPhysicsBody.native_enabled and GSFpsPhysicsBody.native_hull_world_available()
+
+
+## The native body holding this body's world, built and refreshed on demand; null to answer in script.
+## A box or plane changed in place (not through [method add_box] or [method add_plane]) is not seen: call [method invalidate_native].
+func _nat() -> Object:
+	if not native_world_available():
+		return null
+	if _native == null:
+		_native = ClassDB.instantiate(NATIVE_CLASS)
+		_sent_revision = -1
+		_hull_world_sent = false
+		_native.set_perf_caches(perf_caches)
+		if _in_tick:
+			_native.begin_tick()
+	if _sent_revision != _revision or _sent_boxes != boxes.size() or _sent_planes != planes.size() or _sent_floor != floor_y:
+		_send_world()
+	return _native
+
+
+## Sends the world as two packed arrays, 6 floats a box and 4 a plane.
+func _send_world() -> void:
+	var pb := PackedFloat32Array()
+	pb.resize(boxes.size() * 6)
+	var at := 0
+	for box: AABB in boxes:
+		pb[at] = box.position.x
+		pb[at + 1] = box.position.y
+		pb[at + 2] = box.position.z
+		pb[at + 3] = box.size.x
+		pb[at + 4] = box.size.y
+		pb[at + 5] = box.size.z
+		at += 6
+	var pp := PackedFloat32Array()
+	pp.resize(planes.size() * 4)
+	at = 0
+	for plane: Plane in planes:
+		pp[at] = plane.normal.x
+		pp[at + 1] = plane.normal.y
+		pp[at + 2] = plane.normal.z
+		pp[at + 3] = plane.d
+		at += 4
+	_native.set_flat_world(floor_y, pb, pp)
+	_sent_revision = _revision
+	_sent_boxes = boxes.size()
+	_sent_planes = planes.size()
+	_sent_floor = floor_y
+
+
+func _perf_caches_changed() -> void:
+	if _native != null:
+		_native.set_perf_caches(perf_caches)
+
+
+## Makes the next native call send the world again, after a box or plane was changed in place.
+func invalidate_native() -> void:
+	_revision += 1
+
+
+func set_hull_world(world: Object, slot: int) -> bool:
+	if world != null and not native_world_available():
+		world = null
+	if world != _hull_world or slot != _hull_slot:
+		_hull_world = world
+		_hull_slot = slot
+		_hull_world_sent = false
+	return world != null
+
+
+func native_slide(
+	from: Vector3, velocity: Vector3, motion: Vector3, height: float,
+	mode: int, flag: bool, tun: PackedFloat64Array, has_hulls: bool = false, hulls: Array = []
+) -> PackedFloat64Array:
+	var nat := _nat()
+	if nat == null:
+		return PackedFloat64Array()
+	native_ticks += 1
+	return nat.move_slide(from, velocity, motion, height, mode, flag, tun, has_hulls, hulls, collision_mask, pass_out_mask)
+
+
+func native_tick(
+	phase: int, state: PackedFloat64Array, tun: PackedFloat64Array, hulls_mode: int = 0, hulls: Array = []
+) -> PackedFloat64Array:
+	var nat := _nat()
+	if nat == null or not _send_hull_world(nat, hulls_mode):
+		return PackedFloat64Array()
+	native_ticks += 1
+	if phase == 0:
+		return nat.motor_pre(state, tun, hulls_mode, hulls, collision_mask, pass_out_mask)
+	if phase == 2:
+		return nat.motor_tick(state, tun, hulls_mode, hulls, collision_mask, pass_out_mask)
+	return nat.motor_post(state, tun, hulls_mode, hulls, collision_mask, pass_out_mask)
+
+
+func native_batch(meta: PackedInt64Array, at: int, hulls_mode: int = 0) -> Object:
+	var nat := _nat()
+	if nat == null or not _send_hull_world(nat, hulls_mode):
+		return null
+	meta[at] = hulls_mode
+	meta[at + 1] = collision_mask
+	meta[at + 2] = pass_out_mask
+	return nat
+
+
+func native_batch_done(_world_touches: int, _hull_blocks: int, _hull_stops: int) -> void:
+	native_ticks += 1
+
+
+## Hands the native body the hull world a mode 3 call gathers from; false when mode 3 has none.
+func _send_hull_world(nat: Object, hulls_mode: int) -> bool:
+	if hulls_mode != 3:
+		return true
+	if _hull_world == null:
+		return false
+	if not _hull_world_sent:
+		nat.set_hull_world(_hull_world, _hull_slot)
+		_hull_world_sent = true
+	return true
