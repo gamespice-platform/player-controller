@@ -478,6 +478,10 @@ var _hull_world_sent: bool = false
 static func native_world_available() -> bool:
 	if _flat_known < 0:
 		_flat_known = 1 if ClassDB.class_exists(NATIVE_CLASS) and ClassDB.class_has_method(NATIVE_CLASS, &"set_flat_world") else 0
+		# A library older than the flat world (GameSpice Sim 0.2.15) silently sends every player down the script path, several
+		# times slower: say so once, since a profile taken on it measures the fallback, not the native motor.
+		if _flat_known == 0 and ClassDB.class_exists(NATIVE_CLASS) and use_native_world:
+			push_warning("GSFpsFlatBody: the loaded gs_sim library has no set_flat_world (older than GameSpice Sim 0.2.15); movement runs in script. Update the library.")
 	return use_native_world and _flat_known == 1 and GSFpsPhysicsBody.native_enabled and GSFpsPhysicsBody.native_hull_world_available()
 
 
