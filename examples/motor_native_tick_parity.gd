@@ -200,6 +200,9 @@ func _tick_runs() -> void:
 	_sections += 1
 
 
+## The crouch tunables _native_full_tun appends after wall_jump_up_speed (API 43).
+const CROUCH_TUN := 6
+
 ## The motor keeps its native tunables arrays between ticks; a changed value or a swapped resource must rebuild both.
 func _tun_cache_check() -> void:
 	var was := GSFpsMotor.native_tick
@@ -228,8 +231,8 @@ func _tun_cache_check() -> void:
 	t.wall_jump_up_speed += 1.0
 	var tick2 := motor._native_tick_tun(s)
 	var full2 := motor._native_full_tun(tick2)
-	_check(tick2[11] == t.max_speed and full2[11] == t.max_speed and full2[full2.size() - 1] == t.wall_jump_up_speed,
-		"a changed tunable rebuilds the tick and full arrays (max_speed %s, wall_jump_up_speed %s)" % [tick2[11], full2[-1]])
+	_check(tick2[11] == t.max_speed and full2[11] == t.max_speed and full2[full2.size() - 1 - CROUCH_TUN] == t.wall_jump_up_speed,
+		"a changed tunable rebuilds the tick and full arrays (max_speed %s, wall_jump_up_speed %s)" % [tick2[11], full2[full2.size() - 1 - CROUCH_TUN]])
 	var other := _tunables()
 	other.max_speed = t.max_speed + 2.0
 	motor.tunables = other
