@@ -223,7 +223,7 @@ func register_mode(mode: RefCounted) -> int:
 
 ## Whether [param o] is a [GSFpsMoveMode] (its script, or one it extends, is the mode base). Registration only.
 static func _is_move_mode(o: Object) -> bool:
-	var base: Script = load("uid://cjd3om261ppfg")
+	var base: Script = load("res://addons/gs_player_controller/fp/motion/gs_fps_move_mode.gd")
 	var s: Script = o.get_script()
 	while s != null:
 		if s == base:

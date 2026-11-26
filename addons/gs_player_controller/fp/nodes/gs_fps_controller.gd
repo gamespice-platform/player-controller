@@ -78,7 +78,7 @@ func setup() -> GSResult:
 	# After the game's own, so turning this on does not renumber a game's modifiers.
 	if admin_abilities:
 		# GSFpsAdminModifiers, loaded so it and this file do not keep each other's parsers alive.
-		var _count: int = (load("uid://debq1g843c2uy") as GDScript).register(motor)
+		var _count: int = (load("res://addons/gs_player_controller/fp/core/gs_fps_admin_modifiers.gd") as GDScript).register(motor)
 
 	_setup_sampler()
 
