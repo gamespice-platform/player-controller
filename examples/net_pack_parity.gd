@@ -1,6 +1,6 @@
 extends Node
 
-## Holds [method GSFpsNetSync.pull]'s native pack (gs-sim's [code]GSSimFpsNetPack[/code]) to the script packers, to the bit: random and edge states (negative and huge timers, half-code boundaries, wall runs, spent runs, the heading's sign bit, odd stamina) pulled at several tick rates onto a full carrier and one without stamina, once each way, every replicated field compared. Then the cost of a pull each way. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/net_pack_parity.tscn[/code]
+## Holds [method GSFpsNetSync.pull]'s native pack and [method GSFpsNetSync.push_core]'s native unpack (gs-sim's [code]GSSimFpsNetPack[/code]) to the script, to the bit. Unpack: every carrier pulled below pushed back into a stale state each way, plus random 64-bit flags and timers2 codes, every column and crouch_held compared. Pack: random and edge states (negative and huge timers, half-code boundaries, wall runs, spent runs, the heading's sign bit, odd stamina) pulled at several tick rates onto a full carrier and one without stamina, once each way, every replicated field compared. Then the cost of a pull each way. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/net_pack_parity.tscn[/code]
 
 const STATES := 4000
 const RATES := [20, 22, 33, 64, 66, 128]
@@ -50,6 +50,13 @@ func _ready() -> void:
 	else:
 		_parity()
 		_bench()
+	if not GSFpsNetSync._native_unpacker():
+		print("  this gs-sim has no GSSimFpsNetPack.unpack: the native push is skipped")
+		if OS.get_environment("GS_SIM_REQUIRE_NATIVE") == "1":
+			_check(false, "the library has unpack (GS_SIM_REQUIRE_NATIVE=1)")
+	else:
+		_unpack_parity()
+		_unpack_bench()
 	GSFpsNetSync.native_pack = true
 	GSFpsNetSync.timer_scale = had_scale
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -144,3 +151,69 @@ func _bench() -> void:
 			GSFpsNetSync.pull(s, c)
 		us.append(float(Time.get_ticks_usec() - t0) / BENCH_PULLS)
 	print("  pull: script %.2f us, native %.2f us" % us)
+
+
+## A state after [method GSFpsNetSync.push_core] one way, as bytes: every column and crouch_held.
+func _pushed(stale: GSFpsState, native: bool, c: Object, timers2: int) -> PackedByteArray:
+	var s := GSFpsState.new()
+	s.copy_from(stale)
+	GSFpsNetSync.native_pack = native
+	GSFpsNetSync.push_core(s, c.net_position, c.net_velocity, c.net_yaw, c.net_flags, timers2)
+	return var_to_bytes([s._f, s.crouch_held])
+
+
+## A state after the whole [method GSFpsNetSync.push] one way.
+func _pushed_full(stale: GSFpsState, native: bool, c: Object) -> PackedByteArray:
+	var s := GSFpsState.new()
+	s.copy_from(stale)
+	GSFpsNetSync.native_pack = native
+	GSFpsNetSync.push(c, s)
+	return var_to_bytes([s._f, s.crouch_held, s.pitch, s.crouch_fraction, s.stamina, s.modifiers])
+
+
+func _unpack_parity() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2026_11_27
+	var mismatches := 0
+	var cases := 0
+	for rate: int in RATES:
+		GSFpsNetSync.set_tick_rate(rate)
+		for i in range(STATES / 4):
+			var stale := _random_state(rng, GSFpsNetSync.timer_scale)
+			var c := Carrier.new()
+			GSFpsNetSync.native_pack = false
+			GSFpsNetSync.pull(_random_state(rng, GSFpsNetSync.timer_scale), c)
+			if rng.randi() % 3 == 0:
+				# Codes no packer writes: every field at random, the wall-jump code past 6.
+				c.net_flags = (rng.randi() << 32) | rng.randi()
+				c.net_timers2 = ((rng.randi() << 32) | rng.randi()) & ((1 << GSFpsNetSync.TIMERS2_BITS) - 1)
+			for timers2: int in [c.net_timers2, -1]:
+				cases += 1
+				if _pushed(stale, false, c, timers2) != _pushed(stale, true, c, timers2):
+					mismatches += 1
+					if mismatches <= 5:
+						print("  unpack mismatch at rate %d: flags %d timers2 %d" % [rate, c.net_flags, timers2])
+			cases += 1
+			if _pushed_full(stale, false, c) != _pushed_full(stale, true, c):
+				mismatches += 1
+				if mismatches <= 5:
+					print("  push mismatch at rate %d: flags %d" % [rate, c.net_flags])
+	_check(mismatches == 0, "every push is identical both ways (%d of %d differ)" % [mismatches, cases])
+	print("  %d pushes compared" % cases)
+
+
+func _unpack_bench() -> void:
+	GSFpsNetSync.set_tick_rate(66)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var c := Carrier.new()
+	GSFpsNetSync.pull(_random_state(rng, GSFpsNetSync.timer_scale), c)
+	var s := GSFpsState.new()
+	var us := []
+	for native: bool in [false, true]:
+		GSFpsNetSync.native_pack = native
+		var t0 := Time.get_ticks_usec()
+		for i in range(BENCH_PULLS):
+			GSFpsNetSync.push_core(s, c.net_position, c.net_velocity, c.net_yaw, c.net_flags, c.net_timers2)
+		us.append(float(Time.get_ticks_usec() - t0) / BENCH_PULLS)
+	print("  push_core: script %.2f us, native %.2f us" % us)

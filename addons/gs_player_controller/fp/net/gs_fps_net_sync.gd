@@ -313,7 +313,7 @@ static func pull(state: GSFpsState, target: Variant) -> void:
 		target.net_stamina = pack_stamina(state)
 
 
-## [method pull] packs the flags, timers and stamina in one GameSpice Sim call ([code]GSSimFpsNetPack[/code]) when the library is loaded: the same integers as the script packers, which stay the specification (examples/net_pack_parity holds the two together). False keeps the script.
+## [method pull] packs the flags, timers and stamina in one GameSpice Sim call ([code]GSSimFpsNetPack[/code]) when the library is loaded, and [method push_core] unpacks them the same way: the same integers and columns as the script, which stays the specification (examples/net_pack_parity holds the two together). False keeps the script both ways.
 static var native_pack := true
 static var _packer: Object = null
 static var _packer_tried := false
@@ -326,6 +326,17 @@ static func _native_packer() -> Object:
 		if ClassDB.class_exists(_NATIVE_PACKER):
 			_packer = ClassDB.instantiate(_NATIVE_PACKER)
 	return _packer
+
+
+static var _unpacker_ok := -1
+
+
+## Whether the loaded GSSimFpsNetPack has the receiving half (gs-sim 0.2.31 and later).
+static func _native_unpacker() -> bool:
+	if _unpacker_ok < 0:
+		var packer := _native_packer()
+		_unpacker_ok = 1 if packer != null and packer.has_method(&"unpack") else 0
+	return _unpacker_ok == 1
 
 
 static func _pull_native(state: GSFpsState, target: Variant, has: int) -> void:
@@ -490,20 +501,16 @@ static func push(source: Variant, state: GSFpsState) -> void:
 	var has := _carrier_has(source)
 	if has & _HAS_CORE:
 		# Declared properties read directly: this runs per remote player per snapshot and per render frame.
-		state.position = source.net_position
-		state.velocity = source.net_velocity
-		state.yaw = source.net_yaw
+		push_core(state, source.net_position, source.net_velocity, source.net_yaw, int(source.net_flags),
+			int(source.net_timers2) if has & _HAS_TIMERS2 else -1)
 		state.pitch = source.net_pitch
 		state.crouch_fraction = source.net_crouch
-		unpack_flags(state, int(source.net_flags))
 		var mask := int(source.net_modifiers)
 		# unpack_modifiers clears and refills: with nothing to add to an empty list it has nothing to do.
 		if mask != 0 or not state.modifiers.is_empty():
 			unpack_modifiers(state, mask)
 		if has & _HAS_TIMERS:
 			unpack_timers(state, int(source.net_timers))
-		if has & _HAS_TIMERS2:
-			unpack_timers2(state, int(source.net_timers2))
 		if has & _HAS_STAMINA:
 			unpack_stamina(state, int(source.net_stamina))
 		return
@@ -524,6 +531,26 @@ static func push(source: Variant, state: GSFpsState) -> void:
 	if stamina != null:
 		unpack_stamina(state, int(stamina))
 
+
+
+## The column half of [method push]: [param position], [param velocity] and [param yaw] written, [param flags]
+## unpacked ([method unpack_flags]), then [param timers2] when it is not negative ([method unpack_timers2], which
+## overrides the coarse slide and wall-run fields). With [member native_pack] and a GameSpice Sim whose
+## [code]GSSimFpsNetPack[/code] has [code]unpack[/code], one native call writes the columns; the script writes
+## stay the specification (examples/net_pack_parity holds the two together). A carrier with its own push (Fatal
+## Contact's) calls this for the same writes.
+static func push_core(state: GSFpsState, position: Vector3, velocity: Vector3, yaw: float, flags: int,
+		timers2: int = -1) -> void:
+	if native_pack and _native_unpacker():
+		state._f = _packer.unpack(state._f, position, velocity, yaw, flags, timers2, timer_scale)
+		state.crouch_held = (flags & FLAG_CROUCH_HELD) != 0
+		return
+	state.position = position
+	state.velocity = velocity
+	state.yaw = yaw
+	unpack_flags(state, flags)
+	if timers2 >= 0:
+		unpack_timers2(state, timers2)
 
 
 ## Whether two peers will simulate the same way.
