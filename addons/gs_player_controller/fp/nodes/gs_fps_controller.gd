@@ -551,6 +551,7 @@ func begin_tick(tick: int, delta: float) -> bool:
 		_lap_ctrl(0, prof_t)
 	_on_pre_simulate(tick, delta)
 
+	motor.batch_events_begin(get_script(), _external_velocity)
 	_consume_external_velocity(state, _replaying)
 
 	# Every tick: a game sets the tunables' mask after setup, and the body copied it when built.
@@ -581,6 +582,7 @@ func end_tick(tick: int, delta: float) -> void:
 		_lap_ctrl_at = prof_t
 
 	_tick = tick
+	motor.batch_events_take()
 	_publish(_before_mode, _before_y, _before_fall)
 	if prof_t != 0:
 		_lap_ctrl(3, prof_t)
@@ -589,7 +591,7 @@ func end_tick(tick: int, delta: float) -> void:
 		_lap_ctrl(4, prof_t)
 
 	if not _replaying:
-		if state.is_sliding() != _before_sliding:
+		if motor.may_change(GSFpsMotor.EVENT_SLIDE) and state.is_sliding() != _before_sliding:
 			slide_changed.emit(state.is_sliding())
 
 		if motor.launches != _before_launches:
@@ -601,7 +603,7 @@ func end_tick(tick: int, delta: float) -> void:
 		if motor.wall_jumps != _before_wall_jumps:
 			wall_jumped.emit()
 
-		if state.is_wall_running() != _before_wall_running:
+		if motor.may_change(GSFpsMotor.EVENT_WALL_RUN) and state.is_wall_running() != _before_wall_running:
 			wall_run_changed.emit(state.is_wall_running())
 
 		if motor.view_turn != 0.0:
@@ -614,11 +616,8 @@ func end_tick(tick: int, delta: float) -> void:
 		state.airborne_time = (state.airborne_time + delta) if state.mode == GSFpsState.Mode.AIR else 0.0
 	if not _replaying and observe_stats:
 		stats.observe(state, current_command, _stats_previous, delta)
-		if motor.perf_caches:
-			# Observe only asks whether there was a previous command (null on the first tick and after a style change), never reads it: one object kept, not one allocated a tick.
-			if _stats_previous == null:
-				_stats_previous = current_command.duplicate_command()
-		else:
+		# Observe only asks whether there was a previous command (null on the first tick and after a style change), never reads it: with perf_caches one object kept, not one allocated a tick.
+		if not motor.perf_caches or _stats_previous == null:
 			_stats_previous = current_command.duplicate_command()
 
 	if prof_t != 0:
@@ -720,7 +719,7 @@ func _publish(
 
 	_apply_collider(state)
 
-	if before_mode != state.mode:
+	if motor.may_change(GSFpsMotor.EVENT_MODE) and before_mode != state.mode:
 		mode_changed.emit(before_mode, state.mode)
 
 		if (
@@ -735,9 +734,8 @@ func _publish(
 		):
 			jumped.emit()
 
-	# A grounded tick that gained height is a stair step, not a jump — the view
-	# absorbs it so the camera does not jolt once per tread.
-	if state.mode == GSFpsState.Mode.GROUND:
+	# A grounded tick that gained height is a stair step, not a jump: the view absorbs it, no jolt per tread.
+	if motor.may_change(GSFpsMotor.EVENT_Y) and state.mode == GSFpsState.Mode.GROUND:
 		var gained := state.position.y - before_y
 		if gained > 0.001 and gained <= tunables.step_height + 0.01:
 			if view != null:

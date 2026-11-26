@@ -71,6 +71,7 @@ func batch_prepare(
 		return BATCH_DONE
 	if profile:
 		_lap(0)
+	var y_before_crouch := state._f[1]
 	_update_crouch(state, command, delta)
 	if profile:
 		_lap(1)
@@ -93,6 +94,13 @@ func batch_prepare(
 		_fill_full_in(state, command, delta, input, row * 55)
 	else:
 		_fill_full_extra(state, command, delta, input, row * row_len - 12, batch_states)
+		# The row's columns are then the ones the controller's tick-end compares with, so the batch may say what changed.
+		if (
+			batch_states and batch_events_allowed and batch_clocks != 0 and state._f[1] == y_before_crouch
+			and GSFpsMotorBatch.native_events
+		):
+			var at13 := row * row_len + 1
+			input[at13] = int(input[at13]) | ROW_EVENTS
 	return BATCH_READY
 
 

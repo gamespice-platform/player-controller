@@ -490,6 +490,9 @@ func batch_apply_cols(
 		state._f[_Cols.YAW] = yaw
 	_rest_valid = false
 	if batch_states:
+		var flags := int(out[at + 12])
+		if flags & EVENTS_KNOWN != 0:
+			batch_events = flags
 		_states_settle(state, cols, out, at)
 	else:
 		_native_full_settle(state, _native_tick_flags(state, out, at))
@@ -505,6 +508,48 @@ var _rest_native := false
 var _rest_in_script := true
 ## Set by [GSFpsMotorBatch] before [method batch_prepare]: this row goes to [code]run_states[/code].
 var batch_states := false
+## Set by the controller at its tick start ([method batch_events_begin], API 42): nothing but the motor
+## has written the state since its end-of-tick snapshot, so a [code]run_states[/code] row may ask GameSpice Sim what the
+## tick changed (row bit [constant ROW_EVENTS]). [method batch_prepare] adds what it knows: the clocks left to the row,
+## the height unchanged by the crouch.
+var batch_events_allowed := false
+## What the batch said the tick changed, [constant EVENTS_KNOWN] and a bit per change ([constant EVENT_MODE],
+## [constant EVENT_Y], [constant EVENT_SLIDE], [constant EVENT_WALL_RUN]); 0 when it was not asked. The controller reads
+## it at its tick end and clears it.
+var batch_events: int = 0
+const ROW_EVENTS := 8
+const EVENTS_KNOWN := 64
+const EVENT_MODE := 128
+const EVENT_Y := 256
+const EVENT_SLIDE := 512
+const EVENT_WALL_RUN := 1024
+## [member batch_events] as the controller's tick end took it ([method batch_events_take]) for [method may_change].
+var tick_events: int = 0
+## Per controller script: whether it overrides [code]_on_pre_simulate[/code], which may write the state after the snapshot.
+static var _pre_own := {}
+
+
+## The controller's tick start: clears the events and allows them unless its [param script] overrides
+## [code]_on_pre_simulate[/code] or [param external] velocity is pending.
+func batch_events_begin(script: Script, external: Vector3) -> void:
+	batch_events = 0
+	tick_events = 0
+	if not _pre_own.has(script):
+		var own := script.get_script_method_list().filter(func(m): return m["name"] == "_on_pre_simulate")
+		_pre_own[script] = own.size() > 1
+	batch_events_allowed = not _pre_own[script] and external == Vector3.ZERO
+
+
+## The controller's tick end: moves [member batch_events] to [member tick_events].
+func batch_events_take() -> void:
+	tick_events = batch_events
+	batch_events = 0
+
+
+## Whether the tick may have changed what [param bit] stands for ([constant EVENT_MODE] and the others): true unless the
+## batch said what the tick changed and it was not that.
+func may_change(bit: int) -> bool:
+	return tick_events == 0 or tick_events & bit != 0
 
 
 ## This motor's native state for a [code]run_states[/code] row, or null when its rows cannot be ones.
