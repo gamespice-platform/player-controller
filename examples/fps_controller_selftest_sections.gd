@@ -354,6 +354,8 @@ func _test_view_motion() -> void:
 
 	_off_checks(strafing, frame)
 
+	_scale_checks()
+
 	_forwarding_checks()
 
 	# And one of them end to end: a landing under landing_min_speed dips nothing through the view.
@@ -378,6 +380,35 @@ func _test_view_motion() -> void:
 	_check(absf(floor_deepest) < 1e-5, "a landing under GSFpsView.landing_min_speed dips nothing", "%.2f mm" % (-floor_deepest * 1000.0))
 	floor_body.queue_free()
 	_done()
+
+
+## apply_scales: the picks times each scale, each scale 0 off, negatives as 0, the lean bound by the larger.
+func _scale_checks() -> void:
+	var picks := GSFpsViewMotion.new()
+	picks.landing_dip = 0.06
+	picks.landing_pitch = 1.0
+	picks.strafe_roll = 1.0
+	picks.slide_roll = 1.5
+	picks.wall_run_roll = -3.5
+	picks.wall_run_eye_shift = 0.3
+	picks.roll_limit = 5.0
+	picks.fov_speed_gain = 4.0
+	picks.slide_fov_gain = 2.0
+	picks.wall_run_fov_gain = 1.0
+	var m := GSFpsViewMotion.new()
+	m.apply_scales(picks, 1.0, 1.0, 1.0, 1.0)
+	_check(m.landing_dip == 0.06 and m.slide_roll == 1.5 and m.wall_run_roll == -3.5 and m.roll_limit == 5.0
+		and m.fov_speed_gain == 4.0 and m.wall_run_fov_gain == 1.0 and m.wall_run_eye_shift == 0.3,
+		"apply_scales at 1 everywhere is the picks")
+	m.apply_scales(picks, 2.0, 0.5, 0.0, 2.0)
+	_check(is_equal_approx(m.landing_dip, 0.12) and is_equal_approx(m.landing_pitch, 2.0) and is_equal_approx(m.slide_roll, 0.75)
+		and m.wall_run_roll == 0.0 and m.wall_run_eye_shift == 0.0 and is_equal_approx(m.roll_limit, 2.5)
+		and is_equal_approx(m.fov_speed_gain, 8.0) and is_equal_approx(m.slide_fov_gain, 4.0),
+		"apply_scales scales each cue by its own amount; the bound follows the larger lean")
+	m.apply_scales(picks, 0.0, -1.0, 2.0, 0.0)
+	_check(m.landing_dip == 0.0 and m.strafe_roll == 0.0 and m.fov_speed_gain == 0.0 and m.wall_run_fov_gain == 0.0
+		and is_equal_approx(m.roll_limit, 10.0) and is_equal_approx(m.wall_run_eye_shift, 0.3),
+		"apply_scales: 0 is off, a negative is 0, the eye shift stops at the pick")
 
 
 ## Each amount at 0 is off.

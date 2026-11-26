@@ -105,6 +105,29 @@ var _fov_a: float = 0.0
 var _fov: float = 0.0
 
 
+## Sets this motion's amounts to [param picks] times the player's four scales, each 0 (off) to 2,
+## 1 the pick: [param landing] (dip and nod), [param strafe] (strafe and slide lean), [param wall]
+## (wall-run lean and eye shift; the shift stops at 1) and [param widen] (the three widenings).
+## Each goes to 0 on its own, since motion sickness is why they exist. [member roll_limit]
+## follows the larger of strafe and wall. Speeds, references and responses stay as set. A game
+## without a cue passes 0 for it (its pick is 0 too).
+func apply_scales(picks: GSFpsViewMotion, landing: float, strafe: float, wall: float, widen: float) -> void:
+	landing = maxf(landing, 0.0)
+	strafe = maxf(strafe, 0.0)
+	wall = maxf(wall, 0.0)
+	widen = maxf(widen, 0.0)
+	landing_dip = picks.landing_dip * landing
+	landing_pitch = picks.landing_pitch * landing
+	strafe_roll = picks.strafe_roll * strafe
+	slide_roll = picks.slide_roll * strafe
+	wall_run_roll = picks.wall_run_roll * wall
+	wall_run_eye_shift = picks.wall_run_eye_shift * minf(wall, 1.0)
+	roll_limit = picks.roll_limit * maxf(strafe, wall)
+	fov_speed_gain = picks.fov_speed_gain * widen
+	slide_fov_gain = picks.slide_fov_gain * widen
+	wall_run_fov_gain = picks.wall_run_fov_gain * widen
+
+
 ## Moves every cue on by [param delta] seconds toward what [param state] asks for. Once a
 ## rendered frame, with the state as drawn (interpolated), never once a tick.
 func advance(state: GSFpsState, delta: float) -> void:
