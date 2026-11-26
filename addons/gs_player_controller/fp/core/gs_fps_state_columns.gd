@@ -28,14 +28,18 @@ const WALL_JUMP_COUNT := 24
 const WALL_JUMPS_IN_AIR := 25
 const WALL_JUMP_HEADING := 26
 const WALL_NORMAL := 27
+## The crouch: fraction, and held as 0 or 1. Kept in the slot so the native batch crouches without a round trip.
+const CROUCH_FRACTION := 30
+const CROUCH_HELD := 31
 ## The clock block's start and length.
 const CLOCKS := 14
 const CLOCK_COUNT := 16
-const STRIDE := 30
+const STRIDE := 32
 
 ## A new state's values: a fresh [GSFpsState]'s defaults (airborne, ground normal up, no jump or press for 1000 s, not
-## sliding or wall running).
+## sliding or wall running, standing).
 const DEFAULTS := [
 	0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0,
 	1000.0, 0.0, 1000.0, -1.0, 0.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+	0.0, 0.0,
 ]

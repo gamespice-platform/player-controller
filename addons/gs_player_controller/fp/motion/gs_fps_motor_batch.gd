@@ -26,6 +26,10 @@ static var native_state: bool = true
 ## [member GSFpsMotor.batch_events], API 42), so the controller's tick end compares only those. Same signals either way
 ## (examples/motor_batch_parity.gd). On by default; the operator switch for it.
 static var native_events: bool = true
+## Whether, on [member native_state], GameSpice Sim also runs each row's crouch at the row's turn
+## ([member GSFpsMotor.batch_crouch], API 43) instead of the script at [method add]. Same bits either way
+## (examples/motor_batch_parity.gd). On by default; the operator switch for it.
+static var native_crouch: bool = true
 
 ## Rows ticked natively, native calls, rows taken back and rows found stale, since the game last cleared them.
 var rows: int = 0
@@ -45,6 +49,7 @@ var _cols_ok := false
 var _use_cols := false
 ## Whether the library has [code]run_states[/code], and whether this loop uses it.
 var _states_ok := false
+var _crouch_ok := false
 var _use_states := false
 var _delta: float = 0.0
 var _count: int = 0
@@ -91,6 +96,7 @@ func start(delta: float) -> bool:
 		_meta_len = 4 if ClassDB.class_has_method(NATIVE_CLASS, &"run_rows") else 3
 		_cols_ok = _meta_len > 3 and ClassDB.class_has_method(NATIVE_CLASS, &"run_cols")
 		_states_ok = _cols_ok and ClassDB.class_has_method(NATIVE_CLASS, &"run_states")
+		_crouch_ok = _states_ok and ClassDB.class_has_method(NATIVE_CLASS, &"crouch_rows")
 	_use_cols = _cols_ok and native_cols
 	_use_states = _use_cols and _states_ok and native_state
 	_delta = delta
@@ -129,6 +135,7 @@ func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: flo
 	_deltas[row] = delta if delta > 0.0 else _delta
 	var stage: int
 	motor.batch_states = _use_states and motor.batch_motor_state() != null
+	motor.batch_crouch = motor.batch_states and _crouch_ok and native_crouch
 	if _use_cols:
 		stage = motor.batch_prepare(state, command, _deltas[row], _extra, _meta, row, _meta_len, COLS_EXTRA)
 	else:
@@ -246,6 +253,8 @@ func _take_back(row: int) -> void:
 ## [method GSFpsMotor.batch_refill] for a row of columns: the whole row rebuilt as [method add] filled it, refilled from the
 ## state, and its columns taken again.
 func _refill_cols(motor: GSFpsMotor, state: GSFpsState, row: int) -> void:
+	# The refill reads the state, so a crouch left to the batch is run first.
+	motor.batch_crouch_now(state, _commands[row], _deltas[row])
 	if _row.size() != _IN:
 		_row.resize(_IN)
 	var c: PackedFloat64Array = _cols[row]

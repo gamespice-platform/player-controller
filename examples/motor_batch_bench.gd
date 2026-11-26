@@ -141,7 +141,12 @@ func _profiled() -> void:
 func _run() -> void:
 	# --rows: the batch over 55-value rows (GSFpsMotorBatch.native_cols off), for a before and after in one session.
 	GSFpsMotorBatch.native_cols = not ("--rows" in OS.get_cmdline_user_args())
-	print("motor batch bench: n=%d ticks=%d columns=%s" % [_n, _ticks, GSFpsMotorBatch.native_cols])
+	# --no-events: the controller compares every change in script (GSFpsMotorBatch.native_events off), the level-41 loop.
+	GSFpsMotorBatch.native_events = not ("--no-events" in OS.get_cmdline_user_args())
+	# --no-crouch: the batch's crouch runs in script at add (GSFpsMotorBatch.native_crouch off), the level-42 loop.
+	GSFpsMotorBatch.native_crouch = not ("--no-crouch" in OS.get_cmdline_user_args())
+	print("motor batch bench: n=%d ticks=%d columns=%s events=%s crouch=%s" % [
+		_n, _ticks, GSFpsMotorBatch.native_cols, GSFpsMotorBatch.native_events, GSFpsMotorBatch.native_crouch])
 	if not GSFpsPhysicsBody.native_available() or not GSFpsMotorBatch.available() or not ClassDB.class_exists(&"GSSimHullWorld"):
 		print("  gs-sim's motor batch is not loaded: skipped")
 		get_tree().quit(0)
