@@ -18,11 +18,14 @@ const FIRST_CUSTOM_MODE := 3
 ## Most modes one motor can have; the mode travels as a fixed-width field (see [GSFpsNetSync]).
 const MAX_MODES := 16
 
+## The columns layout by path, not by its global name, so a run whose class cache predates it still parses.
+const _Cols := preload("gs_fps_state_columns.gd")
+
 ## The values the motor tick reads and writes, packed: [constant GSFpsStateColumns.STRIDE] float64s in
 ## [GSFpsStateColumns]' layout (API 36), so GameSpice Sim can take them as one array per player instead of a property
 ## read per field. The properties below that index it are accessors (the numbers are the layout's offsets, written out
 ## because a literal index is the cheapest read there is). [method copy_from] replaces it rather than writing through.
-var _f := PackedFloat64Array(GSFpsStateColumns.DEFAULTS)
+var _f := PackedFloat64Array(_Cols.DEFAULTS)
 
 var mode: int:
 	get: return int(_f[9])

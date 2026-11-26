@@ -1,5 +1,8 @@
 class_name GSFpsMotorBatch
 extends RefCounted
+
+## The columns layout by path, not by its global name, so a run whose class cache predates it still parses.
+const _Cols := preload("../core/gs_fps_state_columns.gd")
 ## Several players' motor ticks in runs of one native call (GameSpice Sim's [code]GSSimMotorBatch[/code]), for a server's players' loop.
 ## The game first [method add]s every player in roster order (each motor runs the part of its tick no other player can change), then in the same order [method finish]es one, does its own work for that player and goes on. A run is the consecutive rows GameSpice Sim can tick; it is ticked when its first row is finished, each row seeing the earlier ones where they came to rest, as the players' ticks one after another do. A player that ends its tick elsewhere (a teleport, a death) takes the rows after it back ([method moved_after]); they run again. The answers are [method GSFpsMotor.simulate]'s to the bit.
 
@@ -8,16 +11,28 @@ const _IN := 55
 const _OUT := 45
 ## Values [method post_row] writes per row (API 34).
 const POST := 7
+## Values per row beside the state's columns where the batch hands GameSpice Sim the columns themselves (API 37).
+const COLS_EXTRA := 27
+
+## Whether the rows go to GameSpice Sim as each state's columns ([code]GSSimMotorBatch.run_cols[/code]: no per-field copy in or
+## out of a 55-value row) when the library has it; off fills the rows field by field as before. Same bits either way
+## (examples/motor_batch_parity.gd). On by default; a game's operator switch may turn it off. Read at [method start].
+static var native_cols: bool = true
 
 ## Rows ticked natively, native calls, rows taken back and rows found stale, since the game last cleared them.
 var rows: int = 0
 var runs: int = 0
 var retakes: int = 0
 var stale: int = 0
+## Of [member runs], the ones that handed GameSpice Sim the states' columns ([member native_cols]).
+var cols_runs: int = 0
 
 var _native: Object = null
 ## Meta values per row: 4 where GameSpice Sim runs the rows' clocks too ([code]run_rows[/code]), else 3.
 var _meta_len: int = 3
+## Whether the library has [code]run_cols[/code], and whether this loop uses it.
+var _cols_ok := false
+var _use_cols := false
 var _delta: float = 0.0
 var _count: int = 0
 var _motors: Array[GSFpsMotor] = []
@@ -30,6 +45,12 @@ var _stage := PackedByteArray()
 var _deltas := PackedFloat64Array()
 var _meta := PackedInt64Array()
 var _in := PackedFloat64Array()
+## On [member _use_cols]: each row's state columns as they were at [method add], the [constant COLS_EXTRA] values beside them,
+## the columns the batch answered, and a whole row for [method GSFpsMotor.batch_refill].
+var _cols: Array = []
+var _extra := PackedFloat64Array()
+var _cols_new: Array = []
+var _row := PackedFloat64Array()
 var _sent_position := PackedVector3Array()
 var _sent_velocity := PackedVector3Array()
 var _out := PackedFloat64Array()
@@ -53,6 +74,8 @@ func start(delta: float) -> bool:
 			return false
 		_native = ClassDB.instantiate(NATIVE_CLASS)
 		_meta_len = 4 if ClassDB.class_has_method(NATIVE_CLASS, &"run_rows") else 3
+		_cols_ok = _meta_len > 3 and ClassDB.class_has_method(NATIVE_CLASS, &"run_cols")
+	_use_cols = _cols_ok and native_cols
 	_delta = delta
 	_count = 0
 	_out_from = 0
@@ -77,15 +100,24 @@ func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: flo
 		_deltas.resize(_count)
 		_meta.resize(_count * _meta_len)
 		_in.resize(_count * _IN)
+		_cols.resize(_count)
+		_cols_new.resize(_count)
+		_extra.resize(_count * COLS_EXTRA)
 		_sent_position.resize(_count)
 		_sent_velocity.resize(_count)
 	_motors[row] = motor
 	_states[row] = state
 	_commands[row] = command
 	_deltas[row] = delta if delta > 0.0 else _delta
-	var stage := motor.batch_prepare(state, command, _deltas[row], _in, _meta, row, _meta_len)
+	var stage: int
+	if _use_cols:
+		stage = motor.batch_prepare(state, command, _deltas[row], _extra, _meta, row, _meta_len, COLS_EXTRA)
+	else:
+		stage = motor.batch_prepare(state, command, _deltas[row], _in, _meta, row, _meta_len)
 	_stage[row] = stage
 	if stage == GSFpsMotor.BATCH_READY:
+		if _use_cols:
+			_cols[row] = state._f
 		_bodies[row] = motor.batch_body
 		_tuns[row] = motor.batch_tun
 		_sent_position[row] = state.position
@@ -107,7 +139,10 @@ func finish(row: int) -> bool:
 			# Something moved the player between add and its turn: the row and the ones after it are redone from here.
 			stale += 1
 			_take_back(row)
-			motor.batch_refill(state, _commands[row], _deltas[row], _in, row)
+			if _use_cols:
+				_refill_cols(motor, state, row)
+			else:
+				motor.batch_refill(state, _commands[row], _deltas[row], _in, row)
 			if _meta_len > 3:
 				_meta[row * _meta_len + 3] = motor.batch_clocks
 		if row >= _out_to or row < _out_from:
@@ -115,7 +150,10 @@ func finish(row: int) -> bool:
 		if row < _out_to:
 			_applied_row = row
 			_applied_at = (row - _out_from) * _OUT
-			motor.batch_apply(state, _commands[row], _out, _applied_at)
+			if _use_cols:
+				motor.batch_apply_cols(state, _commands[row], _cols_new[row], _out, _applied_at)
+			else:
+				motor.batch_apply(state, _commands[row], _out, _applied_at)
 			return _meta[row * _meta_len] == 3
 	motor.batch_resume(state, _commands[row], _deltas[row])
 	return false
@@ -172,6 +210,8 @@ func clear() -> void:
 	_tuns.clear()
 	_stage.clear()
 	_deltas.clear()
+	_cols.clear()
+	_cols_new.clear()
 
 
 func _take_back(row: int) -> void:
@@ -182,6 +222,25 @@ func _take_back(row: int) -> void:
 	_out_to = maxi(row, _out_from)
 
 
+## [method GSFpsMotor.batch_refill] for a row of columns: the whole row rebuilt as [method add] filled it, refilled from the
+## state, and its columns taken again.
+func _refill_cols(motor: GSFpsMotor, state: GSFpsState, row: int) -> void:
+	if _row.size() != _IN:
+		_row.resize(_IN)
+	var c: PackedFloat64Array = _cols[row]
+	var e := row * COLS_EXTRA
+	for i in 12:
+		_row[i] = c[i]
+	for i in COLS_EXTRA:
+		_row[12 + i] = _extra[e + i]
+	for i in _Cols.CLOCK_COUNT:
+		_row[39 + i] = c[_Cols.CLOCKS + i]
+	motor.batch_refill(state, _commands[row], _deltas[row], _row, 0)
+	for i in COLS_EXTRA:
+		_extra[e + i] = _row[12 + i]
+	_cols[row] = state._f
+
+
 func _run(row: int) -> void:
 	var to := row
 	while to < _count and _stage[to] == GSFpsMotor.BATCH_READY:
@@ -189,7 +248,10 @@ func _run(row: int) -> void:
 		# A body outside the hull world does not tell it where it came to rest: the game does, before the next row.
 		if _meta[(to - 1) * _meta_len] != 3:
 			break
-	if _meta_len > 3:
+	if _use_cols:
+		_out = _native.run_cols(_bodies, _tuns, _meta, _cols, _extra, _cols_new, row, to)
+		cols_runs += 1
+	elif _meta_len > 3:
 		_out = _native.run_rows(_bodies, _tuns, _meta, _in, row, to)
 	else:
 		_out = _native.run(_bodies, _tuns, _meta, _in, row, to)

@@ -1,5 +1,8 @@
 extends "gs_fps_motor_slide.gd"
 
+## The columns layout by path, not by its global name, so a run whose class cache predates it still parses.
+const _Cols := preload("../core/gs_fps_state_columns.gd")
+
 ## The motor's native side: the tunables and input rows it hands GameSpice Sim, the answers it writes back, and the rest
 ## stamp that lets a settled walker skip its ground probe. Split out of [GSFpsMotor] for file size; it is the layer
 ## between that and gs_fps_motor_slide.gd, and nothing outside the motor names this script.
@@ -125,6 +128,19 @@ func _native_tick_full(state: GSFpsState, command: GSFpsCommand, delta: float, t
 
 ## The whole tick's input, 55 values from [param o] in [param a] (set by index: a literal built a Variant Array of every value, each tick).
 func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: PackedFloat64Array, o: int) -> void:
+	# Position, velocity, ground normal, mode and the ground id's halves: the state's first 12 columns, in this order.
+	var f := state._f
+	for i in 12:
+		a[o + i] = f[i]
+	_fill_full_extra(state, command, delta, a, o)
+	# The clocks, wall counters and wall normal: the state's clock block, in this order.
+	for i in _Cols.CLOCK_COUNT:
+		a[o + 39 + i] = f[_Cols.CLOCKS + i]
+
+
+## The values of [method _fill_full_in]'s row that are not the state's columns, 12..38 of the row starting at [param o]:
+## all a row of [code]GSSimMotorBatch.run_cols[/code] needs beside the columns (there [param o] is 12 before the row's).
+func _fill_full_extra(state: GSFpsState, command: GSFpsCommand, delta: float, a: PackedFloat64Array, o: int) -> void:
 	var height := _height(state)
 	var push := _surface.push
 	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
@@ -138,10 +154,6 @@ func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: Pa
 		_fill_speed = t.speed_for(buttons, load_fraction)
 		_fill_buttons = buttons
 		_fill_load = load_fraction
-	# Position, velocity, ground normal, mode and the ground id's halves: the state's first 12 columns, in this order.
-	var f := state._f
-	for i in 12:
-		a[o + i] = f[i]
 	a[o + 12] = height
 	a[o + 13] = 1.0 if _native_rest_ok(state, height) else 0.0
 	a[o + 14] = _rest_position.x
@@ -173,9 +185,6 @@ func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: Pa
 	a[o + 36] = push.z
 	a[o + 37] = c[7]
 	a[o + 38] = c[8]
-	# The clocks, wall counters and wall normal: the state's clock block, in this order.
-	for i in GSFpsStateColumns.CLOCK_COUNT:
-		a[o + 39 + i] = f[GSFpsStateColumns.CLOCKS + i]
 
 
 ## [method _fill_full_in]'s values only the tunables and the effects decide: the effect flags, jump scale, jump velocity,
@@ -204,7 +213,18 @@ var _fill_speed := 0.0
 ## Writes a whole native tick's 45 values into the state and the counters.
 func _native_full_apply(state: GSFpsState, r: PackedFloat64Array, o: int = 0) -> void:
 	_rest_valid = false
-	var flags := _native_tick_apply(state, r, o)
+	_native_full_settle(state, _native_tick_apply(state, r, o))
+	# The clocks and wall counters (float64 scalars, the flag and counts whole numbers) go into the clock block as they
+	# are; the wall normal through its property, which rounds it to the float32 a Vector3 holds.
+	var f := state._f
+	for i in 13:
+		f[_Cols.CLOCKS + i] = r[o + 23 + i]
+	state.wall_normal = Vector3(r[o + 36], r[o + 37], r[o + 38])
+	_native_full_counters(r, o)
+
+
+## [method _native_full_apply]'s work on the answer's flags once the state holds the tick's end.
+func _native_full_settle(state: GSFpsState, flags: int) -> void:
 	if flags & 2 != 0:
 		reused_ground_ticks += 1
 	if flags & 16 != 0:
@@ -212,12 +232,10 @@ func _native_full_apply(state: GSFpsState, r: PackedFloat64Array, o: int = 0) ->
 	if flags & 8 != 0:
 		settled_ground_ticks += 1
 		_stamp_rest(state)
-	# The clocks and wall counters (float64 scalars, the flag and counts whole numbers) go into the clock block as they
-	# are; the wall normal through its property, which rounds it to the float32 a Vector3 holds.
-	var f := state._f
-	for i in 13:
-		f[GSFpsStateColumns.CLOCKS + i] = r[o + 23 + i]
-	state.wall_normal = Vector3(r[o + 36], r[o + 37], r[o + 38])
+
+
+## The whole tick's view turn and move counters, values 39..44 of the answer at [param o].
+func _native_full_counters(r: PackedFloat64Array, o: int) -> void:
 	view_turn = r[o + 39]
 	slides += int(r[o + 40])
 	launches += int(r[o + 41])
@@ -274,6 +292,11 @@ func _native_tick_apply(state: GSFpsState, r: PackedFloat64Array, o: int = 0) ->
 	state.ground_normal = Vector3(r[o + 6], r[o + 7], r[o + 8])
 	state.mode = int(r[o + 9])
 	state.ground_id = int(r[o + 10]) | (int(r[o + 11]) << 32)
+	return _native_tick_flags(state, r, o)
+
+
+## The answer's flags at [param o] + 12 and the collision counters after them; the flags clear the surface.
+func _native_tick_flags(state: GSFpsState, r: PackedFloat64Array, o: int) -> int:
 	var flags := int(r[o + 12])
 	if flags & 4 != 0:
 		state.surface = &""

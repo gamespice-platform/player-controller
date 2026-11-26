@@ -64,10 +64,10 @@ var batch_tun := PackedFloat64Array()
 var batch_clocks: int = 0
 
 
-## The start of [method simulate] for a tick that may run in GameSpice Sim's batch with other players' ([GSFpsMotorBatch]): everything before the first world query that depends on another player. On [constant BATCH_READY] row [param row] of [param input] (55 values) and [param meta] ([param meta_len] values, 3 or 4) is filled and [method batch_apply] ends the tick; on [constant BATCH_DEFER] [method batch_resume] does, the same way [method simulate] would have. With 4 the row may leave the clocks to GameSpice Sim ([member batch_clocks], API 31).
+## The start of [method simulate] for a tick that may run in GameSpice Sim's batch with other players' ([GSFpsMotorBatch]): everything before the first world query that depends on another player. On [constant BATCH_READY] row [param row] of [param input] (55 values) and [param meta] ([param meta_len] values, 3 or 4) is filled and [method batch_apply] ends the tick; on [constant BATCH_DEFER] [method batch_resume] does, the same way [method simulate] would have. With 4 the row may leave the clocks to GameSpice Sim ([member batch_clocks], API 31). With [param row_len] 27 the row holds only the values that are not the state's columns, for [code]GSSimMotorBatch.run_cols[/code], which takes the columns themselves, and [method batch_apply_cols] ends the tick (API 37).
 func batch_prepare(
 	state: GSFpsState, command: GSFpsCommand, delta: float, input: PackedFloat64Array, meta: PackedInt64Array, row: int,
-	meta_len: int = 3
+	meta_len: int = 3, row_len: int = 55
 ) -> int:
 	body.begin_tick()
 	batch_clocks = 0
@@ -96,7 +96,10 @@ func batch_prepare(
 	if meta_len > 3:
 		meta[at + 3] = batch_clocks
 	batch_tun = _native_full_tun(tick_tun)
-	_fill_full_in(state, command, delta, input, row * 55)
+	if row_len == 55:
+		_fill_full_in(state, command, delta, input, row * 55)
+	else:
+		_fill_full_extra(state, command, delta, input, row * row_len - 12)
 	return BATCH_READY
 
 
@@ -127,6 +130,25 @@ func batch_apply(state: GSFpsState, command: GSFpsCommand, out: PackedFloat64Arr
 	body.native_batch_done(int(out[at + 20]), int(out[at + 21]), int(out[at + 22]))
 	_native_full_apply(state, out, at)
 	state.previous_buttons = command.buttons
+	body.end_tick()
+
+
+## [method batch_apply] for a row of [code]GSSimMotorBatch.run_cols[/code]: [param cols] is the state's columns the batch
+## wrote, the answer's position to wall normal and the previous buttons in them as [method batch_apply] writes them; the
+## rest of the answer (flags, counters, the view turn) is read from the 45 values at [param at] in [param out].
+func batch_apply_cols(
+	state: GSFpsState, command: GSFpsCommand, cols: PackedFloat64Array, out: PackedFloat64Array, at: int
+) -> void:
+	batch_clocks = 0
+	body.native_batch_done(int(out[at + 20]), int(out[at + 21]), int(out[at + 22]))
+	# The batch took the columns at add; the yaw is the one column the answer does not write, so the state's stays.
+	var yaw := state._f[_Cols.YAW]
+	state._f = cols
+	if cols[_Cols.YAW] != yaw:
+		state._f[_Cols.YAW] = yaw
+	_rest_valid = false
+	_native_full_settle(state, _native_tick_flags(state, out, at))
+	_native_full_counters(out, at)
 	body.end_tick()
 
 

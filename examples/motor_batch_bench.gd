@@ -1,6 +1,6 @@
 extends "res://examples/motor_bench.gd"
 
-## Micro-benchmark of the players' loop a dedicated server runs with [GSFpsMotorBatch] (game-fatal-contact's `_tick_players_batched`): N controllers in a collision world, their hulls in gs-sim's hull world, each tick begin_tick and add for every player, then finish and end_tick for every player. Prints microseconds per player per tick for each of the four steps, and a digest of every tick's states: one build prints one digest, and a change that keeps results identical prints the digest the tree before it printed. Also runs the one-by-one loop ([method GSFpsController.simulate_tick]) and says whether it ends in the same states. With no gs-sim library it says so and exits 0. Run: [code]godot --headless --path . res://examples/motor_batch_bench.tscn [-- --n=32 --ticks=1000][/code]
+## Micro-benchmark of the players' loop a dedicated server runs with [GSFpsMotorBatch] (game-fatal-contact's `_tick_players_batched`): N controllers in a collision world, their hulls in gs-sim's hull world, each tick begin_tick and add for every player, then finish and end_tick for every player. Prints microseconds per player per tick for each of the four steps, and a digest of every tick's states: one build prints one digest, and a change that keeps results identical prints the digest the tree before it printed. Also runs the one-by-one loop ([method GSFpsController.simulate_tick]) and says whether it ends in the same states. With no gs-sim library it says so and exits 0. Run: [code]godot --headless --path . res://examples/motor_batch_bench.tscn [-- --n=32 --ticks=1000 --rows][/code] (--rows: the batch over 55-value rows, not the states' columns)
 
 
 ## A controller whose physics body is wrapped in a hull body, as game-fatal-contact's players are (FcSolidBody).
@@ -139,7 +139,9 @@ func _profiled() -> void:
 
 
 func _run() -> void:
-	print("motor batch bench: n=%d ticks=%d" % [_n, _ticks])
+	# --rows: the batch over 55-value rows (GSFpsMotorBatch.native_cols off), for a before and after in one session.
+	GSFpsMotorBatch.native_cols = not ("--rows" in OS.get_cmdline_user_args())
+	print("motor batch bench: n=%d ticks=%d columns=%s" % [_n, _ticks, GSFpsMotorBatch.native_cols])
 	if not GSFpsPhysicsBody.native_available() or not GSFpsMotorBatch.available() or not ClassDB.class_exists(&"GSSimHullWorld"):
 		print("  gs-sim's motor batch is not loaded: skipped")
 		get_tree().quit(0)

@@ -23,7 +23,8 @@ func _snap(s: GSFpsState, motor: GSFpsMotor) -> PackedByteArray:
 		s.wall_run_spent, s.wall_jumps_in_air, s.wall_jump_heading, s.wall_normal, s.previous_buttons, motor.view_turn])
 
 
-func _batch_replay(batched: bool, hz: int, variant: int, streams: Array) -> Dictionary:
+func _batch_replay(batched: bool, hz: int, variant: int, streams: Array, cols: bool = true) -> Dictionary:
+	GSFpsMotorBatch.native_cols = cols
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = true
 	GSFpsMotor.native_full = true
@@ -166,6 +167,7 @@ func _batch_runs() -> void:
 			var a := _batch_replay(false, hz, variant, streams)
 			var b := _batch_replay(true, hz, variant, streams)
 			var label := "%d players @%d Hz set %d" % [PLAYERS, hz, variant]
+			_cols_check(a, _batch_replay(true, hz, variant, streams, false), b, label)
 			var first := -1
 			for i in range(BATCH_TICKS):
 				if a["ticks"][i] != b["ticks"][i]:
@@ -187,6 +189,25 @@ func _batch_runs() -> void:
 	_sections += 1
 
 
+## The batch over 55-value rows ([member GSFpsMotorBatch.native_cols] off) is held to the loop as well, so both of its
+## paths stay; where the library has [code]run_cols[/code] the default run went through it.
+func _cols_check(a: Dictionary, rows: Dictionary, cols: Dictionary, label: String) -> void:
+	var first := -1
+	for i in range(BATCH_TICKS):
+		if a["ticks"][i] != rows["ticks"][i]:
+			first = i
+			break
+	_check(first < 0 and a["counters"] == rows["counters"], label + ": the batch over 55-value rows is identical too%s" % [
+		"" if first < 0 else " (first differs at tick %d)" % first])
+	var by_rows: GSFpsMotorBatch = rows["batch"]
+	var by_cols: GSFpsMotorBatch = cols["batch"]
+	_check(by_rows.cols_runs == 0, label + ": native_cols off hands gs-sim no columns")
+	if ClassDB.class_has_method(GSFpsMotorBatch.NATIVE_CLASS, &"run_cols"):
+		_check(by_cols.cols_runs == by_cols.runs and by_cols.runs > 0, label + ": every run handed gs-sim the states' columns (%d)" % by_cols.cols_runs)
+	else:
+		print("  %s: the library has no run_cols; the columns path was not run" % label)
+
+
 func _run() -> void:
 	print("gs-player-controller motor batch parity")
 	var expected := 1
@@ -200,6 +221,7 @@ func _run() -> void:
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		_batch_runs()
+	GSFpsMotorBatch.native_cols = true
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = false
 	GSFpsMotor.native_full = true
