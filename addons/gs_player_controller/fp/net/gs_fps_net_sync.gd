@@ -339,6 +339,16 @@ static func _native_unpacker() -> bool:
 	return _unpacker_ok == 1
 
 
+static var _exact_ok := -1
+
+
+## Whether the native packer also has [code]unpack_exact[/code] (push_core with an exact record in one call).
+static func _native_exact() -> bool:
+	if _exact_ok < 0:
+		_exact_ok = 1 if _native_unpacker() and _packer.has_method(&"unpack_exact") else 0
+	return _exact_ok == 1
+
+
 static func _pull_native(state: GSFpsState, target: Variant, has: int) -> void:
 	var f := state._f
 	var codes: PackedInt64Array = _packer.pack(f, state.crouch_held, timer_scale,
@@ -535,14 +545,23 @@ static func push(source: Variant, state: GSFpsState) -> void:
 
 ## The column half of [method push]: [param position], [param velocity] and [param yaw] written, [param flags]
 ## unpacked ([method unpack_flags]), then [param timers2] when it is not negative ([method unpack_timers2], which
-## overrides the coarse slide and wall-run fields). With [member native_pack] and a GameSpice Sim whose
-## [code]GSSimFpsNetPack[/code] has [code]unpack[/code], one native call writes the columns; the script writes
-## stay the specification (examples/net_pack_parity holds the two together). A carrier with its own push (Fatal
+## overrides the coarse slide and wall-run fields), then [param exact] when it is an [constant EXACT_FLOATS] long
+## record ([method push_exact], which overrides the quantised position, velocity and timers). With
+## [member native_pack] and a GameSpice Sim whose [code]GSSimFpsNetPack[/code] has [code]unpack[/code]
+## ([code]unpack_exact[/code] for a record), one native call writes the columns; the script writes stay the
+## specification (examples/net_pack_parity holds the two together). A carrier with its own push (Fatal
 ## Contact's) calls this for the same writes.
 static func push_core(state: GSFpsState, position: Vector3, velocity: Vector3, yaw: float, flags: int,
-		timers2: int = -1) -> void:
+		timers2: int = -1, exact: PackedFloat32Array = PackedFloat32Array()) -> void:
+	var has_exact := exact.size() == EXACT_FLOATS
 	if native_pack and _native_unpacker():
-		state._f = _packer.unpack(state._f, position, velocity, yaw, flags, timers2, timer_scale)
+		if has_exact and _native_exact():
+			state._f = _packer.unpack_exact(state._f, position, velocity, yaw, flags, timers2, timer_scale, exact)
+			_push_exact_fields(state, exact)
+		else:
+			state._f = _packer.unpack(state._f, position, velocity, yaw, flags, timers2, timer_scale)
+			if has_exact:
+				push_exact(state, exact)
 		state.crouch_held = (flags & FLAG_CROUCH_HELD) != 0
 		return
 	state.position = position
@@ -551,6 +570,38 @@ static func push_core(state: GSFpsState, position: Vector3, velocity: Vector3, y
 	unpack_flags(state, flags)
 	if timers2 >= 0:
 		unpack_timers2(state, timers2)
+	if has_exact:
+		push_exact(state, exact)
+
+
+## Floats in an exact movement record: position (3), velocity (3), crouch fraction, time since grounded, time
+## since jump, time since jump pressed, wall-run cooldown, stamina, stamina exhausted (above 0.5), stamina delay.
+## A carrier that sends its owner an unquantised copy to rewind from (Fatal Contact's [code]net_exact[/code])
+## lays it out this way.
+const EXACT_FLOATS := 14
+
+
+## Writes an exact movement record ([constant EXACT_FLOATS] long) over [param state]; false, writing nothing,
+## for a record of another length.
+static func push_exact(state: GSFpsState, exact: PackedFloat32Array) -> bool:
+	if exact.size() != EXACT_FLOATS:
+		return false
+	state.position = Vector3(exact[0], exact[1], exact[2])
+	state.velocity = Vector3(exact[3], exact[4], exact[5])
+	state.time_since_grounded = exact[7]
+	state.time_since_jump = exact[8]
+	state.time_since_jump_pressed = exact[9]
+	state.wall_run_cooldown_left = exact[10]
+	_push_exact_fields(state, exact)
+	return true
+
+
+## The record's values outside the columns.
+static func _push_exact_fields(state: GSFpsState, exact: PackedFloat32Array) -> void:
+	state.crouch_fraction = exact[6]
+	state.stamina = exact[11]
+	state.stamina_exhausted = exact[12] > 0.5
+	state.stamina_delay_left = exact[13]
 
 
 ## Whether two peers will simulate the same way.

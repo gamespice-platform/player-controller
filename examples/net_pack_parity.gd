@@ -1,6 +1,6 @@
 extends Node
 
-## Holds [method GSFpsNetSync.pull]'s native pack and [method GSFpsNetSync.push_core]'s native unpack (gs-sim's [code]GSSimFpsNetPack[/code]) to the script, to the bit. Unpack: every carrier pulled below pushed back into a stale state each way, plus random 64-bit flags and timers2 codes, every column and crouch_held compared. Pack: random and edge states (negative and huge timers, half-code boundaries, wall runs, spent runs, the heading's sign bit, odd stamina) pulled at several tick rates onto a full carrier and one without stamina, once each way, every replicated field compared. Then the cost of a pull each way. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/net_pack_parity.tscn[/code]
+## Holds [method GSFpsNetSync.pull]'s native pack and [method GSFpsNetSync.push_core]'s native unpack (gs-sim's [code]GSSimFpsNetPack[/code]) to the script, to the bit. Unpack: every carrier pulled below pushed back into a stale state each way, plus random 64-bit flags and timers2 codes, every column and crouch_held compared; then the same pushes with a random exact record (push_core's last argument, [method GSFpsNetSync.push_exact]), the fields outside the columns compared too, and records of the wrong length. Pack: random and edge states (negative and huge timers, half-code boundaries, wall runs, spent runs, the heading's sign bit, odd stamina) pulled at several tick rates onto a full carrier and one without stamina, once each way, every replicated field compared. Then the cost of a pull each way. With no library it says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead. Run: [code]godot --headless --path . res://examples/net_pack_parity.tscn[/code]
 
 const STATES := 4000
 const RATES := [20, 22, 33, 64, 66, 128]
@@ -57,6 +57,12 @@ func _ready() -> void:
 	else:
 		_unpack_parity()
 		_unpack_bench()
+		if not GSFpsNetSync._native_exact():
+			print("  this gs-sim has no GSSimFpsNetPack.unpack_exact: the exact record goes through the script")
+			if OS.get_environment("GS_SIM_REQUIRE_NATIVE") == "1":
+				_check(false, "the library has unpack_exact (GS_SIM_REQUIRE_NATIVE=1)")
+		_exact_parity()
+		_exact_bench()
 	GSFpsNetSync.native_pack = true
 	GSFpsNetSync.timer_scale = had_scale
 	print("%d passed, %d failed" % [_passed, _failed])
@@ -217,3 +223,86 @@ func _unpack_bench() -> void:
 			GSFpsNetSync.push_core(s, c.net_position, c.net_velocity, c.net_yaw, c.net_flags, c.net_timers2)
 		us.append(float(Time.get_ticks_usec() - t0) / BENCH_PULLS)
 	print("  push_core: script %.2f us, native %.2f us" % us)
+
+
+## A random exact record: plain values, edges of stamina_exhausted's 0.5, negatives and huge timers; one in eight
+## the wrong length (13 or 15), which push_core must ignore.
+func _random_exact(rng: RandomNumberGenerator) -> PackedFloat32Array:
+	var n := GSFpsNetSync.EXACT_FLOATS
+	if rng.randi() % 8 == 0:
+		n += 1 if rng.randi() % 2 == 0 else -1
+	var e := PackedFloat32Array()
+	e.resize(n)
+	for k in range(n):
+		match rng.randi_range(0, 4):
+			0: e[k] = rng.randf_range(-500.0, 500.0)
+			1: e[k] = 0.5 + rng.randf_range(-1e-6, 1e-6)
+			2: e[k] = -1.0
+			3: e[k] = rng.randf_range(1000.0, 1e7)
+			_: e[k] = rng.randf()
+	return e
+
+
+## A state after push_core with an exact record one way: the columns and every field the record writes.
+func _pushed_exact(stale: GSFpsState, native: bool, c: Object, timers2: int, exact: PackedFloat32Array) -> PackedByteArray:
+	var s := GSFpsState.new()
+	s.copy_from(stale)
+	GSFpsNetSync.native_pack = native
+	GSFpsNetSync.push_core(s, c.net_position, c.net_velocity, c.net_yaw, c.net_flags, timers2, exact)
+	return var_to_bytes([s._f, s.crouch_held, s.crouch_fraction, s.stamina, s.stamina_exhausted, s.stamina_delay_left])
+
+
+func _exact_parity() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2026_11_28
+	var mismatches := 0
+	var cases := 0
+	var applied := 0
+	for rate: int in RATES:
+		GSFpsNetSync.set_tick_rate(rate)
+		for i in range(STATES / 4):
+			var stale := _random_state(rng, GSFpsNetSync.timer_scale)
+			var c := Carrier.new()
+			GSFpsNetSync.native_pack = false
+			GSFpsNetSync.pull(_random_state(rng, GSFpsNetSync.timer_scale), c)
+			var exact := _random_exact(rng)
+			applied += 1 if exact.size() == GSFpsNetSync.EXACT_FLOATS else 0
+			for timers2: int in [c.net_timers2, -1]:
+				cases += 1
+				if _pushed_exact(stale, false, c, timers2, exact) != _pushed_exact(stale, true, c, timers2, exact):
+					mismatches += 1
+					if mismatches <= 5:
+						print("  exact mismatch at rate %d: flags %d timers2 %d exact %s" % [rate, c.net_flags, timers2, exact])
+	_check(mismatches == 0, "every push with an exact record is identical both ways (%d of %d differ)" % [mismatches, cases])
+	_check(applied > 0 and applied < cases / 2, "records of both lengths were exercised (%d applied)" % applied)
+	# The record really lands: script push_exact equals the hand-written field writes.
+	var s := GSFpsState.new()
+	var e := _random_exact(rng)
+	while e.size() != GSFpsNetSync.EXACT_FLOATS:
+		e = _random_exact(rng)
+	_check(GSFpsNetSync.push_exact(s, e), "push_exact takes a full record")
+	_check(s.position == Vector3(e[0], e[1], e[2]) and s.velocity == Vector3(e[3], e[4], e[5])
+		and s.time_since_grounded == e[7] and s.time_since_jump == e[8] and s.time_since_jump_pressed == e[9]
+		and s.wall_run_cooldown_left == e[10] and s.crouch_fraction == e[6] and s.stamina == e[11]
+		and s.stamina_exhausted == (e[12] > 0.5) and s.stamina_delay_left == e[13], "push_exact writes each field")
+	_check(not GSFpsNetSync.push_exact(s, PackedFloat32Array([1.0])), "push_exact refuses a short record")
+	print("  %d pushes with an exact record compared" % cases)
+
+
+func _exact_bench() -> void:
+	GSFpsNetSync.set_tick_rate(66)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	var c := Carrier.new()
+	GSFpsNetSync.pull(_random_state(rng, GSFpsNetSync.timer_scale), c)
+	var exact := PackedFloat32Array()
+	exact.resize(GSFpsNetSync.EXACT_FLOATS)
+	var s := GSFpsState.new()
+	var us := []
+	for native: bool in [false, true]:
+		GSFpsNetSync.native_pack = native
+		var t0 := Time.get_ticks_usec()
+		for i in range(BENCH_PULLS):
+			GSFpsNetSync.push_core(s, c.net_position, c.net_velocity, c.net_yaw, c.net_flags, c.net_timers2, exact)
+		us.append(float(Time.get_ticks_usec() - t0) / BENCH_PULLS)
+	print("  push_core with an exact record: script %.2f us, native %.2f us" % us)
