@@ -178,6 +178,9 @@ func _fill_full_extra(
 	if c.is_empty():
 		_fill_clean = _fill_values()
 		c = _fill_clean
+	if bits and _consts_native and _consts_kept(c):
+		a[o + 13] = int(a[o + 13]) | 4
+		return
 	a[o + 23] = c[0]
 	a[o + 24] = c[1]
 	a[o + 25] = c[2] * _surface.jump_scale * c[1]
@@ -194,6 +197,8 @@ func _fill_full_extra(
 	a[o + 36] = push.z
 	a[o + 37] = c[7]
 	a[o + 38] = c[8]
+	if bits and _consts_native:
+		_consts_keep(c, a.slice(o + 23, o + 39))
 
 
 ## [method _fill_full_in]'s values only the tunables and the effects decide: the effect flags, jump scale, jump velocity,
@@ -217,6 +222,36 @@ var _fill_rev := -1
 var _fill_buttons := -1
 var _fill_load := NAN
 var _fill_speed := 0.0
+## Whether this motor's native state keeps a [code]run_states[/code] row's values 23..38 ([code]set_consts[/code], API 40):
+## the row then says so with bit 4 of value 13 and the script writes them only when what decides them changed.
+var _consts_native := false
+## What the kept values were made from: the effect and tunable values, the speed and the surface's values.
+var _consts_c := PackedFloat64Array()
+var _consts_speed := NAN
+var _consts_surface: GSFpsSurface = null
+var _consts_scales := PackedFloat64Array([NAN, NAN, NAN, NAN])
+var _consts_push := Vector3(NAN, NAN, NAN)
+
+
+## Whether the native state's kept values are the ones [method _fill_full_extra] would write now.
+func _consts_kept(c: PackedFloat64Array) -> bool:
+	var s := _surface
+	return (
+		s == _consts_surface and _fill_speed == _consts_speed and c == _consts_c and s.push == _consts_push
+		and s.jump_scale == _consts_scales[0] and s.max_speed_scale == _consts_scales[1]
+		and s.friction_scale == _consts_scales[2] and s.accelerate_scale == _consts_scales[3]
+	)
+
+
+## Hands the native state the values just written and remembers what they were made from.
+func _consts_keep(c: PackedFloat64Array, vals: PackedFloat64Array) -> void:
+	var s := _surface
+	_consts_c = c.duplicate()
+	_consts_speed = _fill_speed
+	_consts_surface = s
+	_consts_push = s.push
+	_consts_scales = PackedFloat64Array([s.jump_scale, s.max_speed_scale, s.friction_scale, s.accelerate_scale])
+	_mstate.set_consts(vals)
 
 
 ## Writes a whole native tick's 45 values into the state and the counters.
@@ -478,6 +513,7 @@ func batch_motor_state() -> Object:
 		if not ClassDB.class_exists(&"GSSimMotorState"):
 			return null
 		_mstate = ClassDB.instantiate(&"GSSimMotorState")
+		_consts_native = _mstate.has_method(&"set_consts")
 	return _mstate
 
 

@@ -53,6 +53,12 @@ func _batch_replay(
 	var posts := [0, 0]
 	for tick in range(BATCH_TICKS):
 		world.begin(ids, _hull_rows(tun, states, alive), Callable(), 1.0e9)
+		# A surface edited in place (same object, new values): a row's kept values (ROW_CONSTS) must follow it.
+		if tick == 300 or tick == 700:
+			var surf: GSFpsSurface = motors[0]._surface
+			surf.friction_scale = 0.5 if tick == 300 else 1.0
+			surf.push = Vector3(0.4, 0.0, -0.2) if tick == 300 else Vector3.ZERO
+			motors[4]._surface.max_speed_scale = 1.25 if tick == 300 else 1.0
 		if batched:
 			wired = batch.start(step) and wired
 			for i in range(PLAYERS):

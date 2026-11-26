@@ -29,7 +29,7 @@ Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is sp
 | `addons/gs_player_controller/fp/nodes/` | `GSFpsController`, `GSFpsSampler`, `GSFpsTouchSampler`, `GSFpsView`, `GSFpsViewMotion` (its motion cues without nodes) |
 | `addons/gs_player_controller/fp/net/` | `GSFpsNetSync`: what replicates, at what precision |
 | `addons/gs_player_controller/tp/` | `core/` (motor, state, tunables) and `nodes/` (controller, `GSTpsCameraRig` on GameSpice Core's `GSCameraBoom` and `GSCameraFade`) |
-| `addons/gs_player_controller/gs_player_controller_api.gd` | the API level (39) |
+| `addons/gs_player_controller/gs_player_controller_api.gd` | the API level (40) |
 | `examples/` | ten self-test scenes, `sandbox.tscn` (a course to feel the movement out, not a test) |
 
 ## Running and testing
