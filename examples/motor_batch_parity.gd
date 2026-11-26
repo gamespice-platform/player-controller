@@ -23,8 +23,11 @@ func _snap(s: GSFpsState, motor: GSFpsMotor) -> PackedByteArray:
 		s.wall_run_spent, s.wall_jumps_in_air, s.wall_jump_heading, s.wall_normal, s.previous_buttons, motor.view_turn])
 
 
-func _batch_replay(batched: bool, hz: int, variant: int, streams: Array, cols: bool = true) -> Dictionary:
+func _batch_replay(
+	batched: bool, hz: int, variant: int, streams: Array, cols: bool = true, native_state: bool = true
+) -> Dictionary:
 	GSFpsMotorBatch.native_cols = cols
+	GSFpsMotorBatch.native_state = native_state
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = true
 	GSFpsMotor.native_full = true
@@ -115,8 +118,23 @@ func _counters(motors: Array[GSFpsMotor]) -> Array:
 	var counters := []
 	for m in motors:
 		counters.append_array([m.body.hull_blocks, m.body.world_touches, m.stuck_ticks, m.depenetrated_ticks, m.slides,
-			m.launches, m.dashes, m.wall_runs, m.wall_jumps, m.ticks_simulated])
+			m.launches, m.dashes, m.wall_runs, m.wall_jumps, m.ticks_simulated, m.reused_ground_ticks, m.settled_ground_ticks,
+			m.embedded_ticks, m.lifted_ticks, m.duplicate_plane_ticks, m.crease_leg_ticks, m.split_leg_ticks, m.idle_ticks])
 	return counters
+
+
+const _COUNTER_NAMES := ["hull_blocks", "world_touches", "stuck", "depenetrated", "slides", "launches", "dashes",
+	"wall_runs", "wall_jumps", "ticks_simulated", "reused_ground", "settled_ground", "embedded", "lifted",
+	"duplicate_plane", "crease_leg", "split_leg", "idle"]
+
+
+## Where two [method _counters] differ ("" when they do not): the first player and counter, both values.
+func _counter_diff(a: Array, b: Array) -> String:
+	for i in range(mini(a.size(), b.size())):
+		if a[i] != b[i]:
+			var n := _COUNTER_NAMES.size()
+			return " (player %d %s: %s vs %s)" % [i / n, _COUNTER_NAMES[i % n], a[i], b[i]]
+	return "" if a.size() == b.size() else " (%d vs %d values)" % [a.size(), b.size()]
 
 
 ## Whether [method GSFpsMotorBatch.post_row]'s [param post] is [param s]'s (the velocity as the float32 it is stored as).
@@ -168,6 +186,7 @@ func _batch_runs() -> void:
 			var b := _batch_replay(true, hz, variant, streams)
 			var label := "%d players @%d Hz set %d" % [PLAYERS, hz, variant]
 			_cols_check(a, _batch_replay(true, hz, variant, streams, false), b, label)
+			_states_check(a, _batch_replay(true, hz, variant, streams, true, false), b, label)
 			var first := -1
 			for i in range(BATCH_TICKS):
 				if a["ticks"][i] != b["ticks"][i]:
@@ -178,7 +197,7 @@ func _batch_runs() -> void:
 				label, batch.rows, batch.runs, batch.retakes, batch.stale, a["blocks"], a["script_gathers"]])
 			_check(a["wired"] and b["wired"], label + ": the hull world and the batch are there")
 			_check(first < 0, label + ": every one of %d ticks identical for every player%s" % [BATCH_TICKS, "" if first < 0 else " (first differs at tick %d)" % first])
-			_check(a["counters"] == b["counters"], label + ": the same motor and hull counters")
+			_check(a["counters"] == b["counters"], label + ": the same motor and hull counters" + _counter_diff(a["counters"], b["counters"]))
 			_check(a["native_ticks"] == b["native_ticks"], label + ": as many native ticks (%d, batched %d)" % [a["native_ticks"], b["native_ticks"]])
 			_check(a["script_gathers"] == b["script_gathers"], label + ": as many script gathers")
 			_check(a["blocks"] > 0, label + ": the players do walk into each other")
@@ -208,6 +227,25 @@ func _cols_check(a: Dictionary, rows: Dictionary, cols: Dictionary, label: Strin
 		print("  %s: the library has no run_cols; the columns path was not run" % label)
 
 
+## The columns batch with the rest stamps kept by the script ([member GSFpsMotorBatch.native_state] off) is held to
+## the loop too; where the library has [code]run_states[/code] the default run kept them natively.
+func _states_check(a: Dictionary, script_kept: Dictionary, native_kept: Dictionary, label: String) -> void:
+	var first := -1
+	for i in range(BATCH_TICKS):
+		if a["ticks"][i] != script_kept["ticks"][i]:
+			first = i
+			break
+	_check(first < 0 and a["counters"] == script_kept["counters"], label + ": native_state off is identical too%s" % [
+		"" if first < 0 else " (first differs at tick %d)" % first])
+	var off: GSFpsMotorBatch = script_kept["batch"]
+	var on: GSFpsMotorBatch = native_kept["batch"]
+	_check(off.state_runs == 0 and off.cols_runs > 0, label + ": native_state off keeps the stamps in the script")
+	if ClassDB.class_has_method(GSFpsMotorBatch.NATIVE_CLASS, &"run_states"):
+		_check(on.state_runs == on.runs and on.runs > 0, label + ": every run kept the rest stamps natively (%d)" % on.state_runs)
+	else:
+		print("  %s: the library has no run_states; the native stamp path was not run" % label)
+
+
 func _run() -> void:
 	print("gs-player-controller motor batch parity")
 	var expected := 1
@@ -222,6 +260,7 @@ func _run() -> void:
 		await get_tree().physics_frame
 		_batch_runs()
 	GSFpsMotorBatch.native_cols = true
+	GSFpsMotorBatch.native_state = true
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = false
 	GSFpsMotor.native_full = true

@@ -73,6 +73,8 @@ func _native_tick_pre(state: GSFpsState, tun: PackedFloat64Array) -> bool:
 
 ## Whether [method _reuse_rest] may reuse the last rest, for the native start: all it compares but the position.
 func _native_rest_ok(state: GSFpsState, height: float) -> bool:
+	if _rest_valid and not _rest_in_script:
+		_rest_pull()
 	return (
 		_rest_valid and state.mode == GSFpsState.Mode.GROUND
 		and state.velocity == _rest_velocity
@@ -140,7 +142,11 @@ func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: Pa
 
 ## The values of [method _fill_full_in]'s row that are not the state's columns, 12..38 of the row starting at [param o]:
 ## all a row of [code]GSSimMotorBatch.run_cols[/code] needs beside the columns (there [param o] is 12 before the row's).
-func _fill_full_extra(state: GSFpsState, command: GSFpsCommand, delta: float, a: PackedFloat64Array, o: int) -> void:
+## With [param bits] the row is one of [code]GSSimMotorBatch.run_states[/code]: 13 holds [method batch_rest_bits], and the
+## rest position is the native stamp's.
+func _fill_full_extra(
+	state: GSFpsState, command: GSFpsCommand, delta: float, a: PackedFloat64Array, o: int, bits: bool = false
+) -> void:
 	var height := _height(state)
 	var push := _surface.push
 	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
@@ -155,10 +161,13 @@ func _fill_full_extra(state: GSFpsState, command: GSFpsCommand, delta: float, a:
 		_fill_buttons = buttons
 		_fill_load = load_fraction
 	a[o + 12] = height
-	a[o + 13] = 1.0 if _native_rest_ok(state, height) else 0.0
-	a[o + 14] = _rest_position.x
-	a[o + 15] = _rest_position.y
-	a[o + 16] = _rest_position.z
+	if bits:
+		a[o + 13] = batch_rest_bits(state)
+	else:
+		a[o + 13] = 1.0 if _native_rest_ok(state, height) else 0.0
+		a[o + 14] = _rest_position.x
+		a[o + 15] = _rest_position.y
+		a[o + 16] = _rest_position.z
 	a[o + 17] = delta
 	a[o + 18] = command.buttons
 	a[o + 19] = state.previous_buttons
@@ -313,6 +322,8 @@ func _native_tick_flags(state: GSFpsState, r: PackedFloat64Array, o: int) -> int
 ## The whole tick for a walker standing still on the floor the last tick proved, or false (nothing written) when anything differs.
 ## Same answers as the full path, which for such a tick changes nothing: wish, velocity and buttons are zero, so only the world can differ, and two queries ask it (embedded? floor still there?).
 func _idle_tick(state: GSFpsState, command: GSFpsCommand) -> bool:
+	if _rest_valid and not _rest_in_script:
+		_rest_pull()
 	if (
 		not _rest_valid or command.move != Vector2.ZERO or command.buttons != 0
 		or state.previous_buttons != 0 or state.mode != GSFpsState.Mode.GROUND
@@ -356,6 +367,8 @@ func _idle_tick(state: GSFpsState, command: GSFpsCommand) -> bool:
 
 ## Remembers the state a settled ground check just proved, for [method _reuse_rest].
 func _stamp_rest(state: GSFpsState) -> void:
+	_rest_native = false
+	_rest_in_script = true
 	_rest_valid = reuse_settled_ground and state.mode == GSFpsState.Mode.GROUND
 	_rest_position = state.position
 	_rest_velocity = state.velocity
@@ -385,6 +398,8 @@ func _ground_node(id: int) -> Node3D:
 func _reuse_rest(state: GSFpsState) -> bool:
 	if not _rest_valid:
 		return false
+	if not _rest_in_script:
+		_rest_pull()
 	_rest_valid = false
 	if (
 		state.mode == GSFpsState.Mode.GROUND
@@ -439,6 +454,83 @@ func batch_apply_cols(
 	if cols[_Cols.YAW] != yaw:
 		state._f[_Cols.YAW] = yaw
 	_rest_valid = false
-	_native_full_settle(state, _native_tick_flags(state, out, at))
-	_native_full_counters(out, at)
+	if batch_states:
+		_states_settle(state, cols, out, at)
+	else:
+		_native_full_settle(state, _native_tick_flags(state, out, at))
+		_native_full_counters(out, at)
 	body.end_tick()
+
+
+## The rest stamp [code]GSSimMotorBatch.run_states[/code] keeps natively (GameSpice Sim's [code]GSSimMotorState[/code], API 38),
+## made at the first such row.
+var _mstate: Object = null
+## Whether the native stamp is the current one, and whether the script's fields are ([method _rest_pull] copies them over).
+var _rest_native := false
+var _rest_in_script := true
+## Set by [GSFpsMotorBatch] before [method batch_prepare]: this row goes to [code]run_states[/code].
+var batch_states := false
+
+
+## This motor's native state for a [code]run_states[/code] row, or null when its rows cannot be ones.
+func batch_motor_state() -> Object:
+	if _mstate == null:
+		if not ClassDB.class_exists(&"GSSimMotorState"):
+			return null
+		_mstate = ClassDB.instantiate(&"GSSimMotorState")
+	return _mstate
+
+
+## A [code]run_states[/code] row's value 13: the script's part of rest ok (1: the stamp is valid, the surface the stamped
+## one, the ground node unmoved; a script stamp is handed to the native state first) and [member reuse_settled_ground] (2).
+func batch_rest_bits(state: GSFpsState) -> int:
+	var reuse := 2 if reuse_settled_ground else 0
+	if not _rest_valid or state.surface != _rest_surface or not _rest_ground_unmoved():
+		return reuse
+	if not _rest_native:
+		var p := _rest_position
+		var v := _rest_velocity
+		var n := _rest_normal
+		var id := _rest_ground_id
+		_mstate.set_rest(PackedFloat64Array([
+			1.0, p.x, p.y, p.z, v.x, v.y, v.z, n.x, n.y, n.z, id & 0xFFFFFFFF, id >> 32, _rest_height,
+		]))
+		_rest_native = true
+	return reuse | 1
+
+
+## Copies the native stamp into the script's fields, for the script's own reuse checks.
+func _rest_pull() -> void:
+	_rest_in_script = true
+	var r: PackedFloat64Array = _mstate.rest()
+	_rest_position = Vector3(r[1], r[2], r[3])
+	_rest_velocity = Vector3(r[4], r[5], r[6])
+	_rest_normal = Vector3(r[7], r[8], r[9])
+	_rest_ground_id = int(r[10]) | (int(r[11]) << 32)
+	_rest_height = r[12]
+
+
+## [method batch_apply_cols]'s flags for a [code]run_states[/code] row: the counters only when flag 32 says one counted,
+## the stamp made natively (flag 8), only its surface kept here.
+func _states_settle(state: GSFpsState, cols: PackedFloat64Array, out: PackedFloat64Array, at: int) -> void:
+	var flags := int(out[at + 12])
+	if flags & 4 != 0:
+		state.surface = &""
+	if flags & 32 != 0:
+		_native_tick_flags(state, out, at)
+		_native_full_counters(out, at)
+	else:
+		view_turn = out[at + 39]
+	if flags & 2 != 0:
+		reused_ground_ticks += 1
+	if flags & 16 != 0:
+		GSLog.warn(CHANNEL, "velocity became non-finite; reset to zero")
+	if flags & 8 != 0:
+		settled_ground_ticks += 1
+		_rest_valid = reuse_settled_ground and int(cols[_Cols.MODE]) == GSFpsState.Mode.GROUND
+		_rest_native = true
+		_rest_in_script = false
+		_rest_surface = state.surface
+		_rest_ground_node = _ground_node(state.ground_id)
+		if _rest_ground_node != null:
+			_rest_ground_xform = _rest_ground_node.global_transform

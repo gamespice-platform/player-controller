@@ -18,6 +18,10 @@ const COLS_EXTRA := 27
 ## out of a 55-value row) when the library has it; off fills the rows field by field as before. Same bits either way
 ## (examples/motor_batch_parity.gd). On by default; a game's operator switch may turn it off. Read at [method start].
 static var native_cols: bool = true
+## Whether, on [member native_cols], GameSpice Sim also keeps each motor's rest stamp and decides its reuse
+## ([code]GSSimMotorBatch.run_states[/code], API 38): no script reads of the columns for it, counters read only when one
+## counted. Same bits either way (examples/motor_batch_parity.gd). On by default. Read at [method start].
+static var native_state: bool = true
 
 ## Rows ticked natively, native calls, rows taken back and rows found stale, since the game last cleared them.
 var rows: int = 0
@@ -26,6 +30,8 @@ var retakes: int = 0
 var stale: int = 0
 ## Of [member runs], the ones that handed GameSpice Sim the states' columns ([member native_cols]).
 var cols_runs: int = 0
+## Of [member cols_runs], the ones GameSpice Sim kept the rest stamps in ([member native_state]).
+var state_runs: int = 0
 
 var _native: Object = null
 ## Meta values per row: 4 where GameSpice Sim runs the rows' clocks too ([code]run_rows[/code]), else 3.
@@ -33,6 +39,9 @@ var _meta_len: int = 3
 ## Whether the library has [code]run_cols[/code], and whether this loop uses it.
 var _cols_ok := false
 var _use_cols := false
+## Whether the library has [code]run_states[/code], and whether this loop uses it.
+var _states_ok := false
+var _use_states := false
 var _delta: float = 0.0
 var _count: int = 0
 var _motors: Array[GSFpsMotor] = []
@@ -50,6 +59,8 @@ var _in := PackedFloat64Array()
 var _cols: Array = []
 var _extra := PackedFloat64Array()
 var _cols_new: Array = []
+## On [member _use_states]: each row's motor's native state ([method GSFpsMotor.batch_motor_state]).
+var _mstates: Array = []
 var _row := PackedFloat64Array()
 var _sent_position := PackedVector3Array()
 var _sent_velocity := PackedVector3Array()
@@ -75,7 +86,9 @@ func start(delta: float) -> bool:
 		_native = ClassDB.instantiate(NATIVE_CLASS)
 		_meta_len = 4 if ClassDB.class_has_method(NATIVE_CLASS, &"run_rows") else 3
 		_cols_ok = _meta_len > 3 and ClassDB.class_has_method(NATIVE_CLASS, &"run_cols")
+		_states_ok = _cols_ok and ClassDB.class_has_method(NATIVE_CLASS, &"run_states")
 	_use_cols = _cols_ok and native_cols
+	_use_states = _use_cols and _states_ok and native_state
 	_delta = delta
 	_count = 0
 	_out_from = 0
@@ -102,6 +115,7 @@ func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: flo
 		_in.resize(_count * _IN)
 		_cols.resize(_count)
 		_cols_new.resize(_count)
+		_mstates.resize(_count)
 		_extra.resize(_count * COLS_EXTRA)
 		_sent_position.resize(_count)
 		_sent_velocity.resize(_count)
@@ -110,6 +124,7 @@ func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: flo
 	_commands[row] = command
 	_deltas[row] = delta if delta > 0.0 else _delta
 	var stage: int
+	motor.batch_states = _use_states and motor.batch_motor_state() != null
 	if _use_cols:
 		stage = motor.batch_prepare(state, command, _deltas[row], _extra, _meta, row, _meta_len, COLS_EXTRA)
 	else:
@@ -118,6 +133,7 @@ func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: flo
 	if stage == GSFpsMotor.BATCH_READY:
 		if _use_cols:
 			_cols[row] = state._f
+			_mstates[row] = motor.batch_motor_state() if motor.batch_states else null
 		_bodies[row] = motor.batch_body
 		_tuns[row] = motor.batch_tun
 		_sent_position[row] = state.position
@@ -212,6 +228,7 @@ func clear() -> void:
 	_deltas.clear()
 	_cols.clear()
 	_cols_new.clear()
+	_mstates.clear()
 
 
 func _take_back(row: int) -> void:
@@ -238,6 +255,8 @@ func _refill_cols(motor: GSFpsMotor, state: GSFpsState, row: int) -> void:
 	motor.batch_refill(state, _commands[row], _deltas[row], _row, 0)
 	for i in COLS_EXTRA:
 		_extra[e + i] = _row[12 + i]
+	if motor.batch_states:
+		_extra[e + 1] = motor.batch_rest_bits(state)
 	_cols[row] = state._f
 
 
@@ -248,7 +267,11 @@ func _run(row: int) -> void:
 		# A body outside the hull world does not tell it where it came to rest: the game does, before the next row.
 		if _meta[(to - 1) * _meta_len] != 3:
 			break
-	if _use_cols:
+	if _use_states:
+		_out = _native.run_states(_bodies, _tuns, _meta, _cols, _extra, _cols_new, _mstates, row, to)
+		cols_runs += 1
+		state_runs += 1
+	elif _use_cols:
 		_out = _native.run_cols(_bodies, _tuns, _meta, _cols, _extra, _cols_new, row, to)
 		cols_runs += 1
 	elif _meta_len > 3:

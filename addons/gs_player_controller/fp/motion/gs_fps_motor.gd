@@ -92,7 +92,7 @@ func batch_prepare(
 	if row_len == 55:
 		_fill_full_in(state, command, delta, input, row * 55)
 	else:
-		_fill_full_extra(state, command, delta, input, row * row_len - 12)
+		_fill_full_extra(state, command, delta, input, row * row_len - 12, batch_states)
 	return BATCH_READY
 
 
