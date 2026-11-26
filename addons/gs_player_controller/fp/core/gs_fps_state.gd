@@ -46,11 +46,15 @@ var yaw: float:
 var pitch: float = 0.0
 
 ## 0 standing, 1 fully crouched. Fractional mid-transition.
-var crouch_fraction: float = 0.0
+var crouch_fraction: float:
+	get: return _f[30]
+	set(v): _f[30] = v
 
 ## Whether crouch was held on the command just applied.
 ## Distinct from [member crouch_fraction] > 0: releasing under a low ceiling stays crouched and retries the stand-up each tick.
-var crouch_held: bool = false
+var crouch_held: bool:
+	get: return _f[31] != 0.0
+	set(v): _f[31] = 1.0 if v else 0.0
 
 ## Normal of the floor under the player. Up when airborne.
 var ground_normal: Vector3:
@@ -250,8 +254,6 @@ func horizontal_speed() -> float:
 func copy_from(other: GSFpsState) -> void:
 	_f = other._f.duplicate()
 	pitch = other.pitch
-	crouch_fraction = other.crouch_fraction
-	crouch_held = other.crouch_held
 	surface = other.surface
 	# Two empty lists are already equal: a duplicate of nothing allocates an Array to be thrown away next tick.
 	if not (modifiers.is_empty() and other.modifiers.is_empty()):

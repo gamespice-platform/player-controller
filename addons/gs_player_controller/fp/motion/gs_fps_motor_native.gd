@@ -105,6 +105,7 @@ func _native_full_tun(tun: PackedFloat64Array) -> PackedFloat64Array:
 		t.wall_run_jump_max_angle, t.wall_run_turn_view, t.wall_run_turn_view_max_angle,
 		t.wall_jump_max_per_wall, t.wall_jump_max_per_air, t.wall_jump_look_blend, t.wall_jump_push_speed,
 		t.wall_jump_up_speed,
+		t.can_crouch, t.stand_height, t.crouch_height, t.crouch_transition_time, t.instant_air_crouch, t.radius,
 	]))
 	_tun_full_cache = full
 	return full
@@ -469,6 +470,7 @@ var batch_clocks: int = 0
 ## Ends a [constant BATCH_READY] tick with the batch's answer, the 45 values at [param at] in [param out].
 func batch_apply(state: GSFpsState, command: GSFpsCommand, out: PackedFloat64Array, at: int) -> void:
 	batch_clocks = 0
+	_crouch_pending = false
 	body.native_batch_done(int(out[at + 20]), int(out[at + 21]), int(out[at + 22]))
 	_native_full_apply(state, out, at)
 	state.previous_buttons = command.buttons
@@ -482,6 +484,7 @@ func batch_apply_cols(
 	state: GSFpsState, command: GSFpsCommand, cols: PackedFloat64Array, out: PackedFloat64Array, at: int
 ) -> void:
 	batch_clocks = 0
+	_crouch_pending = false
 	body.native_batch_done(int(out[at + 20]), int(out[at + 21]), int(out[at + 22]))
 	# The batch took the columns at add; the yaw is the one column the answer does not write, so the state's stays.
 	var yaw := state._f[_Cols.YAW]
@@ -508,6 +511,11 @@ var _rest_native := false
 var _rest_in_script := true
 ## Set by [GSFpsMotorBatch] before [method batch_prepare]: this row goes to [code]run_states[/code].
 var batch_states := false
+## Set by [GSFpsMotorBatch] before [method batch_prepare] (API 43): a [member batch_states] row may leave its crouch to
+## GameSpice Sim (row bit [constant ROW_CROUCH]); the crouch is then run natively at the row's turn, or by
+## [method batch_crouch_now] on every other end.
+var batch_crouch := false
+var _crouch_pending := false
 ## Set by the controller at its tick start ([method batch_events_begin], API 42): nothing but the motor
 ## has written the state since its end-of-tick snapshot, so a [code]run_states[/code] row may ask GameSpice Sim what the
 ## tick changed (row bit [constant ROW_EVENTS]). [method batch_prepare] adds what it knows: the clocks left to the row,
@@ -518,6 +526,7 @@ var batch_events_allowed := false
 ## it at its tick end and clears it.
 var batch_events: int = 0
 const ROW_EVENTS := 8
+const ROW_CROUCH := 16
 const EVENTS_KNOWN := 64
 const EVENT_MODE := 128
 const EVENT_Y := 256
@@ -615,3 +624,82 @@ func _states_settle(state: GSFpsState, cols: PackedFloat64Array, out: PackedFloa
 		_rest_ground_node = _ground_node(state.ground_id)
 		if _rest_ground_node != null:
 			_rest_ground_xform = _rest_ground_node.global_transform
+
+
+# --- Crouch: gs-sim's gs-sim-motor crouch.rs is its twin for the batch ([member batch_crouch]); change both.
+
+## Runs the crouch a prepared row left to GameSpice Sim ([member batch_crouch]) here instead: the row will not go to the
+## batch after all, or is refilled from the state.
+func batch_crouch_now(state: GSFpsState, command: GSFpsCommand, delta: float) -> void:
+	if _crouch_pending:
+		_crouch_pending = false
+		_update_crouch(state, command, delta)
+
+
+## Moves the crouch fraction toward what the player is holding, if it fits.
+## Standing up is attempted, tested and abandoned for this tick if it does not fit, so a player under a low ceiling stays crouched and stands once clear.
+func _update_crouch(
+	state: GSFpsState,
+	command: GSFpsCommand,
+	delta: float
+) -> void:
+	state.crouch_held = (
+		tunables.can_crouch
+		and not _effects.deny_crouch
+		and command.is_pressed(GSFpsCommand.BUTTON_CROUCH)
+	)
+
+	var target := 1.0 if state.crouch_held else 0.0
+
+	if is_equal_approx(state.crouch_fraction, target):
+		state.crouch_fraction = target
+		return
+
+	var airborne := state.mode != GSFpsState.Mode.GROUND
+	var instant := tunables.crouch_transition_time <= 0.0 or (
+		airborne and tunables.instant_air_crouch and state.crouch_held
+	)
+
+	var next := target
+	if not instant:
+		var rate := 1.0 / tunables.crouch_transition_time
+		next = move_toward(state.crouch_fraction, target, rate * delta)
+
+	if next >= state.crouch_fraction:
+		# Getting smaller. Always fits.
+		_set_crouch(state, next, airborne)
+		return
+
+	# Getting larger: the capsule has to have somewhere to grow into.
+	var height := tunables.height_at(next)
+	var probe := _capsule_centre(_position_for_crouch(state, next, airborne), height)
+
+	if body.overlaps(probe, height, tunables.radius):
+		# Blocked. Hold at the current fraction and try again next tick; the player
+		# is under something and standing would put them inside it.
+		return
+
+	_set_crouch(state, next, airborne)
+
+
+## Applies a new crouch fraction, moving the body to keep the right end fixed.
+## On the ground the feet stay put and the head moves; airborne the head stays put and the feet come up (the crouch-jump, which clears a ledge a standing jump cannot).
+func _set_crouch(state: GSFpsState, fraction: float, airborne: bool) -> void:
+	state.position = _position_for_crouch(state, fraction, airborne)
+	state.crouch_fraction = fraction
+
+
+func _position_for_crouch(
+	state: GSFpsState,
+	fraction: float,
+	airborne: bool
+) -> Vector3:
+	if not airborne:
+		return state.position
+
+	var current := tunables.height_at(state.crouch_fraction)
+	var wanted := tunables.height_at(fraction)
+
+	var moved := state.position
+	moved.y += current - wanted
+	return moved
