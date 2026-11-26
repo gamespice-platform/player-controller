@@ -22,6 +22,10 @@ static var native_cols: bool = true
 ## ([code]GSSimMotorBatch.run_states[/code], API 38): no script reads of the columns for it, counters read only when one
 ## counted. Same bits either way (examples/motor_batch_parity.gd). On by default. Read at [method start].
 static var native_state: bool = true
+## Whether, on [member native_state], GameSpice Sim also says what each tick changed (mode, height, slide, wall run;
+## [member GSFpsMotor.batch_events], API 42), so the controller's tick end compares only those. Same signals either way
+## (examples/motor_batch_parity.gd). On by default; the operator switch for it.
+static var native_events: bool = true
 
 ## Rows ticked natively, native calls, rows taken back and rows found stale, since the game last cleared them.
 var rows: int = 0

@@ -1,6 +1,6 @@
 extends "res://examples/motor_bench.gd"
 
-## Micro-benchmark of the players' loop a dedicated server runs with [GSFpsMotorBatch] (game-fatal-contact's `_tick_players_batched`): N controllers in a collision world, their hulls in gs-sim's hull world, each tick begin_tick and add for every player, then finish and end_tick for every player. Prints microseconds per player per tick for each of the four steps, and a digest of every tick's states: one build prints one digest, and a change that keeps results identical prints the digest the tree before it printed. Also runs the one-by-one loop ([method GSFpsController.simulate_tick]) and says whether it ends in the same states. With no gs-sim library it says so and exits 0. Run: [code]godot --headless --path . res://examples/motor_batch_bench.tscn [-- --n=32 --ticks=1000 --rows][/code] (--rows: the batch over 55-value rows, not the states' columns)
+## Micro-benchmark of the players' loop a dedicated server runs with [GSFpsMotorBatch] (game-fatal-contact's `_tick_players_batched`): N controllers in a collision world, their hulls in gs-sim's hull world, each tick begin_tick and add for every player, then finish and end_tick for every player. Prints microseconds per player per tick for each of the four steps, and a digest of every tick's states: one build prints one digest, and a change that keeps results identical prints the digest the tree before it printed. Also runs the one-by-one loop ([method GSFpsController.simulate_tick]) and says whether it ends in the same states. With no gs-sim library it says so and exits 0. Run: [code]godot --headless --path . res://examples/motor_batch_bench.tscn [-- --n=32 --ticks=1000 --rows][/code] (--rows: the batch over 55-value rows, not the states' columns; --phases: begin_tick and end_tick split by phase)
 
 
 ## A controller whose physics body is wrapped in a hull body, as game-fatal-contact's players are (FcSolidBody).
@@ -150,6 +150,7 @@ func _run() -> void:
 	GSFpsMotor.native_tick = true
 	GSFpsMotor.native_full = true
 	GSFpsMotor.profile = false
+	GSFpsController.phase_timers = "--phases" in OS.get_cmdline_user_args()
 	await get_tree().physics_frame
 	var best := {}
 	var one: Dictionary = {}
@@ -157,7 +158,9 @@ func _run() -> void:
 	# Interleaved, best of three, so a loaded machine biases neither loop.
 	for rep in range(3):
 		one = await _loop(false)
+		GSFpsController.phase_us.fill(0)
 		var b: Dictionary = await _loop(true)
+		b["phases"] = GSFpsController.phase_us.duplicate()
 		digests[b["digest"]] = true
 		if best.is_empty() or b["total"] < best["total"]:
 			best = b
@@ -165,6 +168,12 @@ func _run() -> void:
 			rep, one["total"], b["total"], b["begin"], b["add"], b["finish"], b["end"]])
 	print("  best batched %.1f us/player/tick: begin_tick %.1f, add %.1f, finish %.1f, end_tick %.1f; rows %d in %d runs" % [
 		best["total"], best["begin"], best["add"], best["finish"], best["end"], best["rows"], best["runs"]])
+	if GSFpsController.phase_timers:
+		# --phases: begin_tick and end_tick split (GSFpsController.phase_us), us per player per tick of the best run.
+		var ph: PackedInt64Array = best["phases"]
+		var per := float(_n * _ticks)
+		print("  phases: pre %.2f consume %.2f publish %.2f (body write %.2f) report %.2f signals+stats %.2f post %.2f" % [
+			ph[0] / per, ph[1] / per, ph[3] / per, ph[7] / per, ph[4] / per, ph[5] / per, ph[6] / per])
 	print("  BATCH_DIGEST %d counters %d" % [best["digest"], best["counters"]])
 	if "--profile" in OS.get_cmdline_user_args():
 		await _profiled()

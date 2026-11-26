@@ -24,10 +24,12 @@ func _snap(s: GSFpsState, motor: GSFpsMotor) -> PackedByteArray:
 
 
 func _batch_replay(
-	batched: bool, hz: int, variant: int, streams: Array, cols: bool = true, native_state: bool = true
+	batched: bool, hz: int, variant: int, streams: Array, cols: bool = true, native_state: bool = true,
+	native_events: bool = true
 ) -> Dictionary:
 	GSFpsMotorBatch.native_cols = cols
 	GSFpsMotorBatch.native_state = native_state
+	GSFpsMotorBatch.native_events = native_events
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = true
 	GSFpsMotor.native_full = true
@@ -51,6 +53,11 @@ func _batch_replay(
 	var post := PackedFloat64Array()
 	post.resize(GSFpsMotorBatch.POST)
 	var posts := [0, 0]
+	# What each player's tick changed by the controller's compare (mode, height, slide, wall run), against what the
+	# batch said (GSFpsMotor.batch_events): [rows it said, rows that differ, changes seen, mode/height/slide/wall run seen].
+	var events := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+	var was_at := []
+	was_at.resize(PLAYERS)
 	for tick in range(BATCH_TICKS):
 		world.begin(ids, _hull_rows(tun, states, alive), Callable(), 1.0e9)
 		# A surface edited in place (same object, new values): a row's kept values (ROW_CONSTS) must follow it.
@@ -65,6 +72,10 @@ func _batch_replay(
 				if not alive[i] or (i == SKIPS and tick % 2 == 1):
 					rows[i] = -1
 				else:
+					var b := states[i]
+					was_at[i] = [b.mode, b.position.y, b.is_sliding(), b.is_wall_running()]
+					motors[i].batch_events = 0
+					motors[i].batch_events_allowed = true
 					rows[i] = batch.add(motors[i], states[i], streams[i][tick], step * 2.0 if i == SKIPS else -1.0)
 		for i in range(PLAYERS):
 			if batched and rows[i] >= 0 and not alive[i]:
@@ -81,6 +92,7 @@ func _batch_replay(
 			if batched:
 				told = batch.finish(rows[i])
 				if rows[i] >= 0:
+					_tally_events(motors[i], s, was_at[i], events)
 					posts[0] += 1 if batch.post_row(rows[i], post, 0) else 0
 					posts[1] += 0 if _post_matches(post, s) else 1
 			else:
@@ -106,7 +118,7 @@ func _batch_replay(
 				all.append_array(_snap(states[i], motors[i]))
 		ticks.append(all)
 	return {"ticks": ticks, "counters": _counters(motors), "wired": wired, "script_gathers": script_gathers[0],
-		"native_ticks": GSFpsPhysicsBody.native_ticks - before, "batch": batch, "posts": posts, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
+		"native_ticks": GSFpsPhysicsBody.native_ticks - before, "batch": batch, "posts": posts, "events": events, "blocks": motors[0].body.hull_blocks + motors[4].body.hull_blocks}
 
 ## The hull world's per-player rows for one tick: position, radius, height and the flags.
 func _hull_rows(tun: Object, states: Array[GSFpsState], alive: Array[bool]) -> PackedFloat64Array:
@@ -193,6 +205,7 @@ func _batch_runs() -> void:
 			var label := "%d players @%d Hz set %d" % [PLAYERS, hz, variant]
 			_cols_check(a, _batch_replay(true, hz, variant, streams, false), b, label)
 			_states_check(a, _batch_replay(true, hz, variant, streams, true, false), b, label)
+			_events_check(a, _batch_replay(true, hz, variant, streams, true, true, false), b, label)
 			var first := -1
 			for i in range(BATCH_TICKS):
 				if a["ticks"][i] != b["ticks"][i]:
@@ -252,6 +265,29 @@ func _states_check(a: Dictionary, script_kept: Dictionary, native_kept: Dictiona
 		print("  %s: the library has no run_states; the native stamp path was not run" % label)
 
 
+## The batch's events ([member GSFpsMotorBatch.native_events]) are each row's changes exactly, and change nothing else:
+## with them off the run is identical and no row says any. Where the library has none, no row says any either.
+func _events_check(a: Dictionary, off: Dictionary, on: Dictionary, label: String) -> void:
+	var first := -1
+	for i in range(BATCH_TICKS):
+		if a["ticks"][i] != off["ticks"][i]:
+			first = i
+			break
+	_check(first < 0 and a["counters"] == off["counters"], label + ": native_events off is identical too%s" % [
+		"" if first < 0 else " (first differs at tick %d)" % first])
+	var ev: Array = on["events"]
+	_check(off["events"][0] == 0, label + ": native_events off: no row says what changed")
+	_check(ev[1] == 0, label + ": every row's events hold each change the controller's compare sees (%d of %d rows miss bits %d; said unchanged: %s)" % [
+		ev[1], ev[0], ev[2], ev.slice(7)])
+	var cols: GSFpsMotorBatch = on["batch"]
+	if cols.state_runs > 0 and ev[0] == 0:
+		print("  %s: the library says no events (a gs-sim batch without events); the script compared every row" % label)
+	elif cols.state_runs > 0:
+		_check(ev[0] * 2 > cols.rows and ev[3] > 0 and ev[4] > 0,
+			label + ": most rows said what changed (%d of %d; mode %d, height %d, slide %d, wall run %d)" % [
+				ev[0], cols.rows, ev[3], ev[4], ev[5], ev[6]])
+
+
 func _run() -> void:
 	print("gs-player-controller motor batch parity")
 	var expected := 1
@@ -267,6 +303,7 @@ func _run() -> void:
 		_batch_runs()
 	GSFpsMotorBatch.native_cols = true
 	GSFpsMotorBatch.native_state = true
+	GSFpsMotorBatch.native_events = true
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = false
 	GSFpsMotor.native_full = true

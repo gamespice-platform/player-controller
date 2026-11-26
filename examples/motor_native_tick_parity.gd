@@ -69,7 +69,10 @@ func _random_stream(seed: int, ticks: int) -> Array[GSFpsCommand]:
 func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float, hulls: bool, variant: int) -> Dictionary:
 	GSFpsPhysicsBody.native_enabled = way > 0
 	GSFpsMotor.native_tick = way > 0
-	GSFpsMotor.native_full = way == 2
+	GSFpsMotor.native_full = way >= 2
+	# Way 3: the whole tick as a one-row GSFpsMotorBatch run that says what each tick changed (API 42).
+	var batch: GSFpsMotorBatch = GSFpsMotorBatch.new() if way == 3 else null
+	var events := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 	var physics := GSFpsPhysicsBody.for_node(self)
 	physics.pass_out_mask = 1 << 3
 	var body: GSFpsBody = physics
@@ -87,7 +90,17 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 	for c in stream:
 		var after_jump := s.wall_jumps_in_air > 0 and not s.is_wall_running()
 		var runs := motor.wall_runs
-		motor.simulate(s, c, step)
+		if batch != null:
+			var was := [s.mode, s.position.y, s.is_sliding(), s.is_wall_running()]
+			batch.start(step)
+			motor.batch_events = 0
+			motor.batch_events_allowed = true
+			var row := batch.add(motor, s, c)
+			if row >= 0:
+				batch.finish(row)
+				_tally_events(motor, s, was, events)
+		else:
+			motor.simulate(s, c, step)
 		if after_jump and motor.wall_runs > runs:
 			runs_after_jump += 1
 		ticks.append(var_to_bytes([s.position, s.velocity, s.mode, s.move_flags(), s.ground_normal, s.ground_id, s.surface,
@@ -99,13 +112,40 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 		motor.settled_ground_ticks, motor.reused_ground_ticks, motor.slides, motor.launches, motor.dashes, motor.wall_runs,
 		motor.wall_jumps]
 	return {"ticks": ticks, "counters": counters, "end": s.position, "native_ticks": GSFpsPhysicsBody.native_ticks - before,
-		"script_ticks": motor.wall_jump_script_ticks, "runs_after_jump": runs_after_jump}
+		"script_ticks": motor.wall_jump_script_ticks, "runs_after_jump": runs_after_jump, "events": events}
+
+
+## Holds one row's [member GSFpsMotor.batch_events] to the controller's own compare of [param was] (mode, height,
+## sliding, wall running at the tick start) with [param s], into [param events]: [rows that said, rows that missed a
+## change, the bits missed, changes seen of mode, height, slide, wall run, then the bits said with no change seen].
+## Saying more than changed costs only a compare; missing a change would lose a signal.
+func _tally_events(motor: GSFpsMotor, s: GSFpsState, was: Array, events: Array) -> void:
+	var ev := motor.batch_events
+	motor.batch_events = 0
+	if ev & GSFpsMotor.EVENTS_KNOWN == 0:
+		return
+	var want := GSFpsMotor.EVENTS_KNOWN
+	var bits := [GSFpsMotor.EVENT_MODE, GSFpsMotor.EVENT_Y, GSFpsMotor.EVENT_SLIDE, GSFpsMotor.EVENT_WALL_RUN]
+	var now := [s.mode, s.position.y, s.is_sliding(), s.is_wall_running()]
+	for k in range(4):
+		if now[k] != was[k]:
+			want |= bits[k]
+			events[3 + k] += 1
+		elif ev & bits[k] != 0:
+			events[7 + k] += 1
+	events[0] += 1
+	events[1] += 0 if want & ~ev == 0 else 1
+	events[2] |= want & ~ev
 
 
 func _tick_runs() -> void:
 	var names := ["", " +walls", " +moves", " +wallruns"]
 	var total := 0
 	var runs_after_jump := 0
+	var batched := GSFpsMotorBatch.available()
+	# The one-row batch's events over every stream: [rows that said, differ, mode, height, slide, wall run changes].
+	var events := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+	var batch_rows := 0
 	for variant: int in [0, 1, 2, 3]:
 		for hulls: bool in [false, true]:
 			for hz: int in RATES:
@@ -119,6 +159,8 @@ func _tick_runs() -> void:
 					var ways: Array[int] = [2]
 					if variant < 2:
 						ways = [1, 2]
+					if batched:
+						ways.append(3)
 					for way in ways:
 						var b := _tick_replay(way, sc, stream, step, hulls, variant)
 						var first := -1
@@ -126,7 +168,7 @@ func _tick_runs() -> void:
 							if a["ticks"][i] != b["ticks"][i]:
 								first = i
 								break
-						var lw := label + (" full" if way == 2 else " halves")
+						var lw: String = label + [" script", " halves", " full", " batch"][way]
 						total += stream.size()
 						print("  %-44s end %s  native %d  counters %s" % [lw, a["end"], b["native_ticks"], a["counters"]])
 						# With an older library, a tick a run after a wall jump may start in runs in script, its start and end still in the library: two calls.
@@ -134,10 +176,26 @@ func _tick_runs() -> void:
 						if way == 2 and ClassDB.class_has_method(&"GSSimFpsBody", &"runs_after_wall_jump"):
 							_check(b["script_ticks"] == 0, lw + ": a library that slows a run after a wall jump runs every such tick itself (%d in script)" % b["script_ticks"])
 						var want: bool = b["native_ticks"] == calls if way == 2 else b["native_ticks"] > stream.size()
-						_check(want, lw + ": the native run ticked in the library, one call a tick when whole (%d of %d, %d after a wall jump in script)" % [b["native_ticks"], stream.size(), b["script_ticks"]])
+						if way == 3:
+							batch_rows += stream.size()
+							for k in range(events.size()):
+								events[k] += b["events"][k]
+						else:
+							_check(want, lw + ": the native run ticked in the library, one call a tick when whole (%d of %d, %d after a wall jump in script)" % [b["native_ticks"], stream.size(), b["script_ticks"]])
 						_check(first < 0, lw + ": every one of %d ticks identical%s" % [stream.size(), "" if first < 0 else " (first differs at tick %d: script %s native %s)" % [first, bytes_to_var(a["ticks"][first]), bytes_to_var(b["ticks"][first])]])
 						_check(a["counters"] == b["counters"], lw + ": the same motor and hull counters %s (native %s)" % [a["counters"], b["counters"]])
 	print("  %d native ticks compared" % total)
+	if batched:
+		# Rows whose clocks run in script (the first tick, a tick off the ground with its clocks held) do not say: these
+		# streams jump and wall-run so much that 45% of rows say (2026-11-26), the batch parity's walkers more than half.
+		_check(events[1] == 0, "the one-row batch's events hold every change the controller's compare sees (%d of %d rows miss bits %d; said unchanged: %s)" % [
+			events[1], events[0], events[2], events.slice(7)])
+		if events[0] == 0:
+			print("  the library says no events (a gs-sim batch without events); the script compared every row")
+		else:
+			_check(events[0] * 3 > batch_rows and events[3] > 0 and events[4] > 0 and events[5] > 0 and events[6] > 0,
+				"over a third of batch rows said what changed (%d of %d; mode %d, height %d, slide %d, wall run %d)" % [
+					events[0], batch_rows, events[3], events[4], events[5], events[6]])
 	_check(runs_after_jump > 0, "the streams start a wall run after a wall jump in the same air (%d times), the case _run_speed slows" % runs_after_jump)
 	_sections += 1
 
