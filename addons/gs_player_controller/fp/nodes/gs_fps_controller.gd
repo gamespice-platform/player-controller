@@ -611,6 +611,9 @@ func end_tick(tick: int, delta: float) -> void:
 static var phase_us := PackedInt64Array([0, 0, 0, 0, 0, 0, 0, 0])
 ## Fills [member phase_us] without [member GSFpsMotor.profile], which also turns the native motor off: the phases of the path players really run.
 static var phase_timers := false
+## [method _apply_collider] goes through the shape's and collider's engine getters and setters (get_height, set_position)
+## instead of their properties, each a by-name lookup per player per tick; false keeps the properties. Same values (API 44).
+static var direct_getters := true
 var _lap_ctrl_at: int = 0
 
 
@@ -731,6 +734,9 @@ func _publish(
 func _apply_collider(from: GSFpsState) -> void:
 	if _capsule == null:
 		return
+	if direct_getters:
+		_apply_collider_direct(from)
+		return
 
 	var height := tunables.height_at(from.crouch_fraction)
 	var shape_height := maxf(height, tunables.radius * 2.0)
@@ -757,15 +763,6 @@ func _apply_collider(from: GSFpsState) -> void:
 			_collider.position.y = centre
 			_sent_centre = centre
 			_held_centre = _collider.position.y
-
-
-## [method _apply_collider]'s last writes and what the shape and node held after them (NAN: none yet).
-var _sent_height := NAN
-var _held_height := NAN
-var _sent_radius := NAN
-var _held_radius := NAN
-var _sent_centre := NAN
-var _held_centre := NAN
 
 
 

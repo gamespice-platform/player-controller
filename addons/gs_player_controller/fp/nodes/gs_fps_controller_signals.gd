@@ -281,3 +281,38 @@ func _emit_motor_changes(delta: float) -> void:
 
 	# Not during a replay: the statistics have seen that tick, and a lossy client would double-count.
 	state.airborne_time = (state.airborne_time + delta) if int(f[_Cols.MODE]) == GSFpsState.Mode.AIR else 0.0
+
+
+## [method GSFpsController._apply_collider] through the engine getters and setters ([member GSFpsController.direct_getters]):
+## the same comparisons and writes, without a by-name property lookup per access.
+func _apply_collider_direct(from: GSFpsState) -> void:
+	var height := tunables.height_at(from.crouch_fraction)
+	var shape_height := maxf(height, tunables.radius * 2.0)
+	var shape_now := _capsule.get_height()
+	if shape_now != shape_height and not (shape_height == _sent_height and shape_now == _held_height):
+		_capsule.set_height(shape_height)
+		_sent_height = shape_height
+		_held_height = _capsule.get_height()
+	var radius := tunables.radius
+	var radius_now := _capsule.get_radius()
+	if radius_now != radius and not (radius == _sent_radius and radius_now == _held_radius):
+		_capsule.set_radius(radius)
+		_sent_radius = radius
+		_held_radius = _capsule.get_radius()
+	if _collider != null:
+		var centre := height * 0.5
+		var at := _collider.get_position()
+		if at.y != centre and not (centre == _sent_centre and at.y == _held_centre):
+			at.y = centre
+			_collider.set_position(at)
+			_sent_centre = centre
+			_held_centre = _collider.get_position().y
+
+
+## The collider sizing's last writes and what the shape and node held after them (NAN: none yet).
+var _sent_height := NAN
+var _held_height := NAN
+var _sent_radius := NAN
+var _held_radius := NAN
+var _sent_centre := NAN
+var _held_centre := NAN

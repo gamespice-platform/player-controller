@@ -4,7 +4,7 @@ extends "res://examples/fps_controller_selftest_sections.gd"
 ## [method movement_selftest] tests the simulation; this tests the wiring around it (reference resolution, collider following the crouch, fixed-step accumulator, drive modes, registry, the noclip safety gate), which a host game touches first.
 ## Scenes are built in code so a failure names a line and an editor change cannot silently pass.
 
-const CHECKS := 135
+const CHECKS := 141
 
 ## Sections entered against sections that ran to their last line, and against this: a
 ## runtime error aborts a section silently. CHECKS is the other half (docs/testing.md).
@@ -443,7 +443,21 @@ func _test_mask_set_after_setup() -> void:
 
 func _test_collider_follows_crouch() -> void:
 	_section("collider follows the crouch")
+	var direct: Array = await _collider_crouch_trace(true)
+	var props: Array = await _collider_crouch_trace(false)
+	GSFpsController.direct_getters = true
+	_check(
+		direct.size() > 300 and direct == props,
+		"the engine getters (direct_getters) size and centre the collider as the properties do, tick by tick (%d ticks)" % direct.size()
+	)
+	_done()
 
+
+## One stand, crouch and stand-up run with [member GSFpsController.direct_getters] set to [param direct]: each tick's
+## capsule height, radius and collider centre.
+func _collider_crouch_trace(direct: bool) -> Array:
+	GSFpsController.direct_getters = direct
+	var trace: Array = []
 	var world := _make_world()
 	var controller := _make_player(world, GSFpsController.Drive.EXTERNAL)
 
@@ -455,7 +469,7 @@ func _test_collider_follows_crouch() -> void:
 
 	if not _check(capsule != null, "the collider carries a capsule"):
 		world.queue_free()
-		return
+		return trace
 
 	# Not the shape the scene supplied: a CapsuleShape3D loaded from a .tscn is shared by every instance, so resizing one player's collider on crouch would resize every player's.
 	_check( capsule != null and capsule.resource_path == "", "with a private shape, not one shared across instances" )
@@ -465,12 +479,14 @@ func _test_collider_follows_crouch() -> void:
 	for i in range(120):
 		controller.apply_command(_command())
 		controller.simulate_tick(i + 1, STEP)
+		trace.append(Vector3(capsule.height, capsule.radius, collision.position.y))
 
 	_check_near( capsule.height, controller.tunables.stand_height, 0.01, "standing height matches the tunables" )
 
 	for i in range(120):
 		controller.apply_command(_command(0.0, 0.0, 0.0, GSFpsCommand.BUTTON_CROUCH))
 		controller.simulate_tick(200 + i, STEP)
+		trace.append(Vector3(capsule.height, capsule.radius, collision.position.y))
 
 	_check_near( capsule.height, controller.tunables.crouch_height, 0.01, "and the collider shrinks with the crouch" )
 	_check_near(
@@ -478,9 +494,14 @@ func _test_collider_follows_crouch() -> void:
 		"and stays centred on the body, whose origin is at the feet"
 	)
 
+	for i in range(120):
+		controller.apply_command(_command())
+		controller.simulate_tick(400 + i, STEP)
+		trace.append(Vector3(capsule.height, capsule.radius, collision.position.y))
+
 	world.queue_free()
 	await get_tree().process_frame
-	_done()
+	return trace
 
 
 func _test_noclip_gate() -> void:
