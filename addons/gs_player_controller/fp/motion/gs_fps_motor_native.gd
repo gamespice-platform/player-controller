@@ -126,12 +126,7 @@ func _native_tick_full(state: GSFpsState, command: GSFpsCommand, delta: float, t
 ## The whole tick's input, 55 values from [param o] in [param a] (set by index: a literal built a Variant Array of every value, each tick).
 func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: PackedFloat64Array, o: int) -> void:
 	var height := _height(state)
-	var p := state.position
-	var v := state.velocity
-	var n := state.ground_normal
-	var id := state.ground_id
 	var push := _surface.push
-	var w := state.wall_normal
 	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
 	var t := tunables
 	if t != _fill_for or t.revision != _fill_rev:
@@ -143,18 +138,10 @@ func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: Pa
 		_fill_speed = t.speed_for(buttons, load_fraction)
 		_fill_buttons = buttons
 		_fill_load = load_fraction
-	a[o + 0] = p.x
-	a[o + 1] = p.y
-	a[o + 2] = p.z
-	a[o + 3] = v.x
-	a[o + 4] = v.y
-	a[o + 5] = v.z
-	a[o + 6] = n.x
-	a[o + 7] = n.y
-	a[o + 8] = n.z
-	a[o + 9] = state.mode
-	a[o + 10] = id & 0xFFFFFFFF
-	a[o + 11] = id >> 32
+	# Position, velocity, ground normal, mode and the ground id's halves: the state's first 12 columns, in this order.
+	var f := state._f
+	for i in 12:
+		a[o + i] = f[i]
 	a[o + 12] = height
 	a[o + 13] = 1.0 if _native_rest_ok(state, height) else 0.0
 	a[o + 14] = _rest_position.x
@@ -186,22 +173,9 @@ func _fill_full_in(state: GSFpsState, command: GSFpsCommand, delta: float, a: Pa
 	a[o + 36] = push.z
 	a[o + 37] = c[7]
 	a[o + 38] = c[8]
-	a[o + 39] = state.time_since_jump
-	a[o + 40] = state.time_since_grounded
-	a[o + 41] = state.time_since_jump_pressed
-	a[o + 42] = state.slide_time
-	a[o + 43] = state.slide_cooldown_left
-	a[o + 44] = state.launch_cooldown_left
-	a[o + 45] = state.dash_cooldown_left
-	a[o + 46] = state.wall_run_cooldown_left
-	a[o + 47] = state.wall_run_time
-	a[o + 48] = 1.0 if state.wall_run_spent else 0.0
-	a[o + 49] = state.wall_jump_count
-	a[o + 50] = state.wall_jumps_in_air
-	a[o + 51] = state.wall_jump_heading
-	a[o + 52] = w.x
-	a[o + 53] = w.y
-	a[o + 54] = w.z
+	# The clocks, wall counters and wall normal: the state's clock block, in this order.
+	for i in GSFpsStateColumns.CLOCK_COUNT:
+		a[o + 39 + i] = f[GSFpsStateColumns.CLOCKS + i]
 
 
 ## [method _fill_full_in]'s values only the tunables and the effects decide: the effect flags, jump scale, jump velocity,
@@ -238,19 +212,11 @@ func _native_full_apply(state: GSFpsState, r: PackedFloat64Array, o: int = 0) ->
 	if flags & 8 != 0:
 		settled_ground_ticks += 1
 		_stamp_rest(state)
-	state.time_since_jump = r[o + 23]
-	state.time_since_grounded = r[o + 24]
-	state.time_since_jump_pressed = r[o + 25]
-	state.slide_time = r[o + 26]
-	state.slide_cooldown_left = r[o + 27]
-	state.launch_cooldown_left = r[o + 28]
-	state.dash_cooldown_left = r[o + 29]
-	state.wall_run_cooldown_left = r[o + 30]
-	state.wall_run_time = r[o + 31]
-	state.wall_run_spent = r[o + 32] != 0.0
-	state.wall_jump_count = int(r[o + 33])
-	state.wall_jumps_in_air = int(r[o + 34])
-	state.wall_jump_heading = int(r[o + 35])
+	# The clocks and wall counters (float64 scalars, the flag and counts whole numbers) go into the clock block as they
+	# are; the wall normal through its property, which rounds it to the float32 a Vector3 holds.
+	var f := state._f
+	for i in 13:
+		f[GSFpsStateColumns.CLOCKS + i] = r[o + 23 + i]
 	state.wall_normal = Vector3(r[o + 36], r[o + 37], r[o + 38])
 	view_turn = r[o + 39]
 	slides += int(r[o + 40])

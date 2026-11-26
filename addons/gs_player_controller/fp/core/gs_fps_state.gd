@@ -18,14 +18,28 @@ const FIRST_CUSTOM_MODE := 3
 ## Most modes one motor can have; the mode travels as a fixed-width field (see [GSFpsNetSync]).
 const MAX_MODES := 16
 
-var mode: int = Mode.AIR
+## The values the motor tick reads and writes, packed: [constant GSFpsStateColumns.STRIDE] float64s in
+## [GSFpsStateColumns]' layout (API 36), so GameSpice Sim can take them as one array per player instead of a property
+## read per field. The properties below that index it are accessors (the numbers are the layout's offsets, written out
+## because a literal index is the cheapest read there is). [method copy_from] replaces it rather than writing through.
+var _f := PackedFloat64Array(GSFpsStateColumns.DEFAULTS)
 
-var position: Vector3 = Vector3.ZERO
-var velocity: Vector3 = Vector3.ZERO
+var mode: int:
+	get: return int(_f[9])
+	set(v): _f[9] = v
+
+var position: Vector3:
+	get: return Vector3(_f[0], _f[1], _f[2])
+	set(v): _f[0] = v.x; _f[1] = v.y; _f[2] = v.z
+var velocity: Vector3:
+	get: return Vector3(_f[3], _f[4], _f[5])
+	set(v): _f[3] = v.x; _f[4] = v.y; _f[5] = v.z
 
 ## View angles in degrees. Copied from the command each tick and kept here so a
 ## replay restores the view the tick was simulated with.
-var yaw: float = 0.0
+var yaw: float:
+	get: return _f[12]
+	set(v): _f[12] = v
 var pitch: float = 0.0
 
 ## 0 standing, 1 fully crouched. Fractional mid-transition.
@@ -36,10 +50,16 @@ var crouch_fraction: float = 0.0
 var crouch_held: bool = false
 
 ## Normal of the floor under the player. Up when airborne.
-var ground_normal: Vector3 = Vector3.UP
+var ground_normal: Vector3:
+	get: return Vector3(_f[6], _f[7], _f[8])
+	set(v): _f[6] = v.x; _f[7] = v.y; _f[8] = v.z
 
 ## The collider the player is standing on, or 0. A local physics handle, so not replicated and not in [method equals].
-var ground_id: int = 0
+var ground_id: int:
+	get: return (int(_f[11]) << 32) | int(_f[10])
+	set(v):
+		_f[10] = v & 0xFFFFFFFF
+		_f[11] = v >> 32
 
 ## Id of the surface under the player, [code]&""[/code] when unmarked or airborne.
 ## Part of the simulation (it scales friction and acceleration), resolved from scene data so both machines agree. See [GSFpsSurfaceSet].
@@ -50,42 +70,60 @@ var surface: StringName = &""
 var modifiers: Array[Vector2i] = []
 
 ## Seconds since last on the ground, 0 while grounded. Drives coyote time; simulated seconds, so a replay reproduces it.
-var time_since_grounded: float = 0.0
+var time_since_grounded: float:
+	get: return _f[15]
+	set(v): _f[15] = v
 
 ## Seconds spent airborne in this stretch (mode AIR, a wall run included), 0 while anything else.
 ## Observed by the controller on live ticks only, so it is not replicated, not copied by [method copy_from] and not compared by [method equals]: a server reads it for statistics, a replay never feeds it. Unlike [member time_since_grounded] a jump does not seed it.
 var airborne_time: float = 0.0
 
 ## Seconds since the jump button was pressed, or a large number if it never was.
-var time_since_jump_pressed: float = 1000.0
+var time_since_jump_pressed: float:
+	get: return _f[16]
+	set(v): _f[16] = v
 
 ## Seconds since the last jump left the ground.
-var time_since_jump: float = 1000.0
+var time_since_jump: float:
+	get: return _f[14]
+	set(v): _f[14] = v
 
 ## Consecutive ticks spent on the ground, 0 while airborne.
 ## Ticks, not seconds: a perfect hop must score the same at 64 Hz and 128 Hz. In the state so a rewind does not reset it.
 var ground_ticks: int = 0
 
 ## Buttons on the previous command, for edge detection.
-var previous_buttons: int = 0
+var previous_buttons: int:
+	get: return int(_f[13])
+	set(v): _f[13] = v
 
 ## Seconds into the current slide, or -1.0 when not sliding.
 ## In the state so a rewind replays a slide as a slide. See [member GSFpsTunables.slide_enabled].
-var slide_time: float = -1.0
+var slide_time: float:
+	get: return _f[17]
+	set(v): _f[17] = v
 
 ## Seconds before another slide may start. 0 when one may.
-var slide_cooldown_left: float = 0.0
+var slide_cooldown_left: float:
+	get: return _f[18]
+	set(v): _f[18] = v
 
 ## Seconds before the launch ability may be used again, 0 when it may.
 ## Not replicated: the server decides, and the snapshot carries the velocity it produced.
-var launch_cooldown_left: float = 0.0
+var launch_cooldown_left: float:
+	get: return _f[19]
+	set(v): _f[19] = v
 
 ## Seconds before the dash may be used again. Replicated with the launch's; see
 ## [GSFpsNetSync].
-var dash_cooldown_left: float = 0.0
+var dash_cooldown_left: float:
+	get: return _f[20]
+	set(v): _f[20] = v
 
 ## Seconds before another wall run may start ([member GSFpsTunables.wall_run_cooldown]).
-var wall_run_cooldown_left: float = 0.0
+var wall_run_cooldown_left: float:
+	get: return _f[21]
+	set(v): _f[21] = v
 
 ## Sprint stamina, 0 empty to 1 full. Held in the state so a rewind restores it (see [GSFpsNetSync.pack_stamina]).
 var stamina: float = 1.0
@@ -101,29 +139,41 @@ var sprinting: bool = false
 
 ## Seconds into the current wall run, or -1.0 when not running.
 ## In the state and snapshot so a rewind does not replay a wall run as a fall. See [member GSFpsTunables.wall_run_enabled].
-var wall_run_time: float = -1.0
+var wall_run_time: float:
+	get: return _f[22]
+	set(v): _f[22] = v
 
 ## A run has ended in this airborne stretch, so no other may start until the player lands
 ## or wall-jumps. Without it a run that timed out on a wall would start again on the next
 ## tick, and the time cap would mean nothing.
-var wall_run_spent: bool = false
+var wall_run_spent: bool:
+	get: return _f[23] != 0.0
+	set(v): _f[23] = 1.0 if v else 0.0
 
 ## Wall jumps made off the wall at [member wall_jump_heading] since last on the ground.
 ## 0 when there is no such wall. See [member GSFpsTunables.wall_jump_max_per_wall].
-var wall_jump_count: int = 0
+var wall_jump_count: int:
+	get: return int(_f[24])
+	set(v): _f[24] = v
 
 ## Wall jumps off any wall since last on the ground, 0..3. See
 ## [member GSFpsTunables.wall_jump_max_per_air]. Never less than [member wall_jump_count].
-var wall_jumps_in_air: int = 0
+var wall_jumps_in_air: int:
+	get: return int(_f[25])
+	set(v): _f[25] = v
 
 ## Which wall [member wall_jump_count] counts, as the heading of its normal in eighths
 ## of a turn (0..7). Quantised in the simulation itself, not only on the wire, so a value
 ## restored from a snapshot is the one the simulation made.
-var wall_jump_heading: int = 0
+var wall_jump_heading: int:
+	get: return int(_f[26])
+	set(v): _f[26] = v
 
 ## The normal of the wall being run along or touched this tick, or zero.
 ## An output the motor writes each tick (not replicated or compared), read by [GSFpsView] to roll the camera.
-var wall_normal: Vector3 = Vector3.ZERO
+var wall_normal: Vector3:
+	get: return Vector3(_f[27], _f[28], _f[29])
+	set(v): _f[27] = v.x; _f[28] = v.y; _f[29] = v.z
 
 ## Ticks simulated. Diagnostic; not compared.
 var tick: int = 0
@@ -195,40 +245,25 @@ func horizontal_speed() -> float:
 
 
 func copy_from(other: GSFpsState) -> void:
-	mode = other.mode
-	position = other.position
-	velocity = other.velocity
-	yaw = other.yaw
+	_f = other._f.duplicate()
 	pitch = other.pitch
 	crouch_fraction = other.crouch_fraction
 	crouch_held = other.crouch_held
-	ground_normal = other.ground_normal
-	ground_id = other.ground_id
 	surface = other.surface
 	# Two empty lists are already equal: a duplicate of nothing allocates an Array to be thrown away next tick.
 	if not (modifiers.is_empty() and other.modifiers.is_empty()):
 		modifiers = other.modifiers.duplicate()
-	time_since_grounded = other.time_since_grounded
-	time_since_jump_pressed = other.time_since_jump_pressed
-	time_since_jump = other.time_since_jump
 	ground_ticks = other.ground_ticks
-	previous_buttons = other.previous_buttons
-	slide_time = other.slide_time
-	slide_cooldown_left = other.slide_cooldown_left
-	launch_cooldown_left = other.launch_cooldown_left
-	dash_cooldown_left = other.dash_cooldown_left
-	wall_run_cooldown_left = other.wall_run_cooldown_left
 	stamina = other.stamina
 	stamina_exhausted = other.stamina_exhausted
 	stamina_delay_left = other.stamina_delay_left
 	sprinting = other.sprinting
-	wall_run_time = other.wall_run_time
-	wall_run_spent = other.wall_run_spent
-	wall_jump_count = other.wall_jump_count
-	wall_jump_heading = other.wall_jump_heading
-	wall_jumps_in_air = other.wall_jumps_in_air
-	wall_normal = other.wall_normal
 	tick = other.tick
+
+
+## The state's [GSFpsStateColumns] values: the array itself, so a write to it is a write to the state.
+func columns() -> PackedFloat64Array:
+	return _f
 
 
 func duplicate_state() -> GSFpsState:
