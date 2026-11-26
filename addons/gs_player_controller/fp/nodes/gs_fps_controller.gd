@@ -530,28 +530,37 @@ func begin_tick(tick: int, delta: float) -> bool:
 		current_command.pitch = state.pitch
 
 	# A reset (setup, teleport) makes the previous state the current one.
-	_position_two_back = _previous_state.position
+	# The columns are read and written directly ([GSFpsStateColumns]): each property is a call, and this runs per player per tick.
+	var f := state._f
+	var pf := _previous_state._f
+	_position_two_back = Vector3(pf[_Cols.POSITION], pf[_Cols.POSITION + 1], pf[_Cols.POSITION + 2])
 	# Only what the render blend reads ([method render_state], [method previous_position]): a whole copy_from is about
 	# 30 property reads a tick per player, on a server that never draws one. Setup and teleport still copy it whole.
-	_previous_state.position = state.position
-	_previous_state.crouch_fraction = state.crouch_fraction
+	pf[_Cols.POSITION] = f[_Cols.POSITION]
+	pf[_Cols.POSITION + 1] = f[_Cols.POSITION + 1]
+	pf[_Cols.POSITION + 2] = f[_Cols.POSITION + 2]
+	var crouch := state.crouch_fraction
+	_previous_state.crouch_fraction = crouch
 
-	_before_mode = state.mode
-	_before_y = state.position.y
-	_before_fall = state.velocity.y
-	_before_crouched = state.is_crouched()
+	# What end_tick diffs against, as GSFpsState's is_crouched, is_sliding and is_wall_running answer it.
+	_before_mode = int(f[_Cols.MODE]) as GSFpsState.Mode
+	_before_y = f[_Cols.POSITION + 1]
+	_before_fall = f[_Cols.VELOCITY + 1]
+	_before_crouched = crouch > 0.001
 	_before_surface = state.surface
-	_before_sliding = state.is_sliding()
+	_before_sliding = f[_Cols.SLIDE_TIME] >= 0.0
 	_before_launches = motor.launches
 	_before_dashes = motor.dashes
-	_before_wall_running = state.is_wall_running()
+	_before_wall_running = f[_Cols.WALL_RUN_TIME] >= 0.0
 	_before_wall_jumps = motor.wall_jumps
 
 	if prof_t != 0:
 		_lap_ctrl(0, prof_t)
 	_on_pre_simulate(tick, delta)
 
-	_consume_external_velocity(state, _replaying)
+	# Checked here, not only in the call: almost every tick has no push waiting.
+	if _external_velocity != Vector3.ZERO:
+		_consume_external_velocity(state, _replaying)
 
 	# Every tick: a game sets the tunables' mask after setup, and the body copied it when built.
 	if body != null and body.collision_mask != tunables.collision_mask:
@@ -560,18 +569,6 @@ func begin_tick(tick: int, delta: float) -> bool:
 	if prof_t != 0:
 		_lap_ctrl(1, prof_t)
 	return true
-
-
-var _before_mode: GSFpsState.Mode = GSFpsState.Mode.GROUND
-var _before_y: float = 0.0
-var _before_fall: float = 0.0
-var _before_crouched: bool = false
-var _before_surface: StringName = &""
-var _before_sliding: bool = false
-var _before_launches: int = 0
-var _before_dashes: int = 0
-var _before_wall_running: bool = false
-var _before_wall_jumps: int = 0
 
 
 ## [method simulate_tick] after the motor: publishes the tick and emits what changed.
@@ -589,29 +586,7 @@ func end_tick(tick: int, delta: float) -> void:
 		_lap_ctrl(4, prof_t)
 
 	if not _replaying:
-		if state.is_sliding() != _before_sliding:
-			slide_changed.emit(state.is_sliding())
-
-		if motor.launches != _before_launches:
-			launched.emit()
-
-		if motor.dashes != _before_dashes:
-			dashed.emit()
-
-		if motor.wall_jumps != _before_wall_jumps:
-			wall_jumped.emit()
-
-		if state.is_wall_running() != _before_wall_running:
-			wall_run_changed.emit(state.is_wall_running())
-
-		if motor.view_turn != 0.0:
-			view_turned.emit(motor.view_turn)
-			if sampler != null:
-				sampler.look_at_angles(sampler.yaw + motor.view_turn, sampler.pitch)
-
-	# Not during a replay: the statistics have seen that tick, and a lossy client would double-count.
-	if not _replaying:
-		state.airborne_time = (state.airborne_time + delta) if state.mode == GSFpsState.Mode.AIR else 0.0
+		_emit_motor_changes(delta)
 	if not _replaying and observe_stats:
 		stats.observe(state, current_command, _stats_previous, delta)
 		if motor.perf_caches:
@@ -625,7 +600,9 @@ func end_tick(tick: int, delta: float) -> void:
 		_lap_ctrl(5, prof_t)
 	_on_post_simulate(tick, delta)
 
-	simulated.emit(tick, state)
+	# Most servers have no listener: an emit still looks the signal up and packs its arguments, per player per tick.
+	if simulated.has_connections():
+		simulated.emit(tick, state)
 	if prof_t != 0:
 		_lap_ctrl(6, prof_t)
 
@@ -649,11 +626,13 @@ func _report_changes(
 	before_crouched: bool,
 	before_surface: StringName
 ) -> void:
-	if state.is_crouched() != before_crouched:
-		crouch_changed.emit(state.is_crouched())
+	var crouched := state.crouch_fraction > 0.001
+	if crouched != before_crouched:
+		crouch_changed.emit(crouched)
 
-	if state.surface != before_surface:
-		surface_changed.emit(before_surface, state.surface)
+	var surface := state.surface
+	if surface != before_surface:
+		surface_changed.emit(before_surface, surface)
 
 	# Modifiers are diffed against a baseline that persists across ticks, not one captured at the top of this one:
 	# a modifier applied between ticks is already present when the next starts, so a same-tick baseline never reports "added".
@@ -713,32 +692,36 @@ func _publish(
 	var pt := Time.get_ticks_usec() if (GSFpsMotor.profile or phase_timers) else 0
 	# Written only when the node is elsewhere: a write, even of the same place, walks the whole body subtree (hitboxes, figure)
 	# marking transforms dirty, several microseconds a player a tick, and a player standing still did that every tick.
-	if _body_node != null and _body_node.global_position != state.position:
-		_body_node.global_position = state.position
+	var f := state._f
+	if _body_node != null:
+		var at := Vector3(f[_Cols.POSITION], f[_Cols.POSITION + 1], f[_Cols.POSITION + 2])
+		if _body_node.global_position != at:
+			_body_node.global_position = at
 	if pt != 0:
 		phase_us[7] += Time.get_ticks_usec() - pt
 
 	_apply_collider(state)
 
-	if before_mode != state.mode:
-		mode_changed.emit(before_mode, state.mode)
+	var mode := int(f[_Cols.MODE])
+	if before_mode != mode:
+		mode_changed.emit(before_mode, mode)
 
 		if (
-			state.mode == GSFpsState.Mode.GROUND
+			mode == GSFpsState.Mode.GROUND
 			and before_mode == GSFpsState.Mode.AIR
 		):
 			landed.emit(absf(before_fall))
 		elif (
-			state.mode == GSFpsState.Mode.AIR
+			mode == GSFpsState.Mode.AIR
 			and before_mode == GSFpsState.Mode.GROUND
-			and state.velocity.y > 0.0
+			and f[_Cols.VELOCITY + 1] > 0.0
 		):
 			jumped.emit()
 
 	# A grounded tick that gained height is a stair step, not a jump — the view
 	# absorbs it so the camera does not jolt once per tread.
-	if state.mode == GSFpsState.Mode.GROUND:
-		var gained := state.position.y - before_y
+	if mode == GSFpsState.Mode.GROUND:
+		var gained: float = f[_Cols.POSITION + 1] - before_y
 		if gained > 0.001 and gained <= tunables.step_height + 0.01:
 			if view != null:
 				view.note_step_up(gained)

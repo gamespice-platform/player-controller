@@ -33,8 +33,12 @@ func _hull_player(i: int, parent: Node) -> GSFpsController:
 	c.drive = GSFpsController.Drive.EXTERNAL
 	c.register_default_actions = false
 	c.register_service = false
+	c.observe_stats = _stats
 	player.add_child(c)
 	return c
+
+
+var _stats := true
 
 
 ## One run of [member _ticks] ticks; [param batched] picks the loop. Returns the microseconds per player per tick of
@@ -138,7 +142,24 @@ func _profiled() -> void:
 	print("  " + sites)
 
 
+## One more batched run with [member GSFpsController.phase_timers] on (--phases): begin_tick's and end_tick's phases per
+## player per tick, the controller's own cost around the motor batch. The timers add their own cost.
+func _phase_split() -> void:
+	GSFpsController.phase_timers = true
+	GSFpsController.phase_us.fill(0)
+	await _loop(true)
+	GSFpsController.phase_timers = false
+	var per := float(_n * _ticks)
+	var line := "  phases us/player/tick:"
+	var names := ["pre", "consume", "motor", "publish", "report", "signals+stats", "post", "body_write"]
+	for i in names.size():
+		line += " %s %.2f" % [names[i], GSFpsController.phase_us[i] / per]
+	print(line)
+
+
 func _run() -> void:
+	# --no-stats: the controllers do not feed GSFpsStats, as a game server that turns observe_stats off (FC) runs them.
+	_stats = not ("--no-stats" in OS.get_cmdline_user_args())
 	# --rows: the batch over 55-value rows (GSFpsMotorBatch.native_cols off), for a before and after in one session.
 	GSFpsMotorBatch.native_cols = not ("--rows" in OS.get_cmdline_user_args())
 	print("motor batch bench: n=%d ticks=%d columns=%s" % [_n, _ticks, GSFpsMotorBatch.native_cols])
@@ -168,6 +189,8 @@ func _run() -> void:
 	print("  BATCH_DIGEST %d counters %d" % [best["digest"], best["counters"]])
 	if "--profile" in OS.get_cmdline_user_args():
 		await _profiled()
+	if "--phases" in OS.get_cmdline_user_args():
+		await _phase_split()
 	var ok: bool = best["wired"] and digests.size() == 1
 	print("  batched runs identical to each other: %s; identical to the one-by-one loop: %s" % [
 		digests.size() == 1, one["digest"] == best["digest"] and one["counters"] == best["counters"]])

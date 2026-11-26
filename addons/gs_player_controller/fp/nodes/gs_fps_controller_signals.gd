@@ -92,6 +92,8 @@ func _consume_external_velocity(s: GSFpsState, replaying: bool) -> void:
 
 
 const CHANNEL := "fps"
+## The state's column layout, for the per-tick reads in begin_tick and end_tick.
+const _Cols := preload("../core/gs_fps_state_columns.gd")
 const SERVICE := &"gs_fps_controller"
 
 ## Who supplies commands and drives ticks.
@@ -236,3 +238,46 @@ var _tick: int = 0
 var _started: bool = false
 var _registered_name: StringName = &""
 
+
+## What end_tick diffs the tick against, captured by begin_tick before the motor runs.
+var _before_mode: GSFpsState.Mode = GSFpsState.Mode.GROUND
+var _before_y: float = 0.0
+var _before_fall: float = 0.0
+var _before_crouched: bool = false
+var _before_surface: StringName = &""
+var _before_sliding: bool = false
+var _before_launches: int = 0
+var _before_dashes: int = 0
+var _before_wall_running: bool = false
+var _before_wall_jumps: int = 0
+
+
+## end_tick's motor-driven change signals, outside a replay. The state's columns are read directly ([GSFpsStateColumns]):
+## each property is a call, per player per tick. Fetched again here: the motor may have swapped the array since begin_tick.
+func _emit_motor_changes(delta: float) -> void:
+	var f := state._f
+	var sliding := f[_Cols.SLIDE_TIME] >= 0.0
+	if sliding != _before_sliding:
+		slide_changed.emit(sliding)
+
+	if motor.launches != _before_launches:
+		launched.emit()
+
+	if motor.dashes != _before_dashes:
+		dashed.emit()
+
+	if motor.wall_jumps != _before_wall_jumps:
+		wall_jumped.emit()
+
+	var wall_running := f[_Cols.WALL_RUN_TIME] >= 0.0
+	if wall_running != _before_wall_running:
+		wall_run_changed.emit(wall_running)
+
+	var turn := motor.view_turn
+	if turn != 0.0:
+		view_turned.emit(turn)
+		if sampler != null:
+			sampler.look_at_angles(sampler.yaw + turn, sampler.pitch)
+
+	# Not during a replay: the statistics have seen that tick, and a lossy client would double-count.
+	state.airborne_time = (state.airborne_time + delta) if int(f[_Cols.MODE]) == GSFpsState.Mode.AIR else 0.0
