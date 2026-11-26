@@ -285,7 +285,10 @@ static func unpack_modifiers(state: GSFpsState, mask: int) -> void:
 ## [param target] is a [Variant] because it is a [code]GSNetBehaviour[/code] in practice and this file cannot name it.
 static func pull(state: GSFpsState, target: Variant) -> void:
 	var has := _carrier_has(target)
-	if has & _HAS_CORE:
+	if has & _HAS_CORE and native_pack and _native_packer() != null:
+		_pull_native(state, target, has)
+		return
+	elif has & _HAS_CORE:
 		target.net_position = state.position
 		target.net_velocity = state.velocity
 		target.net_yaw = state.yaw
@@ -308,6 +311,40 @@ static func pull(state: GSFpsState, target: Variant) -> void:
 		target.net_timers2 = pack_timers2(state)
 	if has & _HAS_STAMINA:
 		target.net_stamina = pack_stamina(state)
+
+
+## [method pull] packs the flags, timers and stamina in one GameSpice Sim call ([code]GSSimFpsNetPack[/code]) when the library is loaded: the same integers as the script packers, which stay the specification (examples/net_pack_parity holds the two together). False keeps the script.
+static var native_pack := true
+static var _packer: Object = null
+static var _packer_tried := false
+const _NATIVE_PACKER := &"GSSimFpsNetPack"
+
+
+static func _native_packer() -> Object:
+	if not _packer_tried:
+		_packer_tried = true
+		if ClassDB.class_exists(_NATIVE_PACKER):
+			_packer = ClassDB.instantiate(_NATIVE_PACKER)
+	return _packer
+
+
+static func _pull_native(state: GSFpsState, target: Variant, has: int) -> void:
+	var f := state._f
+	var codes: PackedInt64Array = _packer.pack(f, state.crouch_held, timer_scale,
+		state.stamina, state.stamina_exhausted, state.stamina_delay_left)
+	target.net_position = Vector3(f[0], f[1], f[2])
+	target.net_velocity = Vector3(f[3], f[4], f[5])
+	target.net_yaw = f[12]
+	target.net_pitch = state.pitch
+	target.net_crouch = state.crouch_fraction
+	target.net_flags = codes[0]
+	target.net_modifiers = pack_modifiers(state) if not state.modifiers.is_empty() else 0
+	if has & _HAS_TIMERS:
+		target.net_timers = codes[1]
+	if has & _HAS_TIMERS2:
+		target.net_timers2 = codes[2]
+	if has & _HAS_STAMINA:
+		target.net_stamina = codes[3]
 
 
 const _HAS_CORE := 1
