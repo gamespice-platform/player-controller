@@ -62,6 +62,11 @@ const NATIVE_CLASS := &"GSSimTickEvents"
 
 ## Derive natively when the library has the events module (a game's cvar).
 static var native_enabled := true
+## Whether, on a native table that has gs-sim's [code]derive_slots[/code] ([code]GSSimServerTick[/code], API 55), a
+## controller whose motor the batch ran records only a marker row ([method record_slot]) and the native derive reads the
+## before and after from the motor's resident row. Same events to the bit (examples/tick_events_parity.gd). On by
+## default; a game's operator switch may turn it off.
+static var native_slots := true
 
 ## [member row_count] input rows of [constant IN] floats; grows, never shrinks.
 var rows := PackedFloat64Array()
@@ -74,9 +79,13 @@ var floats := PackedFloat64Array()
 var count: int = 0
 ## Derives that ran natively.
 var native_runs: int = 0
+## Marker rows recorded since [method clear] ([method record_slot]).
+var slot_rows: int = 0
 
 var _native: Object = null
 var _native_checked := false
+## Whether [member _native] has [code]derive_slots[/code].
+var _slots_ok := false
 
 
 static func available() -> bool:
@@ -87,6 +96,7 @@ static func available() -> bool:
 func clear() -> void:
 	row_count = 0
 	count = 0
+	slot_rows = 0
 
 
 ## One controller's tick: [param entity] is what [method GSFpsController.dispatch_events] reports it as, b_* before the
@@ -122,6 +132,31 @@ func record(entity: int, flags: int, step_height: float,
 	row_count += 1
 
 
+## Whether a controller may [method record_slot] instead of [method record]: [member native_slots] and
+## [member native_enabled] on, and the native table reads the motor's resident rows.
+func slots_ready() -> bool:
+	return _slots_ok and native_slots and native_enabled
+
+
+## [method record] for a controller whose tick the motor batch ran natively at resident row [param slot]
+## ([member GSFpsMotor.batch_slot]): only the entity, flags and step height; the native derive fills the rest from the
+## row (a marker: [constant IN_B_MODE] -1, the slot in [constant IN_B_Y]). Only when [method slots_ready].
+func record_slot(entity: int, flags: int, step_height: float, slot: int) -> void:
+	var o := row_count * IN
+	if rows.size() < o + IN:
+		rows.resize(maxi(rows.size() * 2, o + IN))
+	rows[o + IN_ENTITY] = entity
+	rows[o + IN_FLAGS] = flags
+	rows[o + IN_STEP_HEIGHT] = step_height
+	rows[o + IN_B_MODE] = -1.0
+	rows[o + IN_B_Y] = slot
+	if side.size() <= row_count:
+		var _s := side.resize(maxi(side.size() * 2, row_count + 1))
+	side[row_count] = 0
+	row_count += 1
+	slot_rows += 1
+
+
 ## ORs [param bits] into the last recorded row's [member side].
 func mark_side(bits: int) -> void:
 	side[row_count - 1] |= bits
@@ -139,8 +174,15 @@ func skip(cursor: int, entity: int) -> int:
 	return cursor
 
 
-## The rows' events into [member ints] and [member floats], in row order; answers [member count].
+## The rows' events into [member ints] and [member floats], in row order; answers [member count]. Marker rows
+## ([method record_slot]) always derive natively.
 func derive(native: bool = native_enabled) -> int:
+	if slot_rows > 0 and _slots_ok:
+		count = int(_native.call(&"derive_slots", rows, row_count))
+		ints = _native.call(&"ints")
+		floats = _native.call(&"floats")
+		native_runs += 1
+		return count
 	if native and _native_ready():
 		count = int(_native.call(&"derive", rows, row_count))
 		ints = _native.call(&"ints")
@@ -150,14 +192,18 @@ func derive(native: bool = native_enabled) -> int:
 	return derive_script()
 
 
-## [method derive] in script, whatever the switch says.
+## [method derive] in script, whatever the switch says (never with marker rows: those derive natively).
 func derive_script() -> int:
 	count = 0
+	if slot_rows > 0:
+		push_error("GSFpsTickEvents.derive_script: %d marker rows need the native table" % slot_rows)
 	var need := row_count * MAX_PER_ROW
 	if ints.size() < need * INTS:
 		ints.resize(need * INTS)
 		floats.resize(need * FLOATS)
 	for r in range(row_count):
+		if slot_rows > 0 and rows[r * IN + IN_B_MODE] < 0.0:
+			continue
 		_derive_row(r * IN)
 	return count
 
@@ -217,6 +263,7 @@ func use_native(native: Object) -> bool:
 	if native == null:
 		_native = null
 		_native_checked = false
+		_slots_ok = false
 		return true
 	for m: StringName in [&"layout", &"derive", &"ints", &"floats"]:
 		if not native.has_method(m):
@@ -228,6 +275,7 @@ func use_native(native: Object) -> bool:
 		return false
 	_native = native
 	_native_checked = true
+	_slots_ok = native.has_method(&"derive_slots")
 	return true
 
 
