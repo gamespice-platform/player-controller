@@ -587,7 +587,15 @@ func end_tick(tick: int, delta: float) -> void:
 		_lap_ctrl(4, prof_t)
 
 	if rows != null:
-		_record_event_row(rows)
+		if (
+			motor.batch_before and motor.tick_events & GSFpsMotor.EVENTS_KNOWN != 0 and not state.batch_dirty
+			and rows.slots_ready()
+		):
+			# The batch ran the whole tick and nothing wrote the state since: GameSpice Sim's row holds before and after.
+			rows.record_slot(event_entity, GSFpsTickEvents.FLAG_REPLAYING if _replaying else 0, tunables.step_height,
+				motor.batch_slot)
+		else:
+			_record_event_row(rows)
 		rows.mark_side(_ev_side | GSFpsTickEvents.SIDE_SIMULATED)
 	elif not _replaying:
 		_emit_late_edges()
