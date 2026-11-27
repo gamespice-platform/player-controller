@@ -18,7 +18,6 @@ func _tick_tunables(variant: int) -> GSFpsTunables:
 		t.dash_enabled = true
 		t.dash_button = GSFpsCommand.BUTTON_USER_1
 		t.dash_from_air = false
-		t.auto_hop = true
 		t.jump_adds_to_velocity = true
 		t.bhop_speed_cap_scale = 1.4
 		t.slide_requires_sprint = true
@@ -36,6 +35,12 @@ func _tick_tunables(variant: int) -> GSFpsTunables:
 		t.aim_button = GSFpsCommand.BUTTON_USER_2
 		t.aim_speed_scale = 0.6
 		t.sprint_blocks_aim = true
+	elif variant >= 4:
+		# Edge friction (gs-sim's has_edge_friction): four times the ground friction with a drop ahead. Variant 5 is
+		# the same walker without it, to show the streams do reach a ledge.
+		t.edge_friction = 4.0 if variant == 4 else 1.0
+		t.edge_friction_reach = 0.6
+		t.edge_friction_drop = 0.5
 	return t
 
 
@@ -139,14 +144,21 @@ func _tally_events(motor: GSFpsMotor, s: GSFpsState, was: Array, events: Array) 
 
 
 func _tick_runs() -> void:
-	var names := ["", " +walls", " +moves", " +wallruns"]
+	var names := ["", " +walls", " +moves", " +wallruns", " +edge"]
+	var edged := ClassDB.class_has_method(&"GSSimFpsBody", &"has_edge_friction")
+	var edge_streams := [0, 0]
 	var total := 0
 	var runs_after_jump := 0
 	var batched := GSFpsMotorBatch.available()
 	# The one-row batch's events over every stream: [rows that said, differ, mode, height, slide, wall run changes].
 	var events := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 	var batch_rows := 0
-	for variant: int in [0, 1, 2, 3]:
+	var variants: Array[int] = [0, 1, 2, 3]
+	if edged:
+		variants.append(4)
+	else:
+		print("  gs-sim has no GSSimFpsBody.has_edge_friction: the edge friction runs are skipped")
+	for variant: int in variants:
 		for hulls: bool in [false, true]:
 			for hz: int in RATES:
 				var step := 1.0 / float(hz)
@@ -156,8 +168,12 @@ func _tick_runs() -> void:
 					var label := "%s @%d Hz%s%s" % [sc[0], hz, " +hulls" if hulls else "", names[variant]]
 					_check(a["native_ticks"] == 0, label + ": the script run did not tick in the library")
 					runs_after_jump += a["runs_after_jump"]
+					if variant == 4:
+						edge_streams[0] += 1
+						if _tick_replay(0, sc, stream, step, hulls, 5)["ticks"] != a["ticks"]:
+							edge_streams[1] += 1
 					var ways: Array[int] = [2]
-					if variant < 2:
+					if variant < 2 or variant == 4:
 						ways = [1, 2]
 					if batched:
 						ways.append(3)
@@ -176,6 +192,9 @@ func _tick_runs() -> void:
 						if way == 2 and ClassDB.class_has_method(&"GSSimFpsBody", &"runs_after_wall_jump"):
 							_check(b["script_ticks"] == 0, lw + ": a library that slows a run after a wall jump runs every such tick itself (%d in script)" % b["script_ticks"])
 						var want: bool = b["native_ticks"] == calls if way == 2 else b["native_ticks"] > stream.size()
+						if way == 1 and variant == 4:
+							# The halves have no edge friction: with native_full off such a motor ticks in script.
+							want = b["native_ticks"] == 0
 						if way == 3:
 							batch_rows += stream.size()
 							for k in range(events.size()):
@@ -196,12 +215,16 @@ func _tick_runs() -> void:
 			_check(events[0] * 3 > batch_rows and events[3] > 0 and events[4] > 0 and events[5] > 0 and events[6] > 0,
 				"over a third of batch rows said what changed (%d of %d; mode %d, height %d, slide %d, wall run %d)" % [
 					events[0], batch_rows, events[3], events[4], events[5], events[6]])
+	if edged:
+		_check(edge_streams[1] > 0,
+			"edge friction changed %d of %d edge streams against the same walker without it: some reach a ledge" % [edge_streams[1], edge_streams[0]])
 	_check(runs_after_jump > 0, "the streams start a wall run after a wall jump in the same air (%d times), the case _run_speed slows" % runs_after_jump)
 	_sections += 1
 
 
-## The crouch tunables _native_full_tun appends after wall_jump_up_speed (API 48).
+## The crouch tunables _native_full_tun appends after wall_jump_up_speed (API 48), then the edge friction's three.
 const CROUCH_TUN := 6
+const EDGE_TUN := 3
 
 ## The motor keeps its native tunables arrays between ticks; a changed value or a swapped resource must rebuild both.
 func _tun_cache_check() -> void:
@@ -231,8 +254,12 @@ func _tun_cache_check() -> void:
 	t.wall_jump_up_speed += 1.0
 	var tick2 := motor._native_tick_tun(s)
 	var full2 := motor._native_full_tun(tick2)
-	_check(tick2[11] == t.max_speed and full2[11] == t.max_speed and full2[full2.size() - 1 - CROUCH_TUN] == t.wall_jump_up_speed,
-		"a changed tunable rebuilds the tick and full arrays (max_speed %s, wall_jump_up_speed %s)" % [tick2[11], full2[full2.size() - 1 - CROUCH_TUN]])
+	_check(tick2[11] == t.max_speed and full2[11] == t.max_speed and full2[full2.size() - 1 - CROUCH_TUN - EDGE_TUN] == t.wall_jump_up_speed,
+		"a changed tunable rebuilds the tick and full arrays (max_speed %s, wall_jump_up_speed %s)" % [tick2[11], full2[full2.size() - 1 - CROUCH_TUN - EDGE_TUN]])
+	t.edge_friction_drop += 0.25
+	var full3 := motor._native_full_tun(motor._native_tick_tun(s))
+	_check(full3[full3.size() - 1] == t.edge_friction_drop and full3[full3.size() - 3] == t.edge_friction,
+		"the full array ends with the edge friction, its reach and drop (%s)" % [full3.slice(full3.size() - 3)])
 	var other := _tunables()
 	other.max_speed = t.max_speed + 2.0
 	motor.tunables = other
