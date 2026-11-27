@@ -1,0 +1,24 @@
+# Per-tick controller scripts checked by gs-ci scripts/check-gd-perf.py (the CI efficiency step).
+# One fnmatch glob per line over tracked paths. Baseline: ci/efficiency/gd-perf.tsv (only shrinks).
+# Left out on purpose: tunables, cvars, styles, stats and admin modifiers (set up, not stepped).
+addons/gs_player_controller/core/gs_player_body_rules.gd
+addons/gs_player_controller/core/gs_player_hull_*.gd
+addons/gs_player_controller/core/gs_player_intent.gd
+addons/gs_player_controller/core/gs_player_look.gd
+addons/gs_player_controller/core/gs_player_view_rules.gd
+addons/gs_player_controller/fp/core/gs_fps_command.gd
+addons/gs_player_controller/fp/core/gs_fps_modifier.gd
+addons/gs_player_controller/fp/core/gs_fps_sprint_rules.gd
+addons/gs_player_controller/fp/core/gs_fps_state*.gd
+addons/gs_player_controller/fp/core/gs_fps_surface*.gd
+addons/gs_player_controller/fp/motion/*.gd
+addons/gs_player_controller/fp/net/gs_fps_net_sync.gd
+addons/gs_player_controller/fp/nodes/gs_fps_controller*.gd
+addons/gs_player_controller/fp/nodes/gs_fps_*sampler.gd
+addons/gs_player_controller/fp/nodes/gs_fps_view*.gd
+addons/gs_player_controller/nodes/gs_player_controller*.gd
+addons/gs_player_controller/tp/core/gs_tps_motor.gd
+addons/gs_player_controller/tp/core/gs_tps_state.gd
+addons/gs_player_controller/tp/nodes/*.gd
+# Run once: the cvar and replicated-state spec tables.
+cold+: cvar_specs|state_specs
