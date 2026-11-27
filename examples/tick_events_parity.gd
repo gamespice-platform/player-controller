@@ -10,6 +10,7 @@ extends "res://examples/fps_controller_selftest_base.gd"
 
 const ROWS := 6000
 const COURSE_TICKS := 720
+const ControllerBatch := preload("res://addons/gs_player_controller/fp/nodes/gs_fps_controller_batch.gd")
 const EDGES: Array[StringName] = [&"mode_changed", &"landed", &"jumped", &"stepped_up", &"crouch_changed",
 	&"slide_changed", &"launched", &"dashed", &"wall_jumped", &"wall_run_changed", &"view_turned"]
 
@@ -36,6 +37,15 @@ func _ready() -> void:
 	if native:
 		var nat := await _course(2)
 		_same(legacy, nat, "rows derived natively")
+	# The whole controller tick in one call (API 53) over a motor batch: the same signals and states as one by one.
+	if GSFpsMotorBatch.available():
+		var batched := await _course(3)
+		_same(legacy, batched, "one batched call (GSFpsControllerBatch.tick)")
+		_check(batched["motored"] == COURSE_TICKS, "the batched call ran a motor row every tick (%d)" % batched["motored"])
+	else:
+		print("  gs-sim's motor batch is not loaded: the batched call's course is skipped")
+	_check(ControllerBatch.new().tick(GSFpsMotorBatch.new(), 0, null, Callable(), Callable(), Callable()) == 0,
+		"the batched call refuses a missing event table")
 	_done()
 	print("%d passed, %d failed" % [_passed, _failed])
 	print("%d of %d sections ran to their last line" % [_completed, _entered])
@@ -100,7 +110,8 @@ func _random_rows(native: bool) -> void:
 	_check(events.native_table() == null, "use_native(null) goes back to the table's own")
 
 
-## [param how]: 0 signals at once, 1 rows derived in script, 2 rows derived natively.
+## [param how]: 0 signals at once, 1 rows derived in script, 2 rows derived natively, 3 the batched call (rows derived
+## natively when the library is there).
 func _course(how: int) -> Dictionary:
 	var world := _make_world()
 	var kerb := StaticBody3D.new()
@@ -122,6 +133,17 @@ func _course(how: int) -> Dictionary:
 			seen[name] = true)
 	var events := GSFpsTickEvents.new()
 	var states := PackedByteArray()
+	var batch := GSFpsMotorBatch.new()
+	var calls := ControllerBatch.new()
+	calls.resize(1)
+	calls.controllers[0] = controller
+	var motored := 0
+	var cmd: Array[GSFpsCommand] = [null]
+	var pre := func(_row: int) -> float:
+		controller.apply_command(cmd[0])
+		return STEP
+	var live := func(_row: int) -> bool: return true
+	var post := func(_row: int, _motor_row: int, _told: bool) -> void: pass
 	for t in range(COURSE_TICKS):
 		var buttons := 0
 		if t % 90 == 30:
@@ -134,12 +156,17 @@ func _course(how: int) -> Dictionary:
 			controller.event_rows = events
 			controller.event_entity = 7
 		var before := edges.size()
-		controller.apply_command(_command(forward, 0.0, 0.0, buttons))
-		controller.simulate_tick(t, STEP)
+		if how == 3:
+			cmd[0] = _command(forward, 0.0, 0.0, buttons)
+			var _started := batch.start(STEP)
+			motored += calls.tick(batch, t, events, pre, live, post)
+		else:
+			controller.apply_command(_command(forward, 0.0, 0.0, buttons))
+			controller.simulate_tick(t, STEP)
 		if how > 0:
 			if edges.size() != before:
 				_check(false, "no motor edge is emitted before the dispatch (tick %d)" % t)
-			events.derive(how == 2)
+			events.derive(how >= 2)
 			var end := controller.dispatch_events(events, 0)
 			if end != events.count:
 				_check(false, "dispatch takes every event of its entity (%d of %d)" % [end, events.count])
@@ -147,7 +174,7 @@ func _course(how: int) -> Dictionary:
 		states.append_array(var_to_bytes([s.position, s.velocity, s.mode, s.crouch_fraction]))
 	world.queue_free()
 	await get_tree().process_frame
-	return {"edges": edges, "seen": seen, "states": states, "native": events.native_runs}
+	return {"edges": edges, "seen": seen, "states": states, "native": events.native_runs, "motored": motored}
 
 
 func _same(a: Dictionary, b: Dictionary, label: String) -> void:
