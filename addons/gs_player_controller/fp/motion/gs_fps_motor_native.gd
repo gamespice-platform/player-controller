@@ -8,11 +8,14 @@ const _Cols := preload("../core/gs_fps_state_columns.gd")
 ## between that and gs_fps_motor_slide.gd, and nothing outside the motor names this script.
 
 
-## [member native_tick]'s tunables for this tick, or empty when this tick may not run natively.
+## [member native_tick]'s tunables for this tick, or empty when this tick may not run natively. Edge friction runs
+## natively only in the whole tick ([member native_full]) with a library that has it; [method simulate] then keeps the
+## halves in script.
 func _native_tick_tun(state: GSFpsState) -> PackedFloat64Array:
 	if (
-		not native_tick or surfaces != null or tunables.edge_friction > 1.0
+		not native_tick or surfaces != null
 		or (state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR)
+		or (tunables.edge_friction > 1.0 and not (native_full and _native_edge_friction()))
 	):
 		return PackedFloat64Array()
 	if tunables != _tun_for or tunables.revision != _tun_rev:
@@ -29,6 +32,19 @@ var _tun_cache := PackedFloat64Array()
 var _tun_full_cache := PackedFloat64Array()
 var _tun_for: GSFpsTunables = null
 var _tun_rev := -1
+
+
+## -1 not asked yet, else whether GameSpice Sim's whole tick applies [member GSFpsTunables.edge_friction]
+## ([code]GSSimFpsBody.has_edge_friction[/code]); without it a motor with edge friction ticks in script.
+static var _native_edge_known: int = -1
+
+
+func _native_edge_friction() -> bool:
+	if _native_edge_known < 0:
+		_native_edge_known = 1 if (
+			ClassDB.class_exists(&"GSSimFpsBody") and ClassDB.class_has_method(&"GSSimFpsBody", &"has_edge_friction")
+		) else 0
+	return _native_edge_known == 1
 
 
 func _build_tick_tun() -> PackedFloat64Array:
@@ -50,6 +66,8 @@ var _native_start_settled := false
 ## written) when the body cannot. The script decides everything [method _reuse_rest] compares but the position, which the
 ## native depenetration may move.
 func _native_tick_pre(state: GSFpsState, tun: PackedFloat64Array) -> bool:
+	if tunables.edge_friction > 1.0:
+		return false  # The halves have no edge friction (see [method _native_tick_tun]): such a tick runs in script.
 	var height := _height(state)
 	var rest_ok := _native_rest_ok(state, height)
 	var p := state.position
@@ -106,6 +124,7 @@ func _native_full_tun(tun: PackedFloat64Array) -> PackedFloat64Array:
 		t.wall_jump_max_per_wall, t.wall_jump_max_per_air, t.wall_jump_look_blend, t.wall_jump_push_speed,
 		t.wall_jump_up_speed,
 		t.can_crouch, t.stand_height, t.crouch_height, t.crouch_transition_time, t.instant_air_crouch, t.radius,
+		t.edge_friction, t.edge_friction_reach, t.edge_friction_drop,
 	]))
 	_tun_full_cache = full
 	return full
@@ -294,7 +313,7 @@ func _native_tick_post(
 	state: GSFpsState, command: GSFpsCommand, delta: float, tun: PackedFloat64Array, jumped: bool,
 	wall: GSFpsBody.Hit, start_settled: bool, start_position: Vector3, start_velocity: Vector3
 ) -> bool:
-	if state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR:
+	if tunables.edge_friction > 1.0 or (state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR):
 		return false
 	var sliding := state.is_sliding()
 	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
