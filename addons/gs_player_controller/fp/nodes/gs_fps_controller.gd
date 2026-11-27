@@ -1,6 +1,6 @@
 @tool
 class_name GSFpsController
-extends "gs_fps_controller_collider.gd"
+extends "gs_fps_controller_events.gd"
 
 ## The player controller. Add it under a [Node3D] and it moves.
 ##
@@ -564,19 +564,8 @@ func begin_tick(tick: int, delta: float) -> bool:
 	return true
 
 
-var _before_mode: GSFpsState.Mode = GSFpsState.Mode.GROUND
-var _before_y: float = 0.0
-var _before_fall: float = 0.0
-var _before_crouched: bool = false
-var _before_surface: StringName = &""
-var _before_sliding: bool = false
-var _before_launches: int = 0
-var _before_dashes: int = 0
-var _before_wall_running: bool = false
-var _before_wall_jumps: int = 0
-
-
-## [method simulate_tick] after the motor: publishes the tick and emits what changed.
+## [method simulate_tick] after the motor: publishes the tick and emits what changed (with [member event_rows], records
+## the motor's edges there instead, for the game's [method dispatch_events]).
 func end_tick(tick: int, delta: float) -> void:
 	var prof_t := Time.get_ticks_usec() if (GSFpsMotor.profile or phase_timers) else 0
 	if prof_t != 0:
@@ -584,33 +573,21 @@ func end_tick(tick: int, delta: float) -> void:
 
 	_tick = tick
 	motor.batch_events_take()
-	_publish(_before_mode, _before_y, _before_fall)
+	_publish()
+	var rows := event_rows
+	if rows == null:
+		_emit_early_edges()
 	if prof_t != 0:
 		_lap_ctrl(3, prof_t)
-	_report_changes(_before_crouched, _before_surface)
+	# The crouch edge rides in the table with the motor's other edges.
+	_report_changes(_before_crouched if rows == null else state.is_crouched(), _before_surface)
 	if prof_t != 0:
 		_lap_ctrl(4, prof_t)
 
-	if not _replaying:
-		if motor.may_change(GSFpsMotor.EVENT_SLIDE) and state.is_sliding() != _before_sliding:
-			slide_changed.emit(state.is_sliding())
-
-		if motor.launches != _before_launches:
-			launched.emit()
-
-		if motor.dashes != _before_dashes:
-			dashed.emit()
-
-		if motor.wall_jumps != _before_wall_jumps:
-			wall_jumped.emit()
-
-		if motor.may_change(GSFpsMotor.EVENT_WALL_RUN) and state.is_wall_running() != _before_wall_running:
-			wall_run_changed.emit(state.is_wall_running())
-
-		if motor.view_turn != 0.0:
-			view_turned.emit(motor.view_turn)
-			if sampler != null:
-				sampler.look_at_angles(sampler.yaw + motor.view_turn, sampler.pitch)
+	if rows != null:
+		_record_event_row(rows)
+	elif not _replaying:
+		_emit_late_edges()
 
 	# Not during a replay: the statistics have seen that tick, and a lossy client would double-count.
 	if not _replaying:
@@ -704,12 +681,8 @@ func _repeat_command() -> GSFpsCommand:
 	return repeated
 
 
-## Writes the simulated state out to the scene, and reports what changed.
-func _publish(
-	before_mode: GSFpsState.Mode,
-	before_y: float,
-	before_fall: float
-) -> void:
+## Writes the simulated state out to the scene.
+func _publish() -> void:
 	var pt := Time.get_ticks_usec() if (GSFpsMotor.profile or phase_timers) else 0
 	# Written only when the node is elsewhere: a write, even of the same place, walks the whole body subtree (hitboxes, figure)
 	# marking transforms dirty, several microseconds a player a tick, and a player standing still did that every tick.
@@ -719,29 +692,6 @@ func _publish(
 		phase_us[7] += Time.get_ticks_usec() - pt
 
 	_apply_collider(state)
-
-	if motor.may_change(GSFpsMotor.EVENT_MODE) and before_mode != state.mode:
-		mode_changed.emit(before_mode, state.mode)
-
-		if (
-			state.mode == GSFpsState.Mode.GROUND
-			and before_mode == GSFpsState.Mode.AIR
-		):
-			landed.emit(absf(before_fall))
-		elif (
-			state.mode == GSFpsState.Mode.AIR
-			and before_mode == GSFpsState.Mode.GROUND
-			and state.velocity.y > 0.0
-		):
-			jumped.emit()
-
-	# A grounded tick that gained height is a stair step, not a jump: the view absorbs it, no jolt per tread.
-	if motor.may_change(GSFpsMotor.EVENT_Y) and state.mode == GSFpsState.Mode.GROUND:
-		var gained := state.position.y - before_y
-		if gained > 0.001 and gained <= tunables.step_height + 0.01:
-			if view != null:
-				view.note_step_up(gained)
-			stepped_up.emit(gained)
 
 
 ## Moves the player, discarding velocity and smoothing.
