@@ -83,6 +83,21 @@ func _random_rows(native: bool) -> void:
 		"native and script floats are identical to the bit")
 	events.clear()
 	_check(events.derive(true) == 0, "native: no rows, no events")
+	# A game's native server tick (gs-sim GSSimServerTick API 2) derives the same table and answers it from events().
+	if not ClassDB.class_exists(&"GSSimServerTick") or not ClassDB.class_has_method(&"GSSimServerTick", &"derive"):
+		print("  gs-sim's GSSimServerTick has no derive (API 2): the server tick half is skipped")
+		return
+	var tick: Object = ClassDB.instantiate(&"GSSimServerTick")
+	_check(not events.use_native(RefCounted.new()), "use_native refuses an object without the table's methods")
+	_check(events.use_native(tick) and events.native_table() == tick, "use_native takes the server tick")
+	events.row_count = ROWS
+	var t := events.derive(true)
+	var wide: PackedInt64Array = tick.call(&"events")
+	_check(t == n and events.ints.slice(0, t * GSFpsTickEvents.INTS) == s_ints, "the server tick derives the script's ints (%d, %d)" % [t, n])
+	_check(events.floats.slice(0, t * GSFpsTickEvents.FLOATS).to_byte_array() == s_floats.to_byte_array(), "the server tick's floats are the script's to the bit")
+	_check(wide.size() == n * GSFpsTickEvents.INTS and PackedInt32Array(Array(wide)) == s_ints, "GSSimServerTick.events() is the tick's ints (%d values)" % wide.size())
+	var _back := events.use_native(null)
+	_check(events.native_table() == null, "use_native(null) goes back to the table's own")
 
 
 ## [param how]: 0 signals at once, 1 rows derived in script, 2 rows derived natively.

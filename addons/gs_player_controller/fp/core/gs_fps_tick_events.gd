@@ -182,6 +182,32 @@ func _push(e: int, kind: int, i0: int, i1: int, f0: float) -> void:
 	count += 1
 
 
+## Derives on [param native] instead of a `GSSimTickEvents` of its own: any object with gs-sim's `layout`, `derive`,
+## `ints` and `floats` (a game's native server tick, gs-sim's `GSSimServerTick`, which then answers its `events()`).
+## Answers whether it was taken; a wrong layout is said once and the table keeps what it had. Null goes back to its own.
+func use_native(native: Object) -> bool:
+	if native == null:
+		_native = null
+		_native_checked = false
+		return true
+	for m: StringName in [&"layout", &"derive", &"ints", &"floats"]:
+		if not native.has_method(m):
+			push_error("GSFpsTickEvents.use_native: %s has no %s" % [native, m])
+			return false
+	var layout: PackedInt32Array = native.call(&"layout")
+	if layout != PackedInt32Array([IN, INTS, FLOATS, Kind.COUNT]):
+		push_error("GSFpsTickEvents.use_native: layout %s is not this one" % layout)
+		return false
+	_native = native
+	_native_checked = true
+	return true
+
+
+## The object deriving natively (null: none yet, or script).
+func native_table() -> Object:
+	return _native
+
+
 ## The native table, once, if its layout is this one.
 func _native_ready() -> bool:
 	if _native_checked:
