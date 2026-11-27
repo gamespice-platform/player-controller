@@ -119,40 +119,15 @@ func _random_rows(native: bool) -> void:
 ## natively when the library is there).
 func _course(how: int) -> Dictionary:
 	var world := _make_world()
-	var kerb := StaticBody3D.new()
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = Vector3(4.0, 0.25, 4.0)
-	shape.shape = box
-	kerb.add_child(shape)
-	kerb.position = Vector3(0.0, 0.125, -6.0)
-	world.add_child(kerb)
+	var kerb := _add_kerb(world)
 	var controller := _make_player(world, GSFpsController.Drive.LOCAL)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
-	# The kerb is metal and the floor has no surface: stepping on and off it changes the surface.
-	var surfaces := GSFpsSurfaceSet.new()
-	surfaces.add(GSFpsSurface.make(&"metal"))
-	var kerb_id := kerb.get_instance_id()
-	controller.surfaces = surfaces
-	controller.motor.surfaces = surfaces
-	controller.motor.surface_resolver = func(id: int) -> StringName: return &"metal" if id == kerb_id else &""
-	var boost := GSFpsModifier.make(&"boost")
-	boost.max_speed_scale = 1.5
-	boost.duration_sec = 0.25
-	controller.motor.register_modifier(boost)
+	_rig_course_player(controller, kerb.get_instance_id())
 	var edges: Array = []
 	var side: Array = []
 	var seen := {}
-	for name in EDGES:
-		controller.connect(name, func(a: Variant = null, b: Variant = null) -> void:
-			edges.append([name, a, b])
-			seen[name] = true)
-	for name in SIDE:
-		controller.connect(name, func(a: Variant = null, b: Variant = null) -> void:
-			# simulated's state is the controller's own: its position then, not the object.
-			side.append([name, a, (b as GSFpsState).position if b is GSFpsState else b])
-			seen[name] = true)
+	_listen_course(controller, edges, side, seen)
 	var events := GSFpsTickEvents.new()
 	var states := PackedByteArray()
 	var batch := GSFpsMotorBatch.new()
@@ -167,11 +142,7 @@ func _course(how: int) -> Dictionary:
 	var live := func(_row: int) -> bool: return true
 	var post := func(_row: int, _motor_row: int, _told: bool) -> void: pass
 	for t in range(COURSE_TICKS):
-		var buttons := 0
-		if t % 90 == 30:
-			buttons |= GSFpsCommand.BUTTON_JUMP
-		if (t / 120) % 2 == 1:
-			buttons |= GSFpsCommand.BUTTON_CROUCH
+		var buttons := _course_buttons(t)
 		var forward := 1.0 if (t / 240) % 2 == 0 else -1.0
 		if how > 0:
 			events.clear()
@@ -207,6 +178,52 @@ func _course(how: int) -> Dictionary:
 	world.queue_free()
 	await get_tree().process_frame
 	return {"edges": edges, "side": course_side, "seen": seen, "states": states, "native": events.native_runs, "motored": motored}
+
+
+func _add_kerb(world: Node3D) -> StaticBody3D:
+	var kerb := StaticBody3D.new()
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4.0, 0.25, 4.0)
+	shape.shape = box
+	kerb.add_child(shape)
+	kerb.position = Vector3(0.0, 0.125, -6.0)
+	world.add_child(kerb)
+	return kerb
+
+
+## The kerb is metal and the floor has no surface: stepping on and off it changes the surface.
+func _rig_course_player(controller: GSFpsController, kerb_id: int) -> void:
+	var surfaces := GSFpsSurfaceSet.new()
+	surfaces.add(GSFpsSurface.make(&"metal"))
+	controller.surfaces = surfaces
+	controller.motor.surfaces = surfaces
+	controller.motor.surface_resolver = func(id: int) -> StringName: return &"metal" if id == kerb_id else &""
+	var boost := GSFpsModifier.make(&"boost")
+	boost.max_speed_scale = 1.5
+	boost.duration_sec = 0.25
+	controller.motor.register_modifier(boost)
+
+
+func _listen_course(controller: GSFpsController, edges: Array, side: Array, seen: Dictionary) -> void:
+	for name in EDGES:
+		controller.connect(name, func(a: Variant = null, b: Variant = null) -> void:
+			edges.append([name, a, b])
+			seen[name] = true)
+	for name in SIDE:
+		controller.connect(name, func(a: Variant = null, b: Variant = null) -> void:
+			# simulated's state is the controller's own: its position then, not the object.
+			side.append([name, a, (b as GSFpsState).position if b is GSFpsState else b])
+			seen[name] = true)
+
+
+static func _course_buttons(t: int) -> int:
+	var buttons := 0
+	if t % 90 == 30:
+		buttons |= GSFpsCommand.BUTTON_JUMP
+	if (t / 120) % 2 == 1:
+		buttons |= GSFpsCommand.BUTTON_CROUCH
+	return buttons
 
 
 func _same(a: Dictionary, b: Dictionary, label: String) -> void:
