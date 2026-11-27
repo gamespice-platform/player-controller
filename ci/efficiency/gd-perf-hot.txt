@@ -22,3 +22,6 @@ addons/gs_player_controller/tp/core/gs_tps_state.gd
 addons/gs_player_controller/tp/nodes/*.gd
 # Run once: the cvar and replicated-state spec tables.
 cold+: cvar_specs|state_specs
+# Set up or on an event, never per tick: surface sets are built once, an intent decodes from a saved payload,
+# body rules apply at spawn or on a rule change, a switch collects and activates when the player switches.
+cold+: ^(from_physics|from_dict|apply_to|apply_exceptions|_collect|activate)$

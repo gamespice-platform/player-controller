@@ -1,10 +1,7 @@
 # gd-perf
 # Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
-addons/gs_player_controller/core/gs_player_body_rules.gd::apply_exceptions::alloc	1
-addons/gs_player_controller/core/gs_player_body_rules.gd::apply_exceptions::dynamic_call	4
 addons/gs_player_controller/core/gs_player_body_rules.gd::apply_exceptions::untyped_array	2
 addons/gs_player_controller/core/gs_player_body_rules.gd::apply_hull::node_lookup	1
-addons/gs_player_controller/core/gs_player_body_rules.gd::apply_to::dynamic_call	4
 addons/gs_player_controller/core/gs_player_body_rules.gd::bind_cvars::untyped_array	2
 addons/gs_player_controller/core/gs_player_body_rules.gd::blocks::dynamic_call	1
 addons/gs_player_controller/core/gs_player_body_rules.gd::describe::untyped_array	1
@@ -30,7 +27,6 @@ addons/gs_player_controller/core/gs_player_intent.gd::<members>::untyped_array	1
 addons/gs_player_controller/core/gs_player_intent.gd::button_names::string_build	1
 addons/gs_player_controller/core/gs_player_intent.gd::button_of::string_build	1
 addons/gs_player_controller/core/gs_player_intent.gd::copy_intent::alloc	1
-addons/gs_player_controller/core/gs_player_intent.gd::from_dict::dynamic_call	5
 addons/gs_player_controller/core/gs_player_intent.gd::from_dict::untyped_array	1
 addons/gs_player_controller/core/gs_player_intent.gd::to_dict::alloc	1
 addons/gs_player_controller/core/gs_player_intent.gd::to_dict::untyped_array	1
@@ -52,10 +48,8 @@ addons/gs_player_controller/fp/core/gs_fps_state.gd::copy_from::alloc	2
 addons/gs_player_controller/fp/core/gs_fps_state.gd::describe::untyped_array	1
 addons/gs_player_controller/fp/core/gs_fps_state.gd::mode_name::string_build	1
 addons/gs_player_controller/fp/core/gs_fps_surface.gd::describe::untyped_array	1
-addons/gs_player_controller/fp/core/gs_fps_surface.gd::from_physics::dynamic_call	7
 addons/gs_player_controller/fp/core/gs_fps_surface_set.gd::<members>::untyped_array	1
 addons/gs_player_controller/fp/core/gs_fps_surface_set.gd::describe::untyped_array	1
-addons/gs_player_controller/fp/core/gs_fps_surface_set.gd::from_physics::dynamic_call	1
 addons/gs_player_controller/fp/motion/gs_fps_body.gd::copy_filters_to::alloc	1
 addons/gs_player_controller/fp/motion/gs_fps_body.gd::describe::untyped_array	1
 addons/gs_player_controller/fp/motion/gs_fps_body.gd::native_slide::untyped_array	1
@@ -138,9 +132,6 @@ addons/gs_player_controller/nodes/gs_player_controller.gd::adopt_state::untyped_
 addons/gs_player_controller/nodes/gs_player_controller.gd::handover_state::alloc	1
 addons/gs_player_controller/nodes/gs_player_controller.gd::handover_state::untyped_array	1
 addons/gs_player_controller/nodes/gs_player_controller_switch.gd::<members>::untyped_array	1
-addons/gs_player_controller/nodes/gs_player_controller_switch.gd::_collect::alloc	3
-addons/gs_player_controller/nodes/gs_player_controller_switch.gd::activate::alloc	3
-addons/gs_player_controller/nodes/gs_player_controller_switch.gd::activate::string_build	1
 addons/gs_player_controller/nodes/gs_player_controller_switch.gd::activate::untyped_array	1
 addons/gs_player_controller/nodes/gs_player_controller_switch.gd::available::alloc	1
 addons/gs_player_controller/nodes/gs_player_controller_switch.gd::refresh::alloc	1
