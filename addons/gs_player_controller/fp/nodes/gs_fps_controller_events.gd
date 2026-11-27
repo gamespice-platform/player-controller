@@ -3,12 +3,13 @@ extends "gs_fps_controller_collider.gd"
 
 ## The motor edges [GSFpsController] reports after a tick (mode, landing, jump, step, crouch, slide, launch, dash, wall
 ## jump, wall run, view turn), emitted at once or, with [member event_rows], recorded as a row of a [GSFpsTickEvents]
-## table the game derives once for every player and walks with [method dispatch_events]. Kept apart so the controller
+## table the game derives once for every player and walks with [method dispatch_row]. Kept apart so the controller
 ## file stays small.
 
-## A game's tick table: while set, [method GSFpsController.end_tick] records its edges here instead of emitting them, and
-## the game emits them after the tick with [method dispatch_events]. Surface and modifier changes, [signal simulated] and
-## the statistics stay in [method GSFpsController.end_tick]. Null (the default) emits everything at once.
+## A game's tick table: while set, [method GSFpsController.end_tick] emits no signal: it records its edges here and
+## holds its surface and modifier changes and [signal simulated], and the game emits them all after the tick with
+## [method dispatch_row] (API 54; [method dispatch_events] alone emits only the motor's edges). The statistics stay in
+## [method GSFpsController.end_tick]. Null (the default) emits everything at once.
 var event_rows: GSFpsTickEvents = null
 ## This controller's entity in [member event_rows].
 var event_entity: int = 0
@@ -23,6 +24,13 @@ var _before_launches: int = 0
 var _before_dashes: int = 0
 var _before_wall_running: bool = false
 var _before_wall_jumps: int = 0
+## What [method end_tick] held for [method dispatch_row] with [member event_rows] set: the table's side bits, the surface
+## change and the modifier ids (reused, never reallocated a tick).
+var _ev_side: int = 0
+var _ev_surface_from: StringName = &""
+var _ev_surface_to: StringName = &""
+var _ev_added: Array[StringName] = []
+var _ev_removed: Array[StringName] = []
 
 
 ## Mode, landing, jump and step edges, emitted now (before the crouch and surface ones).
@@ -110,6 +118,26 @@ func dispatch_events(events: GSFpsTickEvents, cursor: int) -> int:
 			GSFpsTickEvents.Kind.VIEW_TURNED:
 				_view_turn(f)
 		cursor += 1
+	return cursor
+
+
+## Everything input row [param row] holds for this controller, from [param cursor] (its first derived event, or past
+## them when it has none): the motor's edges as [method dispatch_events], then the surface change, the modifiers added
+## and removed and [signal simulated]. Answers the cursor past its events. The game walks every row in order after
+## [method GSFpsTickEvents.derive] (one row a controller a table); the tick's other signals are the same as one by one.
+func dispatch_row(events: GSFpsTickEvents, row: int, cursor: int) -> int:
+	if cursor < events.count and events.ints[cursor * GSFpsTickEvents.INTS] == events.entity_at(row):
+		cursor = dispatch_events(events, cursor)
+	var side := events.side[row]
+	if side & GSFpsTickEvents.SIDE_SURFACE != 0:
+		surface_changed.emit(_ev_surface_from, _ev_surface_to)
+	if side & GSFpsTickEvents.SIDE_MODIFIERS != 0:
+		for id in _ev_added:
+			modifier_added.emit(id)
+		for id in _ev_removed:
+			modifier_removed.emit(id)
+	if side & GSFpsTickEvents.SIDE_SIMULATED != 0:
+		simulated.emit(_tick, state)
 	return cursor
 
 

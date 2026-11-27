@@ -1,15 +1,16 @@
 extends RefCounted
 
-## Every player's controller tick in one call (API 53): [method GSFpsController.begin_tick] and
+## Every player's controller tick in one call (API 53; its signals through the table since API 54): [method GSFpsController.begin_tick] and
 ## [method GSFpsMotorBatch.add] for each row in order, then for each row in order [method GSFpsMotorBatch.finish] and
 ## [method GSFpsController.end_tick], with the game's own work before and after each row as three hooks. The order is
 ## exactly the loop a game wrote by hand around the motor batch, so the states and signals are the same to the bit; what
 ## goes is that loop's glue per player.
 ##
-## The motor edges go only through the event table ([member GSFpsController.event_rows] is set for every row): the game
-## derives and dispatches them once after the call. Surface and modifier signals, [signal GSFpsController.simulated] and the
-## statistics stay in [method GSFpsController.end_tick], as with any table. A player ticked one by one
-## ([method GSFpsController.simulate_tick]) is the fallback and is unchanged.
+## Every signal of the tick goes through the event table ([member GSFpsController.event_rows] is set for every row): the
+## motor's edges, the surface and modifier changes and [signal GSFpsController.simulated] (API 54). The game derives and
+## dispatches them once after the call ([method dispatch], or its own walk of [method GSFpsController.dispatch_row]). The
+## statistics stay in [method GSFpsController.end_tick]. A player ticked one by one ([method GSFpsController.simulate_tick])
+## is the fallback and is unchanged.
 ##
 ## No class_name: preload by path ([code]fp/nodes/gs_fps_controller_batch.gd[/code]); [code]examples/tick_events_parity[/code]
 ## holds it to the one-by-one course.
@@ -87,3 +88,21 @@ func tick(batch: GSFpsMotorBatch, tick_number: int, events: GSFpsTickEvents, pre
 		post.call(i, row, told)
 		controller.event_rows = null
 	return motored
+
+
+## After [method tick]: derives [param events] once and emits every row's signals through its controller
+## ([method GSFpsController.dispatch_row], entities being row numbers as [method tick] records them), then clears the
+## table. Answers the derived events.
+func dispatch(events: GSFpsTickEvents) -> int:
+	var count := events.derive()
+	var n := controllers.size()
+	var cursor := 0
+	for r in range(events.row_count):
+		var e := events.entity_at(r)
+		var controller: GSFpsController = controllers[e] if e >= 0 and e < n else null
+		if controller == null:
+			cursor = events.skip(cursor, e)
+			continue
+		cursor = controller.dispatch_row(events, r, cursor)
+	events.clear()
+	return count

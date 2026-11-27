@@ -564,8 +564,9 @@ func begin_tick(tick: int, delta: float) -> bool:
 	return true
 
 
-## [method simulate_tick] after the motor: publishes the tick and emits what changed (with [member event_rows], records
-## the motor's edges there instead, for the game's [method dispatch_events]).
+## [method simulate_tick] after the motor: publishes the tick and emits what changed. With [member event_rows] it emits
+## nothing: the motor's edges are recorded there, and the surface and modifier changes and [signal simulated] are held
+## for the game's [method dispatch_row] (API 54).
 func end_tick(tick: int, delta: float) -> void:
 	var prof_t := Time.get_ticks_usec() if (GSFpsMotor.profile or phase_timers) else 0
 	if prof_t != 0:
@@ -575,6 +576,7 @@ func end_tick(tick: int, delta: float) -> void:
 	motor.batch_events_take()
 	_publish()
 	var rows := event_rows
+	_ev_side = 0
 	if rows == null:
 		_emit_early_edges()
 	if prof_t != 0:
@@ -586,6 +588,7 @@ func end_tick(tick: int, delta: float) -> void:
 
 	if rows != null:
 		_record_event_row(rows)
+		rows.mark_side(_ev_side | GSFpsTickEvents.SIDE_SIMULATED)
 	elif not _replaying:
 		_emit_late_edges()
 
@@ -602,7 +605,8 @@ func end_tick(tick: int, delta: float) -> void:
 		_lap_ctrl(5, prof_t)
 	_on_post_simulate(tick, delta)
 
-	simulated.emit(tick, state)
+	if rows == null:
+		simulated.emit(tick, state)
 	if prof_t != 0:
 		_lap_ctrl(6, prof_t)
 
@@ -621,7 +625,8 @@ func _lap_ctrl(phase: int, start: int) -> void:
 
 
 ## Emits the change signals for anything the tick altered.
-## Diffed here so a game gets one edge per change instead of polling.
+## Diffed here so a game gets one edge per change instead of polling. With [member event_rows] the surface and modifier
+## changes are held for [method dispatch_row] instead ([member _ev_side]).
 func _report_changes(
 	before_crouched: bool,
 	before_surface: StringName
@@ -629,8 +634,14 @@ func _report_changes(
 	if state.is_crouched() != before_crouched:
 		crouch_changed.emit(state.is_crouched())
 
+	var held := event_rows != null
 	if state.surface != before_surface:
-		surface_changed.emit(before_surface, state.surface)
+		if held:
+			_ev_surface_from = before_surface
+			_ev_surface_to = state.surface
+			_ev_side |= GSFpsTickEvents.SIDE_SURFACE
+		else:
+			surface_changed.emit(before_surface, state.surface)
 
 	# Modifiers are diffed against a baseline that persists across ticks, not one captured at the top of this one:
 	# a modifier applied between ticks is already present when the next starts, so a same-tick baseline never reports "added".
@@ -640,6 +651,9 @@ func _report_changes(
 
 	var before_modifiers := _last_modifiers
 	_last_modifiers = state.modifiers.duplicate()
+	if held:
+		_ev_added.clear()
+		_ev_removed.clear()
 
 	# Small arrays — usually empty, rarely more than two or three — so a linear
 	# comparison is cheaper than building sets to diff them.
@@ -647,13 +661,21 @@ func _report_changes(
 		if not _contains_modifier(before_modifiers, entry.x):
 			var added := motor.modifier_at(entry.x)
 			if added != null:
-				modifier_added.emit(added.id)
+				if held:
+					_ev_added.append(added.id)
+				else:
+					modifier_added.emit(added.id)
 
 	for entry in before_modifiers:
 		if not _contains_modifier(state.modifiers, entry.x):
 			var removed := motor.modifier_at(entry.x)
 			if removed != null:
-				modifier_removed.emit(removed.id)
+				if held:
+					_ev_removed.append(removed.id)
+				else:
+					modifier_removed.emit(removed.id)
+	if held and not (_ev_added.is_empty() and _ev_removed.is_empty()):
+		_ev_side |= GSFpsTickEvents.SIDE_MODIFIERS
 
 
 static func _contains_modifier(entries: Array[Vector2i], index: int) -> bool:

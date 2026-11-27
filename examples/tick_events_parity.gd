@@ -3,9 +3,10 @@ extends "res://examples/fps_controller_selftest_base.gd"
 ## Holds [GSFpsTickEvents] (a tick's motor edges for every player as one table, derived once) to the signals
 ## [GSFpsController] emitted one at a time: gs-sim's [code]GSSimTickEvents[/code] against the script derive, to the bit,
 ## over seeded random rows that reach every kind and both edges of each comparison; then one controller's course
-## (walking, jumping, crouching, stepping up a kerb) run three ways, signals at once, rows derived in script and rows
-## derived natively, with the same signals in the same order and the same states. With no library the native half says
-## so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
+## (walking, jumping, crouching, stepping on and off a metal kerb, a modifier coming and going) run four ways: signals at
+## once, rows derived in script, rows derived natively and the batched call, with the same signals in the same order and
+## the same states (the held surface, modifier and simulated signals in their own order). With no library the native half
+## says so and passes; [code]GS_SIM_REQUIRE_NATIVE=1[/code] (CI) fails instead.
 ## Run: [code]godot --headless --path . res://examples/tick_events_parity.tscn[/code]
 
 const ROWS := 6000
@@ -13,6 +14,9 @@ const COURSE_TICKS := 720
 const ControllerBatch := preload("res://addons/gs_player_controller/fp/nodes/gs_fps_controller_batch.gd")
 const EDGES: Array[StringName] = [&"mode_changed", &"landed", &"jumped", &"stepped_up", &"crouch_changed",
 	&"slide_changed", &"launched", &"dashed", &"wall_jumped", &"wall_run_changed", &"view_turned"]
+## The signals [method GSFpsController.end_tick] holds with a table (API 54) and [method GSFpsController.dispatch_row]
+## emits after the row's motor edges: compared in their own order, since one by one the late edges come after them.
+const SIDE: Array[StringName] = [&"surface_changed", &"modifier_added", &"modifier_removed", &"simulated"]
 
 
 func _ready() -> void:
@@ -31,7 +35,8 @@ func _ready() -> void:
 	var legacy := await _course(0)
 	var script := await _course(1)
 	_check(legacy["edges"].size() > 20, "the course makes edges (%d)" % legacy["edges"].size())
-	for k in [&"mode_changed", &"landed", &"jumped", &"stepped_up", &"crouch_changed"]:
+	for k in [&"mode_changed", &"landed", &"jumped", &"stepped_up", &"crouch_changed", &"surface_changed",
+			&"modifier_added", &"modifier_removed", &"simulated"]:
 		_check(legacy["seen"].has(k), "the course reaches %s" % k)
 	_same(legacy, script, "rows derived in script")
 	if native:
@@ -125,11 +130,28 @@ func _course(how: int) -> Dictionary:
 	var controller := _make_player(world, GSFpsController.Drive.LOCAL)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	# The kerb is metal and the floor has no surface: stepping on and off it changes the surface.
+	var surfaces := GSFpsSurfaceSet.new()
+	surfaces.add(GSFpsSurface.make(&"metal"))
+	var kerb_id := kerb.get_instance_id()
+	controller.surfaces = surfaces
+	controller.motor.surfaces = surfaces
+	controller.motor.surface_resolver = func(id: int) -> StringName: return &"metal" if id == kerb_id else &""
+	var boost := GSFpsModifier.make(&"boost")
+	boost.max_speed_scale = 1.5
+	boost.duration_sec = 0.25
+	controller.motor.register_modifier(boost)
 	var edges: Array = []
+	var side: Array = []
 	var seen := {}
 	for name in EDGES:
 		controller.connect(name, func(a: Variant = null, b: Variant = null) -> void:
 			edges.append([name, a, b])
+			seen[name] = true)
+	for name in SIDE:
+		controller.connect(name, func(a: Variant = null, b: Variant = null) -> void:
+			# simulated's state is the controller's own: its position then, not the object.
+			side.append([name, a, (b as GSFpsState).position if b is GSFpsState else b])
 			seen[name] = true)
 	var events := GSFpsTickEvents.new()
 	var states := PackedByteArray()
@@ -156,6 +178,9 @@ func _course(how: int) -> Dictionary:
 			controller.event_rows = events
 			controller.event_entity = 7
 		var before := edges.size()
+		var side_before := side.size()
+		if t % 150 == 10:
+			var _added := controller.add_modifier(&"boost")
 		if how == 3:
 			cmd[0] = _command(forward, 0.0, 0.0, buttons)
 			var _started := batch.start(STEP)
@@ -164,17 +189,24 @@ func _course(how: int) -> Dictionary:
 			controller.apply_command(_command(forward, 0.0, 0.0, buttons))
 			controller.simulate_tick(t, STEP)
 		if how > 0:
-			if edges.size() != before:
-				_check(false, "no motor edge is emitted before the dispatch (tick %d)" % t)
-			events.derive(how >= 2)
-			var end := controller.dispatch_events(events, 0)
-			if end != events.count:
-				_check(false, "dispatch takes every event of its entity (%d of %d)" % [end, events.count])
+			if edges.size() != before or side.size() != side_before:
+				_check(false, "no signal is emitted before the dispatch (tick %d)" % t)
+			if how == 3:
+				var _derived := calls.dispatch(events)
+				if events.row_count != 0:
+					_check(false, "the batch's dispatch clears the table (tick %d)" % t)
+			else:
+				events.derive(how >= 2)
+				var end := controller.dispatch_row(events, 0, 0)
+				if end != events.count:
+					_check(false, "dispatch takes every event of its entity (%d of %d)" % [end, events.count])
 		var s := controller.state
 		states.append_array(var_to_bytes([s.position, s.velocity, s.mode, s.crouch_fraction]))
+	# What the course emitted, taken before the frame that frees the world (a LOCAL player may tick itself in it).
+	var course_side := side.duplicate()
 	world.queue_free()
 	await get_tree().process_frame
-	return {"edges": edges, "seen": seen, "states": states, "native": events.native_runs, "motored": motored}
+	return {"edges": edges, "side": course_side, "seen": seen, "states": states, "native": events.native_runs, "motored": motored}
 
 
 func _same(a: Dictionary, b: Dictionary, label: String) -> void:
@@ -187,4 +219,13 @@ func _same(a: Dictionary, b: Dictionary, label: String) -> void:
 			break
 	_check(ea.size() == eb.size() and first < 0, "%s: the same signals in the same order (%d, %d%s)" % [
 		label, ea.size(), eb.size(), "" if first < 0 else "; first differs at %d: %s vs %s" % [first, ea[first], eb[first]]])
+	var sa: Array = a["side"]
+	var sb: Array = b["side"]
+	var side_first := -1
+	for i in range(mini(sa.size(), sb.size())):
+		if var_to_bytes(sa[i]) != var_to_bytes(sb[i]):
+			side_first = i
+			break
+	_check(sa.size() == sb.size() and side_first < 0, "%s: the same surface, modifier and simulated signals (%d, %d%s)" % [
+		label, sa.size(), sb.size(), "" if side_first < 0 else "; first differs at %d: %s vs %s" % [side_first, sa[side_first], sb[side_first]]])
 	_check(a["states"] == b["states"], "%s: the same states every tick" % label)
