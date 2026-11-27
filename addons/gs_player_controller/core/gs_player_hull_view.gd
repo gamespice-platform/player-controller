@@ -13,6 +13,8 @@ const DEFAULT_TELEPORT_CUT := 10.0
 
 ## Misses between two warnings.
 const WARN_EVERY := 256
+## Read-only "no samples for this id" default.
+const _NO_FEET := {}
 
 ## The rewind this view feeds; [method around] runs through it. Its `feet_fn` and `snap_fn` are set to this view's.
 var rewind := GSPlayerHullRewind.new()
@@ -69,7 +71,7 @@ func record(tick: int, positions: Dictionary) -> void:
 
 ## Feet of [param id] at exactly [param tick], or null.
 func ring_at(id: Variant, tick: int) -> Variant:
-	var by_tick: Dictionary = _feet.get(id, {})
+	var by_tick: Dictionary = _feet.get(id, _NO_FEET)
 	return by_tick.get(tick)
 
 

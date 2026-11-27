@@ -21,7 +21,6 @@ addons/gs_player_controller/core/gs_player_hull_view.gd::record::alloc	1
 addons/gs_player_controller/core/gs_player_hull_view.gd::record::untyped_array	2
 addons/gs_player_controller/core/gs_player_hull_view.gd::resolve::alloc	1
 addons/gs_player_controller/core/gs_player_hull_view.gd::resolve::untyped_array	1
-addons/gs_player_controller/core/gs_player_hull_view.gd::ring_at::alloc	1
 addons/gs_player_controller/core/gs_player_hull_view.gd::ring_at::untyped_array	1
 addons/gs_player_controller/core/gs_player_intent.gd::<members>::untyped_array	1
 addons/gs_player_controller/core/gs_player_intent.gd::button_names::string_build	1
@@ -78,7 +77,6 @@ addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::_native_full_tun::
 addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::_native_tick_pre::alloc	1
 addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::batch_motor_state::dynamic_call	1
 addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::batch_rest_bits::alloc	1
-addons/gs_player_controller/fp/motion/gs_fps_motor_walls.gd::_wall_probe_directions::alloc	1
 addons/gs_player_controller/fp/motion/gs_fps_move_mode.gd::describe::untyped_array	1
 addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::<members>::untyped_array	1
 addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::copy_for_simulation::dynamic_call	1

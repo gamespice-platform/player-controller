@@ -11,14 +11,19 @@ const WALL_HEADINGS := 8
 ## The wall counters' ceiling, the width of their replicated field.
 const WALL_JUMP_COUNT_MAX := 3
 
+## [method _wall_probe_directions]' list, refilled per call: the wall check runs every tick it is armed.
+var _probe_dirs: Array[Vector3] = []
+
 ## Below this horizontal speed, in m/s, the velocity has no direction worth probing along,
 ## and only the view's directions are asked.
 const WALL_PROBE_MIN_SPEED := 0.5
 
 
 ## The probe directions for a wall: both sides of the velocity when moving, then the view's four flat directions.
+## Returns the motor's reused list, valid until the next call.
 func _wall_probe_directions(state: GSFpsState) -> Array[Vector3]:
-	var directions: Array[Vector3] = []
+	var directions := _probe_dirs
+	directions.clear()
 	var flat := Vector3(state.velocity.x, 0.0, state.velocity.z)
 
 	if flat.length() >= WALL_PROBE_MIN_SPEED:
