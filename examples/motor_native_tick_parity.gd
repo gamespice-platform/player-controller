@@ -96,6 +96,12 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 		swim.volumes = _swim_boxes
 		swim.idle_sink_speed = _swim_sink
 		motor.register_mode(swim)
+	var ladder: GSFpsLadderMode = null
+	if not _ladder_boxes.is_empty():
+		ladder = GSFpsLadderMode.new()
+		ladder.volumes = _ladder_boxes
+		ladder.dampen = _ladder_dampen
+		motor.register_mode(ladder)
 	var ticks: Array[PackedByteArray] = []
 	var before := GSFpsPhysicsBody.native_ticks
 	var runs_after_jump := 0
@@ -107,6 +113,8 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 			# The game's own entry, each tick (GSFpsSwimMode.update); the mode leaves by itself.
 			swim.update(motor, s)
 			swims += 1 if s.mode == swim.mode_id else 0
+		if ladder != null:
+			swims += 1 if s.mode == ladder.mode_id else 0
 		if batch != null:
 			var was := [s.mode, s.position.y, s.is_sliding(), s.is_wall_running()]
 			batch.start(step)
@@ -118,6 +126,11 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 				_tally_events(motor, s, was, events)
 		else:
 			motor.simulate(s, c, step)
+		if ladder != null:
+			# The game's own entry, after the move (GSFpsLadderMode.update), with the commanded heading.
+			var basis := GSFpsMotor._view_basis(c.yaw, 0.0)
+			ladder.wish = basis.forward * c.move.y + basis.right * c.move.x
+			ladder.update(motor, s)
 		if after_jump and motor.wall_runs > runs:
 			runs_after_jump += 1
 		ticks.append(var_to_bytes([s.position, s.velocity, s.mode, s.move_flags(), s.ground_normal, s.ground_id, s.surface,
@@ -136,6 +149,10 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 ## The water [method _tick_replay] swims in when not empty (a GSFpsSwimMode it registers), and that mode's sink speed.
 var _swim_boxes: Array[AABB] = []
 var _swim_sink := 0.0
+## The ladders [method _tick_replay] climbs when not empty (a GSFpsLadderMode it registers; its ticks count as
+## [code]swims[/code]), and that mode's dampen.
+var _ladder_boxes: Array[AABB] = []
+var _ladder_dampen := 0.0
 
 
 ## Swimmers on the walkers' random streams with pitch, in and out of two overlapping pools over the determinism world's
@@ -192,6 +209,67 @@ func _swim_runs() -> void:
 	_swim_sink = 0.0
 	print("  %d swim stream ticks compared, %d swim ticks in script, %d in the library" % [total, swum, native_swum])
 	_check(swum > 0 and native_swum > 0, "the streams swim (%d script swim ticks)" % swum)
+	_sections += 1
+
+
+## Climbers on the walkers' streams with pitch over a grid of thin ladders (x and z facing, on the floor and a metre up,
+## GSFpsLadderMode.update after each move): the native tick (has_ladder, API 57) and the one-row batch hold to the
+## script to the bit, with and without dampen, and the library ran the ladder ticks.
+func _ladder_runs() -> void:
+	if not ClassDB.class_has_method(&"GSSimFpsBody", &"has_ladder"):
+		print("  gs-sim has no GSSimFpsBody.has_ladder: the ladder runs are skipped")
+		if OS.get_environment("GS_SIM_REQUIRE_NATIVE") == "1":
+			_check(false, "the library runs the ladder tick (GS_SIM_REQUIRE_NATIVE=1)")
+		return
+	var boxes: Array[AABB] = []
+	for gx in range(-7, 8):
+		for gz in range(-7, 8):
+			var at := Vector3(gx * 4.0 + 1.3, 0.0 if (gx + gz) % 3 != 0 else 1.0, gz * 4.0 - 0.7)
+			var size := Vector3(0.12, 4.0, 1.6) if (gx + gz) % 2 == 0 else Vector3(1.6, 4.0, 0.12)
+			boxes.append(AABB(at, size))
+	var batched := GSFpsMotorBatch.available()
+	var climbed := 0
+	var native_climbed := 0
+	var total := 0
+	for dampen: float in [0.0, 0.4]:
+		_ladder_dampen = dampen
+		for hulls: bool in [false, true]:
+			for hz: int in RATES:
+				var step := 1.0 / float(hz)
+				for sc: Array in SCENARIOS:
+					_ladder_boxes = boxes
+					var stream := _random_stream(sc[3] * 23 + hz, SWIM_TICKS)
+					var rng := RandomNumberGenerator.new()
+					rng.seed = sc[3] * 11 + hz
+					var pitch := 0.0
+					for c in stream:
+						pitch = clampf(pitch + rng.randf_range(-6.0, 6.0), -89.0, 89.0)
+						c.pitch = pitch
+					var a := _tick_replay(0, sc, stream, step, hulls, 0)
+					var label := "%s @%d Hz%s ladder%s" % [sc[0], hz, " +hulls" if hulls else "", " dampen" if dampen > 0.0 else ""]
+					_check(a["native_ticks"] == 0 and a["custom"] == 0, label + ": the script run did not tick in the library")
+					climbed += a["swims"]
+					var ways: Array[int] = [2]
+					if batched:
+						ways.append(3)
+					for way in ways:
+						var b := _tick_replay(way, sc, stream, step, hulls, 0)
+						var first := -1
+						for i in range(a["ticks"].size()):
+							if a["ticks"][i] != b["ticks"][i]:
+								first = i
+								break
+						var lw: String = label + [" script", " halves", " full", " batch"][way]
+						total += stream.size()
+						native_climbed += b["custom"]
+						_check(b["swims"] == a["swims"] and b["custom"] == b["swims"],
+							lw + ": the library ran every ladder tick (%d of %d)" % [b["custom"], b["swims"]])
+						_check(first < 0, lw + ": every one of %d ticks identical%s" % [stream.size(), "" if first < 0 else " (first differs at tick %d: script %s native %s)" % [first, bytes_to_var(a["ticks"][first]), bytes_to_var(b["ticks"][first])]])
+						_check(a["counters"] == b["counters"], lw + ": the same motor and hull counters %s (native %s)" % [a["counters"], b["counters"]])
+	_ladder_boxes = []
+	_ladder_dampen = 0.0
+	print("  %d ladder stream ticks compared, %d ladder ticks in script, %d in the library" % [total, climbed, native_climbed])
+	_check(climbed > 0 and native_climbed > 0, "the streams climb (%d script ladder ticks)" % climbed)
 	_sections += 1
 
 
@@ -361,7 +439,10 @@ func _run() -> void:
 		await get_tree().physics_frame
 		_tick_runs()
 		_swim_runs()
-		expected = 2 if ClassDB.class_has_method(&"GSSimFpsBody", &"has_swim") else 1
+		_ladder_runs()
+		expected = 1
+		expected += 1 if ClassDB.class_has_method(&"GSSimFpsBody", &"has_swim") else 0
+		expected += 1 if ClassDB.class_has_method(&"GSSimFpsBody", &"has_ladder") else 0
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = false
 	GSFpsMotor.native_full = true

@@ -123,6 +123,65 @@ func _simulate(state: GSFpsState, command: GSFpsCommand, delta: float, motor: GS
 			state.mode = mode_id
 
 
+## GameSpice Sim's ladder tail (API 57) for this mode's [method _simulate]; none for a subclass, whose tick may differ.
+## The jump-off tick is stamped here for a tick that runs natively, exactly as [method _simulate] would stamp it.
+func _native_tail(
+	state: GSFpsState, command: GSFpsCommand, motor: GSFpsMotor, out: PackedFloat64Array, at: int
+) -> bool:
+	if get_script() != GSFpsLadderMode:
+		return false
+	var t := motor.tunables
+	var height := t.height_at(state.crouch_fraction)
+	if not write_native_tail(
+		out, at, mode_id, climb_speed, jump_off_speed, reach, dampen, false, t.radius, height, state.pitch, volumes
+	):
+		return false
+	if command.is_pressed(GSFpsCommand.BUTTON_JUMP) and touching(state.position, t.radius, height).size != Vector3.ZERO:
+		_jumped_off_tick = state.tick
+	return true
+
+
+## -1 not asked yet, else whether GameSpice Sim's whole tick runs a ladder tail ([code]has_ladder[/code]).
+static var _native_known: int = -1
+
+
+## Writes GameSpice Sim's ladder tail into [param out] from [param at] (resized); false, nothing written, without a library
+## that runs one. [param carry_over_top]: off the top while rising and pushing forward, go on over the lip at climb speed.
+## Static so a game's own copy of this mode, with the same tick, sends the same tail.
+static func write_native_tail(
+	out: PackedFloat64Array, at: int, id: int, climb: float, jump_off: float, reach_m: float, dampen_f: float,
+	carry_over_top: bool, radius: float, height: float, pitch: float, boxes: Array[AABB]
+) -> bool:
+	if _native_known < 0:
+		_native_known = 1 if (
+			ClassDB.class_exists(&"GSSimFpsBody") and ClassDB.class_has_method(&"GSSimFpsBody", &"has_ladder")
+		) else 0
+	if _native_known == 0:
+		return false
+	out.resize(at + 11 + boxes.size() * 6)
+	out[at] = 2.0
+	out[at + 1] = id
+	out[at + 2] = climb
+	out[at + 3] = jump_off
+	out[at + 4] = reach_m
+	out[at + 5] = dampen_f
+	out[at + 6] = 1.0 if carry_over_top else 0.0
+	out[at + 7] = radius
+	out[at + 8] = height
+	out[at + 9] = pitch
+	out[at + 10] = boxes.size()
+	var o := at + 11
+	for box in boxes:
+		out[o] = box.position.x
+		out[o + 1] = box.position.y
+		out[o + 2] = box.position.z
+		out[o + 3] = box.size.x
+		out[o + 4] = box.size.y
+		out[o + 5] = box.size.z
+		o += 6
+	return true
+
+
 ## Horizontal unit vector from the ladder's face out toward the player.
 static func _away(box: AABB, feet: Vector3) -> Vector3:
 	var c := box.get_center()

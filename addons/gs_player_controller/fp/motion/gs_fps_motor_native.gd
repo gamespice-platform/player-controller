@@ -65,7 +65,7 @@ var _custom_tun := PackedFloat64Array()
 
 
 ## [member _custom_tun] with [param custom]'s tail written in, or empty to run its [code]_simulate[/code].
-func _native_custom_tun(state: GSFpsState, custom: RefCounted) -> PackedFloat64Array:
+func _native_custom_tun(state: GSFpsState, command: GSFpsCommand, custom: RefCounted) -> PackedFloat64Array:
 	if _native_custom_known < 0:
 		_native_custom_known = 1 if (
 			ClassDB.class_exists(&"GSSimFpsBody") and ClassDB.class_has_method(&"GSSimFpsBody", &"has_swim")
@@ -79,7 +79,7 @@ func _native_custom_tun(state: GSFpsState, custom: RefCounted) -> PackedFloat64A
 			_custom_tun.clear()
 			return PackedFloat64Array()
 	# Untyped like GSFpsMotor.mode_for: register_mode admits only GSFpsMoveMode, and naming it here would tie the parsers.
-	return _custom_tun if custom._native_tail(state, _custom_tun, 84) else PackedFloat64Array()
+	return _custom_tun if custom._native_tail(state, command, self, _custom_tun, 84) else PackedFloat64Array()
 
 
 func _build_tick_tun() -> PackedFloat64Array:

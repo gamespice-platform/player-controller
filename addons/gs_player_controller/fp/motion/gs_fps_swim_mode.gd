@@ -148,7 +148,9 @@ func _simulate(
 
 ## GameSpice Sim's swim tail (API 56): kind 1, the mode id, the tunables, the clamped pitch (the tick row does not
 ## hold it), then each volume's position and size. None for a subclass, whose [method _simulate] may differ.
-func _native_tail(state: GSFpsState, out: PackedFloat64Array, at: int) -> bool:
+func _native_tail(
+	state: GSFpsState, _command: GSFpsCommand, _motor: GSFpsMotor, out: PackedFloat64Array, at: int
+) -> bool:
 	if get_script() != GSFpsSwimMode:
 		return false
 	out.resize(at + 12 + volumes.size() * 6)
