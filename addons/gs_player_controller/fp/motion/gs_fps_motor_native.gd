@@ -553,6 +553,9 @@ var batch_events_allowed := false
 ## [constant EVENT_Y], [constant EVENT_SLIDE], [constant EVENT_WALL_RUN]); 0 when it was not asked. The controller reads
 ## it at its tick end and clears it.
 var batch_events: int = 0
+## Set by [GSFpsMotorBatch.add] (API 55): the resident row ([member batch_slot]) holds the state as the controller's
+## tick started, for GameSpice Sim's event rows ([method GSFpsTickEvents.record_slot]). Cleared at each tick start.
+var batch_before := false
 const ROW_EVENTS := 8
 const ROW_CROUCH := 16
 const EVENTS_KNOWN := 64
@@ -571,6 +574,7 @@ static var _pre_own := {}
 func batch_events_begin(script: Script, external: Vector3) -> void:
 	batch_events = 0
 	tick_events = 0
+	batch_before = false
 	if not _pre_own.has(script):
 		var own := script.get_script_method_list().filter(func(m): return m["name"] == "_on_pre_simulate")
 		_pre_own[script] = own.size() > 1

@@ -47,6 +47,25 @@ func _ready() -> void:
 		var batched := await _course(3)
 		_same(legacy, batched, "one batched call (GSFpsControllerBatch.tick)")
 		_check(batched["motored"] == COURSE_TICKS, "the batched call ran a motor row every tick (%d)" % batched["motored"])
+		# On a native server tick (gs-sim GSSimServerTick API 4, gs-player-controller 55) the rows the batch ran are marker
+		# rows filled from the motor's resident rows: the same signals and states, with the switch on and off.
+		if ClassDB.class_exists(&"GSSimServerTick") and ClassDB.class_has_method(&"GSSimServerTick", &"derive_slots"):
+			# With surfaces the motor stays in script (no marker row); without them every row runs natively.
+			var deferred := await _course(4)
+			_same(legacy, deferred, "the server tick with surfaces (rows run in script)")
+			legacy = await _course(0, false)
+			var slots := await _course(4, false)
+			_same(legacy, slots, "marker rows from the resident rows (GSSimServerTick.derive_slots)")
+			_check(slots["slot_rows"] > COURSE_TICKS / 2,
+				"most ticks recorded a marker row (%d of %d)" % [slots["slot_rows"], COURSE_TICKS])
+			_check(slots["slot_misses"] == 0, "no marker row missed its resident row (%d)" % slots["slot_misses"])
+			GSFpsTickEvents.native_slots = false
+			var off := await _course(4, false)
+			GSFpsTickEvents.native_slots = true
+			_same(legacy, off, "the server tick with native_slots off")
+			_check(off["slot_rows"] == 0, "native_slots off records no marker row (%d)" % off["slot_rows"])
+		else:
+			print("  gs-sim's GSSimServerTick has no derive_slots (API 4): the marker rows' course is skipped")
 	else:
 		print("  gs-sim's motor batch is not loaded: the batched call's course is skipped")
 	_check(ControllerBatch.new().tick(GSFpsMotorBatch.new(), 0, null, Callable(), Callable(), Callable()) == 0,
@@ -116,8 +135,9 @@ func _random_rows(native: bool) -> void:
 
 
 ## [param how]: 0 signals at once, 1 rows derived in script, 2 rows derived natively, 3 the batched call (rows derived
-## natively when the library is there).
-func _course(how: int) -> Dictionary:
+## natively when the library is there), 4 the batched call on a native server tick (GSSimServerTick's motor and derive).
+## Without [param surfaced] the kerb has no surface, so the motor may run natively.
+func _course(how: int, surfaced: bool = true) -> Dictionary:
 	var world := _make_world()
 	var kerb := StaticBody3D.new()
 	var shape := CollisionShape3D.new()
@@ -131,12 +151,13 @@ func _course(how: int) -> Dictionary:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	# The kerb is metal and the floor has no surface: stepping on and off it changes the surface.
-	var surfaces := GSFpsSurfaceSet.new()
-	surfaces.add(GSFpsSurface.make(&"metal"))
-	var kerb_id := kerb.get_instance_id()
-	controller.surfaces = surfaces
-	controller.motor.surfaces = surfaces
-	controller.motor.surface_resolver = func(id: int) -> StringName: return &"metal" if id == kerb_id else &""
+	if surfaced:
+		var surfaces := GSFpsSurfaceSet.new()
+		surfaces.add(GSFpsSurface.make(&"metal"))
+		var kerb_id := kerb.get_instance_id()
+		controller.surfaces = surfaces
+		controller.motor.surfaces = surfaces
+		controller.motor.surface_resolver = func(id: int) -> StringName: return &"metal" if id == kerb_id else &""
 	var boost := GSFpsModifier.make(&"boost")
 	boost.max_speed_scale = 1.5
 	boost.duration_sec = 0.25
@@ -160,6 +181,10 @@ func _course(how: int) -> Dictionary:
 	calls.resize(1)
 	calls.controllers[0] = controller
 	var motored := 0
+	var server: Object = null
+	if how == 4:
+		server = ClassDB.instantiate(&"GSSimServerTick")
+		_check(batch.use_native(server.call(&"motor")) and events.use_native(server), "the course runs on a GSSimServerTick")
 	var cmd: Array[GSFpsCommand] = [null]
 	var pre := func(_row: int) -> float:
 		controller.apply_command(cmd[0])
@@ -181,7 +206,7 @@ func _course(how: int) -> Dictionary:
 		var side_before := side.size()
 		if t % 150 == 10:
 			var _added := controller.add_modifier(&"boost")
-		if how == 3:
+		if how >= 3:
 			cmd[0] = _command(forward, 0.0, 0.0, buttons)
 			var _started := batch.start(STEP)
 			motored += calls.tick(batch, t, events, pre, live, post)
@@ -191,7 +216,7 @@ func _course(how: int) -> Dictionary:
 		if how > 0:
 			if edges.size() != before or side.size() != side_before:
 				_check(false, "no signal is emitted before the dispatch (tick %d)" % t)
-			if how == 3:
+			if how >= 3:
 				var _derived := calls.dispatch(events)
 				if events.row_count != 0:
 					_check(false, "the batch's dispatch clears the table (tick %d)" % t)
@@ -206,7 +231,9 @@ func _course(how: int) -> Dictionary:
 	var course_side := side.duplicate()
 	world.queue_free()
 	await get_tree().process_frame
-	return {"edges": edges, "side": course_side, "seen": seen, "states": states, "native": events.native_runs, "motored": motored}
+	var counted: PackedInt64Array = server.call(&"counters") if server != null else PackedInt64Array([0, 0, 0, 0, 0, 0, 0])
+	return {"edges": edges, "side": course_side, "seen": seen, "states": states, "native": events.native_runs, "motored": motored,
+		"slot_rows": counted[5], "slot_misses": counted[6]}
 
 
 func _same(a: Dictionary, b: Dictionary, label: String) -> void:

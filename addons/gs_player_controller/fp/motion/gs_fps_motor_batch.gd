@@ -58,6 +58,10 @@ var _use_cols := false
 ## Whether the library has [code]run_slots[/code], and whether this loop uses it.
 var _states_ok := false
 var _crouch_ok := false
+## Whether the library has [code]slot_push_before[/code] (API 55: [member GSFpsMotor.batch_before]).
+var _before_ok := false
+## Resident rows [method _slot_for] made.
+var _made: int = 0
 var _use_states := false
 var _delta: float = 0.0
 var _count: int = 0
@@ -163,6 +167,9 @@ func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: flo
 	var stage: int
 	motor.batch_states = _use_states and motor.batch_motor_state() != null
 	motor.batch_crouch = motor.batch_states and _crouch_ok and native_crouch
+	var before_slot := -1
+	if motor.batch_states and _before_ok and motor.batch_events_allowed and GSFpsTickEvents.native_slots:
+		before_slot = _push_before(motor, state)
 	if _use_cols:
 		stage = motor.batch_prepare(state, command, _deltas[row], _extra, _meta, row, _meta_len, COLS_EXTRA)
 	else:
@@ -170,7 +177,10 @@ func add(motor: GSFpsMotor, state: GSFpsState, command: GSFpsCommand, delta: flo
 	_stage[row] = stage
 	if stage == GSFpsMotor.BATCH_READY:
 		if motor.batch_states:
+			var kept := unmarked + _made
 			_slots[row] = _slot_for(motor, state)
+			# A row made again here, or sent for a write that did not mark it, did not hold the tick's start.
+			motor.batch_before = before_slot >= 0 and unmarked + _made == kept
 		elif _use_states:
 			_slots[row] = -1
 		elif _use_cols:
@@ -288,6 +298,7 @@ func _take_native() -> void:
 	_cols_ok = _meta_len > 3 and ClassDB.class_has_method(NATIVE_CLASS, &"run_cols")
 	_states_ok = _cols_ok and ClassDB.class_has_method(NATIVE_CLASS, &"run_slots")
 	_crouch_ok = _states_ok and ClassDB.class_has_method(NATIVE_CLASS, &"crouch_rows")
+	_before_ok = _states_ok and ClassDB.class_has_method(NATIVE_CLASS, &"slot_push_before")
 
 
 func _take_back(row: int) -> void:
@@ -324,6 +335,21 @@ func _refill_cols(motor: GSFpsMotor, state: GSFpsState, row: int) -> void:
 		_cols[row] = state._f
 
 
+## Before [method GSFpsMotor.batch_prepare]: [param motor]'s resident row, if it has one in this batch for this state,
+## holds the state as its tick starts (sent now when marked, else as the row's first run or write of the loop finds it);
+## the row, or -1 when it has none ([method _slot_for] makes it after the prepare).
+func _push_before(motor: GSFpsMotor, state: GSFpsState) -> int:
+	if motor.batch_slot < 0 or motor.batch_slot_owner != _native or motor.batch_slot_state != state:
+		return -1
+	if state.batch_dirty:
+		_native.slot_push_before(motor.batch_slot, state._f)
+		state.batch_dirty = false
+		pushes += 1
+		motor.batch_slot_position = state.position
+		motor.batch_slot_velocity = state.velocity
+	return motor.batch_slot
+
+
 ## [param motor]'s resident row in this loop's GameSpice Sim batch, made (or made again for another body or state) when
 ## it has none, its tunables resent when they changed. A state whose columns moved without a write that marks it is an
 ## error: it is printed and the columns sent anyway.
@@ -339,6 +365,7 @@ func _slot_for(motor: GSFpsMotor, state: GSFpsState) -> int:
 		motor.batch_slot_body = motor.batch_body
 		motor.batch_slot_state = state
 		state.batch_dirty = true
+		_made += 1
 	elif motor.batch_slot_tun_for != tun or motor.batch_slot_tun_rev != tun.revision:
 		_native.slot_tun(motor.batch_slot, motor.batch_tun)
 	elif not state.batch_dirty and (
