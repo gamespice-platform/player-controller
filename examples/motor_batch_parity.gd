@@ -25,7 +25,7 @@ func _snap(s: GSFpsState, motor: GSFpsMotor) -> PackedByteArray:
 
 func _batch_replay(
 	batched: bool, hz: int, variant: int, streams: Array, cols: bool = true, native_state: bool = true,
-	native_events: bool = true
+	native_events: bool = true, swap_at: int = -1
 ) -> Dictionary:
 	GSFpsMotorBatch.native_cols = cols
 	GSFpsMotorBatch.native_state = native_state
@@ -67,6 +67,10 @@ func _batch_replay(
 			surf.push = Vector3(0.4, 0.0, -0.2) if tick == 300 else Vector3.ZERO
 			motors[4]._surface.max_speed_scale = 1.25 if tick == 300 else 1.0
 		if batched:
+			# A native batch handed over between loops (a game's server tick, use_native): every resident row is made
+			# again in it, same bits.
+			if tick == swap_at:
+				wired = batch.use_native(ClassDB.instantiate(GSFpsMotorBatch.NATIVE_CLASS)) and wired
 			wired = batch.start(step) and wired
 			for i in range(PLAYERS):
 				if not alive[i] or (i == SKIPS and tick % 2 == 1):
@@ -206,6 +210,8 @@ func _batch_runs() -> void:
 			_cols_check(a, _batch_replay(true, hz, variant, streams, false), b, label)
 			_states_check(a, _batch_replay(true, hz, variant, streams, true, false), b, label)
 			_events_check(a, _batch_replay(true, hz, variant, streams, true, true, false), b, label)
+			if variant == 0:
+				_swap_check(a, _batch_replay(true, hz, variant, streams, true, true, true, int(BATCH_TICKS / 3.0)), label)
 			var first := -1
 			for i in range(BATCH_TICKS):
 				if a["ticks"][i] != b["ticks"][i]:
@@ -225,6 +231,17 @@ func _batch_runs() -> void:
 			var posts: Array = b["posts"]
 			_check(posts[1] == 0 and posts[0] > BATCH_TICKS, label + ": post_row is each row's state after its motor (%d from the batch's answer, %d differ)" % [posts[0], posts[1]])
 	_sections += 1
+
+
+## A batch handed a new native mid-run ([method GSFpsMotorBatch.use_native], API 51) is held to the loop too.
+func _swap_check(a: Dictionary, swapped: Dictionary, label: String) -> void:
+	var first := -1
+	for i in range(BATCH_TICKS):
+		if a["ticks"][i] != swapped["ticks"][i]:
+			first = i
+			break
+	_check(swapped["wired"] and first < 0 and a["counters"] == swapped["counters"],
+		label + ": a native handed over mid-run (use_native) is identical too%s" % ["" if first < 0 else " (first differs at tick %d)" % first])
 
 
 ## The batch over 55-value rows ([member GSFpsMotorBatch.native_cols] off) is held to the loop as well, so both of its

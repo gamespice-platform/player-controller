@@ -97,16 +97,32 @@ static func available() -> bool:
 	return ClassDB.class_exists(NATIVE_CLASS)
 
 
+## Runs the rows on [param native], a [code]GSSimMotorBatch[/code] someone else holds (a game's native server tick,
+## [code]GSSimServerTick.motor[/code], reads the resident rows straight after the loop), instead of one of its own; null
+## goes back to its own at the next [method start]. Every motor's resident row is made again in the new batch at its
+## next tick (same bits); call it between loops, never inside one. False, and nothing changed, when [param native] is not a [code]GSSimMotorBatch[/code] (API 51).
+func use_native(native: Object) -> bool:
+	if native != null and not native.is_class(NATIVE_CLASS):
+		push_error("GSFpsMotorBatch.use_native: %s is not a %s" % [native.get_class(), NATIVE_CLASS])
+		return false
+	_native = native
+	if native != null:
+		_take_native()
+	return true
+
+
+## The batch [method start] runs the rows on (made there when none was handed to [method use_native]).
+func native() -> Object:
+	return _native
+
+
 ## Starts a players' loop of ticks [param delta] long; false when GameSpice Sim has no batch (the game ticks each player itself).
 func start(delta: float) -> bool:
 	if _native == null:
 		if delta <= 0.0 or not ClassDB.class_exists(NATIVE_CLASS):
 			return false
 		_native = ClassDB.instantiate(NATIVE_CLASS)
-		_meta_len = 4 if ClassDB.class_has_method(NATIVE_CLASS, &"run_rows") else 3
-		_cols_ok = _meta_len > 3 and ClassDB.class_has_method(NATIVE_CLASS, &"run_cols")
-		_states_ok = _cols_ok and ClassDB.class_has_method(NATIVE_CLASS, &"run_slots")
-		_crouch_ok = _states_ok and ClassDB.class_has_method(NATIVE_CLASS, &"crouch_rows")
+		_take_native()
 	_use_cols = _cols_ok and native_cols
 	_use_states = _use_cols and _states_ok and native_state
 	_stride = _SLOT if _use_states else _OUT
@@ -265,6 +281,13 @@ func clear() -> void:
 	_cols.clear()
 	_cols_new.clear()
 	_slots.clear()
+
+
+func _take_native() -> void:
+	_meta_len = 4 if ClassDB.class_has_method(NATIVE_CLASS, &"run_rows") else 3
+	_cols_ok = _meta_len > 3 and ClassDB.class_has_method(NATIVE_CLASS, &"run_cols")
+	_states_ok = _cols_ok and ClassDB.class_has_method(NATIVE_CLASS, &"run_slots")
+	_crouch_ok = _states_ok and ClassDB.class_has_method(NATIVE_CLASS, &"crouch_rows")
 
 
 func _take_back(row: int) -> void:
