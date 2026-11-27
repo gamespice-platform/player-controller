@@ -147,6 +147,7 @@ func _tick_runs() -> void:
 	var names := ["", " +walls", " +moves", " +wallruns", " +edge"]
 	var edged := ClassDB.class_has_method(&"GSSimFpsBody", &"has_edge_friction")
 	var edge_streams := [0, 0]
+	var edge_halves := 0
 	var total := 0
 	var runs_after_jump := 0
 	var batched := GSFpsMotorBatch.available()
@@ -193,8 +194,8 @@ func _tick_runs() -> void:
 							_check(b["script_ticks"] == 0, lw + ": a library that slows a run after a wall jump runs every such tick itself (%d in script)" % b["script_ticks"])
 						var want: bool = b["native_ticks"] == calls if way == 2 else b["native_ticks"] > stream.size()
 						if way == 1 and variant == 4:
-							# The halves have no edge friction: with native_full off such a motor ticks in script.
-							want = b["native_ticks"] == 0
+							# The halves' end reads the edge friction from the full array's tail (P1h).
+							edge_halves += b["native_ticks"]
 						if way == 3:
 							batch_rows += stream.size()
 							for k in range(events.size()):
@@ -218,6 +219,7 @@ func _tick_runs() -> void:
 	if edged:
 		_check(edge_streams[1] > 0,
 			"edge friction changed %d of %d edge streams against the same walker without it: some reach a ledge" % [edge_streams[1], edge_streams[0]])
+		_check(edge_halves > 0, "the halves ran %d edge friction ticks in the library" % edge_halves)
 	_check(runs_after_jump > 0, "the streams start a wall run after a wall jump in the same air (%d times), the case _run_speed slows" % runs_after_jump)
 	_sections += 1
 

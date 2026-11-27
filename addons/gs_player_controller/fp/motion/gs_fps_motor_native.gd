@@ -9,13 +9,14 @@ const _Cols := preload("../core/gs_fps_state_columns.gd")
 
 
 ## [member native_tick]'s tunables for this tick, or empty when this tick may not run natively. Edge friction runs
-## natively only in the whole tick ([member native_full]) with a library that has it; [method simulate] then keeps the
-## halves in script.
+## natively with a library that has it ([code]GSSimFpsBody.has_edge_friction[/code]), in the whole tick and in the
+## halves, whose end reads it from the full array's tail ([method _native_tick_post]); without it such a motor ticks in
+## script.
 func _native_tick_tun(state: GSFpsState) -> PackedFloat64Array:
 	if (
 		not native_tick or surfaces != null
 		or (state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR)
-		or (tunables.edge_friction > 1.0 and not (native_full and _native_edge_friction()))
+		or (tunables.edge_friction > 1.0 and not _native_edge_friction())
 	):
 		return PackedFloat64Array()
 	if tunables != _tun_for or tunables.revision != _tun_rev:
@@ -66,8 +67,6 @@ var _native_start_settled := false
 ## written) when the body cannot. The script decides everything [method _reuse_rest] compares but the position, which the
 ## native depenetration may move.
 func _native_tick_pre(state: GSFpsState, tun: PackedFloat64Array) -> bool:
-	if tunables.edge_friction > 1.0:
-		return false  # The halves have no edge friction (see [method _native_tick_tun]): such a tick runs in script.
 	var height := _height(state)
 	var rest_ok := _native_rest_ok(state, height)
 	var p := state.position
@@ -313,8 +312,12 @@ func _native_tick_post(
 	state: GSFpsState, command: GSFpsCommand, delta: float, tun: PackedFloat64Array, jumped: bool,
 	wall: GSFpsBody.Hit, start_settled: bool, start_position: Vector3, start_velocity: Vector3
 ) -> bool:
-	if tunables.edge_friction > 1.0 or (state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR):
+	if state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR:
 		return false
+	if tunables.edge_friction > 1.0:
+		# gs-sim's motor_post reads the edge friction at the full array's tail (EDGE_TUN_AT); the shorter tick array
+		# has it off. _native_tick_tun only lets such a motor here with a library that has it.
+		tun = _native_full_tun(tun)
 	var sliding := state.is_sliding()
 	var buttons := command.buttons if state.sprinting else command.buttons & ~GSFpsCommand.BUTTON_SPRINT
 	var flags := (
