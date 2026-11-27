@@ -562,6 +562,7 @@ static func push_core(state: GSFpsState, position: Vector3, velocity: Vector3, y
 			state._f = _packer.unpack(state._f, position, velocity, yaw, flags, timers2, timer_scale)
 			if has_exact:
 				push_exact(state, exact)
+		state.batch_dirty = true
 		state.crouch_held = (flags & FLAG_CROUCH_HELD) != 0
 		return
 	state.position = position

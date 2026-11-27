@@ -25,7 +25,7 @@ func _snap(s: GSFpsState, motor: GSFpsMotor) -> PackedByteArray:
 
 func _batch_replay(
 	batched: bool, hz: int, variant: int, streams: Array, cols: bool = true, native_state: bool = true,
-	native_events: bool = true
+	native_events: bool = true, swap_at: int = -1
 ) -> Dictionary:
 	GSFpsMotorBatch.native_cols = cols
 	GSFpsMotorBatch.native_state = native_state
@@ -67,6 +67,10 @@ func _batch_replay(
 			surf.push = Vector3(0.4, 0.0, -0.2) if tick == 300 else Vector3.ZERO
 			motors[4]._surface.max_speed_scale = 1.25 if tick == 300 else 1.0
 		if batched:
+			# A native batch handed over between loops (a game's server tick, use_native): every resident row is made
+			# again in it, same bits.
+			if tick == swap_at:
+				wired = batch.use_native(ClassDB.instantiate(GSFpsMotorBatch.NATIVE_CLASS)) and wired
 			wired = batch.start(step) and wired
 			for i in range(PLAYERS):
 				if not alive[i] or (i == SKIPS and tick % 2 == 1):
@@ -206,6 +210,8 @@ func _batch_runs() -> void:
 			_cols_check(a, _batch_replay(true, hz, variant, streams, false), b, label)
 			_states_check(a, _batch_replay(true, hz, variant, streams, true, false), b, label)
 			_events_check(a, _batch_replay(true, hz, variant, streams, true, true, false), b, label)
+			if variant == 0:
+				_swap_check(a, _batch_replay(true, hz, variant, streams, true, true, true, int(BATCH_TICKS / 3.0)), label)
 			var first := -1
 			for i in range(BATCH_TICKS):
 				if a["ticks"][i] != b["ticks"][i]:
@@ -225,6 +231,17 @@ func _batch_runs() -> void:
 			var posts: Array = b["posts"]
 			_check(posts[1] == 0 and posts[0] > BATCH_TICKS, label + ": post_row is each row's state after its motor (%d from the batch's answer, %d differ)" % [posts[0], posts[1]])
 	_sections += 1
+
+
+## A batch handed a new native mid-run ([method GSFpsMotorBatch.use_native], API 51) is held to the loop too.
+func _swap_check(a: Dictionary, swapped: Dictionary, label: String) -> void:
+	var first := -1
+	for i in range(BATCH_TICKS):
+		if a["ticks"][i] != swapped["ticks"][i]:
+			first = i
+			break
+	_check(swapped["wired"] and first < 0 and a["counters"] == swapped["counters"],
+		label + ": a native handed over mid-run (use_native) is identical too%s" % ["" if first < 0 else " (first differs at tick %d)" % first])
 
 
 ## The batch over 55-value rows ([member GSFpsMotorBatch.native_cols] off) is held to the loop as well, so both of its
@@ -247,7 +264,7 @@ func _cols_check(a: Dictionary, rows: Dictionary, cols: Dictionary, label: Strin
 
 
 ## The columns batch with the rest stamps kept by the script ([member GSFpsMotorBatch.native_state] off) is held to
-## the loop too; where the library has [code]run_states[/code] the default run kept them natively.
+## the loop too; where the library has [code]run_slots[/code] the default run kept them, and the columns, natively.
 func _states_check(a: Dictionary, script_kept: Dictionary, native_kept: Dictionary, label: String) -> void:
 	var first := -1
 	for i in range(BATCH_TICKS):
@@ -259,10 +276,14 @@ func _states_check(a: Dictionary, script_kept: Dictionary, native_kept: Dictiona
 	var off: GSFpsMotorBatch = script_kept["batch"]
 	var on: GSFpsMotorBatch = native_kept["batch"]
 	_check(off.state_runs == 0 and off.cols_runs > 0, label + ": native_state off keeps the stamps in the script")
-	if ClassDB.class_has_method(GSFpsMotorBatch.NATIVE_CLASS, &"run_states"):
+	if ClassDB.class_has_method(GSFpsMotorBatch.NATIVE_CLASS, &"run_slots"):
 		_check(on.state_runs == on.runs and on.runs > 0, label + ": every run kept the rest stamps natively (%d)" % on.state_runs)
+		# The columns stay resident: sent when a slot is made or a script write (push, teleport, death) marked them.
+		print("  %s: %d rows, %d column pushes, %d unmarked" % [label, on.rows, on.pushes, on.unmarked])
+		_check(on.pushes > 0 and on.pushes < on.rows, label + ": the columns stayed resident across ticks (%d pushes for %d rows)" % [on.pushes, on.rows])
+		_check(on.unmarked == 0, label + ": every column write marked the state (%d unmarked)" % on.unmarked)
 	else:
-		print("  %s: the library has no run_states; the native stamp path was not run" % label)
+		print("  %s: the library has no run_slots; the native stamp path was not run" % label)
 
 
 ## The batch's events ([member GSFpsMotorBatch.native_events]) are each row's changes exactly, and change nothing else:
