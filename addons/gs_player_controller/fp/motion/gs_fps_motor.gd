@@ -64,11 +64,18 @@ func batch_prepare(
 ) -> int:
 	body.begin_tick()
 	batch_clocks = 0
+	batch_tun_custom = false
 	if meta_len > 3 and _clocks_may_wait(state, command):
 		_batch_head(state, command)
-	elif _simulate_head(state, command, delta):
-		body.end_tick()
-		return BATCH_DONE
+	else:
+		_custom_to_batch = true
+		var done := _simulate_head(state, command, delta)
+		_custom_to_batch = false
+		if done:
+			body.end_tick()
+			return BATCH_DONE
+		if batch_tun_custom:
+			return _batch_custom(state, command, delta, input, meta, row, meta_len, row_len)
 	if profile:
 		_lap(0)
 	var y_before_crouch := state._f[1]
@@ -107,6 +114,30 @@ func batch_prepare(
 			and (_crouch_pending or state._f[1] == y_before_crouch) and GSFpsMotorBatch.native_events
 		):
 			input[at13] = int(input[at13]) | ROW_EVENTS
+	return BATCH_READY
+
+
+## [method batch_prepare] for a custom mode GameSpice Sim runs whole ([member batch_tun] holds its tail): the head and
+## crouch have run, so the row leaves nothing else to the batch. Without a batch body the mode ticks here.
+func _batch_custom(
+	state: GSFpsState, command: GSFpsCommand, delta: float, input: PackedFloat64Array, meta: PackedInt64Array, row: int,
+	meta_len: int, row_len: int
+) -> int:
+	var at := row * meta_len
+	batch_body = body.native_batch(meta, at)
+	if batch_body == null:
+		batch_tun_custom = false
+		mode_for(state.mode)._simulate(state, command, delta, self)
+		state.previous_buttons = command.buttons
+		body.end_tick()
+		return BATCH_DONE
+	custom_native_ticks += 1
+	if meta_len > 3:
+		meta[at + 3] = 0
+	if row_len == 55:
+		_fill_full_in(state, command, delta, input, row * 55)
+	else:
+		_fill_full_extra(state, command, delta, input, row * row_len - 12, batch_states)
 	return BATCH_READY
 
 
@@ -246,6 +277,18 @@ func _simulate_head(
 		if custom._uses_crouch():
 			_update_crouch(state, command, delta)
 
+		# GameSpice Sim runs the mode's whole tick where the mode sends a tail (GSFpsMoveMode._native_tail): in the
+		# batch when batch_prepare asks, else alone; the script below is the specification and the fallback.
+		var custom_tun := _native_custom_tun(state, custom)
+		if not custom_tun.is_empty():
+			if _custom_to_batch:
+				batch_tun = custom_tun
+				batch_tun_custom = true
+				return false
+			if _native_tick_full(state, command, delta, custom_tun):
+				custom_native_ticks += 1
+				state.previous_buttons = command.buttons
+				return true
 		custom._simulate(state, command, delta, self)
 		state.previous_buttons = command.buttons
 		return true
@@ -276,7 +319,7 @@ func _simulate_tail(state: GSFpsState, command: GSFpsCommand, delta: float, crou
 	if whole and _wall_jump_run_in_script(state):
 		whole = false
 		wall_jump_script_ticks += 1
-	if whole and _native_tick_full(state, command, delta, tick_tun):
+	if whole and _native_tick_full(state, command, delta, _native_full_tun(tick_tun)):
 		if profile:
 			_lap(7)
 		state.previous_buttons = command.buttons

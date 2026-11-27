@@ -146,6 +146,36 @@ func _simulate(
 	motor.move_and_slide(state, delta)
 
 
+## GameSpice Sim's swim tail (API 56): kind 1, the mode id, the tunables, the clamped pitch (the tick row does not
+## hold it), then each volume's position and size. None for a subclass, whose [method _simulate] may differ.
+func _native_tail(state: GSFpsState, out: PackedFloat64Array, at: int) -> bool:
+	if get_script() != GSFpsSwimMode:
+		return false
+	out.resize(at + 12 + volumes.size() * 6)
+	out[at] = 1.0
+	out[at + 1] = mode_id
+	out[at + 2] = swim_speed
+	out[at + 3] = accelerate
+	out[at + 4] = waist
+	out[at + 5] = float_depth
+	out[at + 6] = exit_speed
+	out[at + 7] = exit_reach
+	out[at + 8] = idle_sink_speed
+	out[at + 9] = friction
+	out[at + 10] = state.pitch
+	out[at + 11] = volumes.size()
+	var o := at + 12
+	for box in volumes:
+		out[o] = box.position.x
+		out[o + 1] = box.position.y
+		out[o + 2] = box.position.z
+		out[o + 3] = box.size.x
+		out[o + 4] = box.size.y
+		out[o + 5] = box.size.z
+		o += 6
+	return true
+
+
 func describe() -> Dictionary:
 	var out := super.describe()
 	out["volumes"] = volumes.size()

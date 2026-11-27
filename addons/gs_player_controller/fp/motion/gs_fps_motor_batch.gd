@@ -366,7 +366,11 @@ func _slot_for(motor: GSFpsMotor, state: GSFpsState) -> int:
 		motor.batch_slot_state = state
 		state.batch_dirty = true
 		_made += 1
-	elif motor.batch_slot_tun_for != tun or motor.batch_slot_tun_rev != tun.revision:
+	elif (
+		motor.batch_slot_tun_for != tun or motor.batch_slot_tun_rev != tun.revision
+		# A custom mode's tail (its pitch and volumes) is sent each tick, and the walker's tunables after it.
+		or motor.batch_tun_custom or motor.batch_slot_tun_custom
+	):
 		_native.slot_tun(motor.batch_slot, motor.batch_tun)
 	elif not state.batch_dirty and (
 		state.position != motor.batch_slot_position or state.velocity != motor.batch_slot_velocity
@@ -376,6 +380,7 @@ func _slot_for(motor: GSFpsMotor, state: GSFpsState) -> int:
 		state.batch_dirty = true
 	motor.batch_slot_tun_for = tun
 	motor.batch_slot_tun_rev = tun.revision
+	motor.batch_slot_tun_custom = motor.batch_tun_custom
 	return motor.batch_slot
 
 
