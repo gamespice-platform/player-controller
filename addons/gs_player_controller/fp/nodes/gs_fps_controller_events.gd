@@ -96,25 +96,25 @@ func dispatch_events(events: GSFpsTickEvents, cursor: int) -> int:
 		var f := floats[cursor * GSFpsTickEvents.FLOATS]
 		match ints[i + 1]:
 			GSFpsTickEvents.Kind.MODE_CHANGED:
-				mode_changed.emit(ints[i + 2], ints[i + 3])
+				mode_changed.emit(ints[i + 2], ints[i + 3])  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.LANDED:
-				landed.emit(f)
+				landed.emit(f)  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.JUMPED:
-				jumped.emit()
+				jumped.emit()  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.STEPPED_UP:
 				_step_up(f)
 			GSFpsTickEvents.Kind.CROUCH_CHANGED:
-				crouch_changed.emit(ints[i + 2] != 0)
+				crouch_changed.emit(ints[i + 2] != 0)  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.SLIDE_CHANGED:
-				slide_changed.emit(ints[i + 2] != 0)
+				slide_changed.emit(ints[i + 2] != 0)  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.LAUNCHED:
-				launched.emit()
+				launched.emit()  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.DASHED:
-				dashed.emit()
+				dashed.emit()  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.WALL_JUMPED:
-				wall_jumped.emit()
+				wall_jumped.emit()  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.WALL_RUN_CHANGED:
-				wall_run_changed.emit(ints[i + 2] != 0)
+				wall_run_changed.emit(ints[i + 2] != 0)  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 			GSFpsTickEvents.Kind.VIEW_TURNED:
 				_view_turn(f)
 		cursor += 1
@@ -133,9 +133,9 @@ func dispatch_row(events: GSFpsTickEvents, row: int, cursor: int) -> int:
 		surface_changed.emit(_ev_surface_from, _ev_surface_to)
 	if side & GSFpsTickEvents.SIDE_MODIFIERS != 0:
 		for id in _ev_added:
-			modifier_added.emit(id)
+			modifier_added.emit(id)  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 		for id in _ev_removed:
-			modifier_removed.emit(id)
+			modifier_removed.emit(id)  # perf-lint: allow emit_in_loop the batched dispatch point: one public signal per recorded event, after the tick
 	if side & GSFpsTickEvents.SIDE_SIMULATED != 0:
 		simulated.emit(_tick, state)
 	return cursor

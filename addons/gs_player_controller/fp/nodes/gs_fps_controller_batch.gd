@@ -58,7 +58,7 @@ func tick(batch: GSFpsMotorBatch, tick_number: int, events: GSFpsTickEvents, pre
 		var controller := controllers[i]
 		if controller == null:
 			continue
-		var d: float = pre.call(i)
+		var d: float = pre.call(i)  # perf-lint: allow dynamic_call the game hook per row is the batch API (level 53)
 		if d < 0.0:
 			continue
 		deltas[i] = d
@@ -70,7 +70,7 @@ func tick(batch: GSFpsMotorBatch, tick_number: int, events: GSFpsTickEvents, pre
 		var row := rows[i]
 		if row == ABSENT:
 			continue
-		if not bool(live.call(i)):
+		if not bool(live.call(i)):  # perf-lint: allow dynamic_call the game hook per row is the batch API (level 53)
 			faults += 1
 			if row >= 0:
 				batch.skip(row)
@@ -85,7 +85,7 @@ func tick(batch: GSFpsMotorBatch, tick_number: int, events: GSFpsTickEvents, pre
 				faults += 1
 			told = batch.finish(row)
 			controller.end_tick(tick_number, deltas[i])
-		post.call(i, row, told)
+		post.call(i, row, told)  # perf-lint: allow dynamic_call the game hook per row is the batch API (level 53)
 		controller.event_rows = null
 	return motored
 
