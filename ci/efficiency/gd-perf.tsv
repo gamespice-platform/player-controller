@@ -103,8 +103,6 @@ addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::<members>::untyped_array	
 addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::_carrier_has::dynamic_call	1
 addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::_native_exact::dynamic_call	1
 addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::_native_unpacker::dynamic_call	1
-addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::pull::dynamic_call	7
-addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::push::dynamic_call	10
 addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::rewind_specs2::alloc	1
 addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::rewind_specs::alloc	1
 addons/gs_player_controller/fp/net/gs_fps_net_sync.gd::stamina_specs::alloc	1

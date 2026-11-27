@@ -297,14 +297,7 @@ static func pull(state: GSFpsState, target: Variant) -> void:
 		target.net_flags = pack_flags(state)
 		target.net_modifiers = pack_modifiers(state)
 	else:
-		# A carrier without all seven: set() skips the missing ones, where an assignment would stop the script.
-		target.set(&"net_position", state.position)
-		target.set(&"net_velocity", state.velocity)
-		target.set(&"net_yaw", state.yaw)
-		target.set(&"net_pitch", state.pitch)
-		target.set(&"net_crouch", state.crouch_fraction)
-		target.set(&"net_flags", pack_flags(state))
-		target.set(&"net_modifiers", pack_modifiers(state))
+		_pull_partial(state, target as Object)
 	if has & _HAS_TIMERS:
 		target.net_timers = pack_timers(state)
 	if has & _HAS_TIMERS2:
@@ -373,6 +366,27 @@ const _HAS_TIMERS := 2
 const _HAS_TIMERS2 := 4
 const _HAS_STAMINA := 8
 const _CORE: Array[StringName] = [&"net_position", &"net_velocity", &"net_yaw", &"net_pitch", &"net_crouch", &"net_flags", &"net_modifiers"]
+## The core seven, then the optional three, in the order [method _push_partial] reads them.
+const _ALL: Array[StringName] = [&"net_position", &"net_velocity", &"net_yaw", &"net_pitch", &"net_crouch", &"net_flags",
+	&"net_modifiers", &"net_timers", &"net_timers2", &"net_stamina"]
+
+
+## [method pull] onto a carrier without all seven core values: [method Object.set] skips the missing ones, where
+## an assignment would stop the script. Cold: every real carrier declares them and takes the typed path.
+static func _pull_partial(state: GSFpsState, target: Object) -> void:
+	for i in _CORE.size():
+		target.set(_CORE[i], _pull_value(state, i))  # perf-lint: allow dynamic_call a partial carrier, which declares no typed fields to write
+
+
+static func _pull_value(state: GSFpsState, index: int) -> Variant:
+	match index:
+		0: return state.position
+		1: return state.velocity
+		2: return state.yaw
+		3: return state.pitch
+		4: return state.crouch_fraction
+		5: return pack_flags(state)
+	return pack_modifiers(state)
 
 ## Which net_* a carrier's script declares (_HAS_*), by script. [method pull] runs per player per tick on a server, and
 ## `in` for a property the carrier lacks walks its scripts and every engine class above them, three times a pull.
@@ -524,22 +538,34 @@ static func push(source: Variant, state: GSFpsState) -> void:
 		if has & _HAS_STAMINA:
 			unpack_stamina(state, int(source.net_stamina))
 		return
-	state.position = source.get(&"net_position")
-	state.velocity = source.get(&"net_velocity")
-	state.yaw = source.get(&"net_yaw")
-	state.pitch = source.get(&"net_pitch")
-	state.crouch_fraction = source.get(&"net_crouch")
-	unpack_flags(state, int(source.get(&"net_flags")))
-	unpack_modifiers(state, int(source.get(&"net_modifiers")))
-	var timers: Variant = source.get(&"net_timers")
-	if timers != null:
-		unpack_timers(state, int(timers))
-	var timers2: Variant = source.get(&"net_timers2")
-	if timers2 != null:
-		unpack_timers2(state, int(timers2))
-	var stamina: Variant = source.get(&"net_stamina")
-	if stamina != null:
-		unpack_stamina(state, int(stamina))
+	_push_partial(source as Object, state)
+
+
+## [method push] from a carrier without all seven core values (a test double, an old game's own node): read by
+## name, in [constant _ALL] order. Cold: every real carrier declares them and takes the typed path.
+static func _push_partial(source: Object, state: GSFpsState) -> void:
+	for i in _ALL.size():
+		_push_value(state, i, source.get(_ALL[i]))  # perf-lint: allow dynamic_call a partial carrier, which declares no typed fields to read
+
+
+static func _push_value(state: GSFpsState, index: int, value: Variant) -> void:
+	match index:
+		0: state.position = value
+		1: state.velocity = value
+		2: state.yaw = value
+		3: state.pitch = value
+		4: state.crouch_fraction = value
+		5: unpack_flags(state, int(value))
+		6: unpack_modifiers(state, int(value))
+		7:
+			if value != null:
+				unpack_timers(state, int(value))
+		8:
+			if value != null:
+				unpack_timers2(state, int(value))
+		9:
+			if value != null:
+				unpack_stamina(state, int(value))
 
 
 
