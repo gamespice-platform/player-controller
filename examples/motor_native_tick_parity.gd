@@ -4,6 +4,7 @@ extends "res://examples/motor_native_parity.gd"
 
 
 const RANDOM_TICKS := 3000
+const SWIM_TICKS := 1000
 
 
 func _tick_tunables(variant: int) -> GSFpsTunables:
@@ -89,12 +90,23 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 	s.position = sc[1]
 	s.velocity = sc[2]
 	s.mode = GSFpsState.Mode.AIR
+	var swim: GSFpsSwimMode = null
+	if not _swim_boxes.is_empty():
+		swim = GSFpsSwimMode.new()
+		swim.volumes = _swim_boxes
+		swim.idle_sink_speed = _swim_sink
+		motor.register_mode(swim)
 	var ticks: Array[PackedByteArray] = []
 	var before := GSFpsPhysicsBody.native_ticks
 	var runs_after_jump := 0
+	var swims := 0
 	for c in stream:
 		var after_jump := s.wall_jumps_in_air > 0 and not s.is_wall_running()
 		var runs := motor.wall_runs
+		if swim != null:
+			# The game's own entry, each tick (GSFpsSwimMode.update); the mode leaves by itself.
+			swim.update(motor, s)
+			swims += 1 if s.mode == swim.mode_id else 0
 		if batch != null:
 			var was := [s.mode, s.position.y, s.is_sliding(), s.is_wall_running()]
 			batch.start(step)
@@ -117,7 +129,70 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 		motor.settled_ground_ticks, motor.reused_ground_ticks, motor.slides, motor.launches, motor.dashes, motor.wall_runs,
 		motor.wall_jumps]
 	return {"ticks": ticks, "counters": counters, "end": s.position, "native_ticks": GSFpsPhysicsBody.native_ticks - before,
-		"script_ticks": motor.wall_jump_script_ticks, "runs_after_jump": runs_after_jump, "events": events}
+		"script_ticks": motor.wall_jump_script_ticks, "runs_after_jump": runs_after_jump, "events": events,
+		"swims": swims, "custom": motor.custom_native_ticks}
+
+
+## The water [method _tick_replay] swims in when not empty (a GSFpsSwimMode it registers), and that mode's sink speed.
+var _swim_boxes: Array[AABB] = []
+var _swim_sink := 0.0
+
+
+## Swimmers on the walkers' random streams with pitch, in and out of two overlapping pools over the determinism world's
+## floor, ramps and walls (the game's GSFpsSwimMode.update each tick): the whole tick native (gs-sim's swim tail,
+## GSSimFpsBody.has_swim, API 56) and the one-row batch hold to the script to the bit, and the library ran the swim ticks.
+func _swim_runs() -> void:
+	if not ClassDB.class_has_method(&"GSSimFpsBody", &"has_swim"):
+		print("  gs-sim has no GSSimFpsBody.has_swim: the swim runs are skipped")
+		if OS.get_environment("GS_SIM_REQUIRE_NATIVE") == "1":
+			_check(false, "the library runs the swim tick (GS_SIM_REQUIRE_NATIVE=1)")
+		return
+	var batched := GSFpsMotorBatch.available()
+	var swum := 0
+	var native_swum := 0
+	var total := 0
+	for sink: float in [0.0, 0.6]:
+		_swim_sink = sink
+		for hulls: bool in [false, true]:
+			for hz: int in RATES:
+				var step := 1.0 / float(hz)
+				for sc: Array in SCENARIOS:
+					# The first pool is shallow (its top 1.6 m up: a wader stands, a swimmer climbs out); the deep one
+					# overlaps it and comes second, so the first box holding a point decides its surface.
+					_swim_boxes = [AABB(Vector3(-30, -1, -30), Vector3(60, 2.6, 60)), AABB(Vector3(8, -1, -30), Vector3(22, 7, 40))]
+					var stream := _random_stream(sc[3] * 17 + hz, SWIM_TICKS)
+					var rng := RandomNumberGenerator.new()
+					rng.seed = sc[3] * 7 + hz
+					var pitch := 0.0
+					for c in stream:
+						pitch = clampf(pitch + rng.randf_range(-6.0, 6.0), -89.0, 89.0)
+						c.pitch = pitch
+					var a := _tick_replay(0, sc, stream, step, hulls, 0)
+					var label := "%s @%d Hz%s swim%s" % [sc[0], hz, " +hulls" if hulls else "", " sink" if sink > 0.0 else ""]
+					_check(a["native_ticks"] == 0 and a["custom"] == 0, label + ": the script run did not tick in the library")
+					swum += a["swims"]
+					var ways: Array[int] = [2]
+					if batched:
+						ways.append(3)
+					for way in ways:
+						var b := _tick_replay(way, sc, stream, step, hulls, 0)
+						var first := -1
+						for i in range(a["ticks"].size()):
+							if a["ticks"][i] != b["ticks"][i]:
+								first = i
+								break
+						var lw: String = label + [" script", " halves", " full", " batch"][way]
+						total += stream.size()
+						native_swum += b["custom"]
+						_check(b["swims"] == a["swims"] and b["custom"] == b["swims"],
+							lw + ": the library ran every swim tick (%d of %d)" % [b["custom"], b["swims"]])
+						_check(first < 0, lw + ": every one of %d ticks identical%s" % [stream.size(), "" if first < 0 else " (first differs at tick %d: script %s native %s)" % [first, bytes_to_var(a["ticks"][first]), bytes_to_var(b["ticks"][first])]])
+						_check(a["counters"] == b["counters"], lw + ": the same motor and hull counters %s (native %s)" % [a["counters"], b["counters"]])
+	_swim_boxes = []
+	_swim_sink = 0.0
+	print("  %d swim stream ticks compared, %d swim ticks in script, %d in the library" % [total, swum, native_swum])
+	_check(swum > 0 and native_swum > 0, "the streams swim (%d script swim ticks)" % swum)
+	_sections += 1
 
 
 ## Holds one row's [member GSFpsMotor.batch_events] to the controller's own compare of [param was] (mode, height,
@@ -285,6 +360,8 @@ func _run() -> void:
 		await get_tree().physics_frame
 		await get_tree().physics_frame
 		_tick_runs()
+		_swim_runs()
+		expected = 2 if ClassDB.class_has_method(&"GSSimFpsBody", &"has_swim") else 1
 	GSFpsPhysicsBody.native_enabled = true
 	GSFpsMotor.native_tick = false
 	GSFpsMotor.native_full = true

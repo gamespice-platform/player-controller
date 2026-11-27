@@ -42,6 +42,13 @@ func _uses_crouch() -> bool:
 	return true
 
 
+## Writes into [param out] from [param at] (resized) the tail that lets GameSpice Sim run this mode's whole tick
+## ([code]GSSimFpsBody.has_swim[/code], API 56), bit for bit; false (the default) runs [method _simulate] here, which
+## stays the specification and the fallback.
+func _native_tail(_state: GSFpsState, _out: PackedFloat64Array, _at: int) -> bool:
+	return false
+
+
 func describe() -> Dictionary:
 	return {"id": mode_id, "name": String(_name())}
 

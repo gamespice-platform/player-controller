@@ -13,15 +13,19 @@ const _Cols := preload("../core/gs_fps_state_columns.gd")
 ## halves, whose end reads it from the full array's tail ([method _native_tick_post]); without it such a motor ticks in
 ## script.
 func _native_tick_tun(state: GSFpsState) -> PackedFloat64Array:
-	if (
-		not native_tick or surfaces != null
-		or (state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR)
-		or (tunables.edge_friction > 1.0 and not _native_edge_friction())
-	):
+	if state.mode != GSFpsState.Mode.GROUND and state.mode != GSFpsState.Mode.AIR:
+		return PackedFloat64Array()
+	return _native_tun_now()
+
+
+## [method _native_tick_tun] whatever the mode: empty where the motor may not tick natively at all.
+func _native_tun_now() -> PackedFloat64Array:
+	if not native_tick or surfaces != null or (tunables.edge_friction > 1.0 and not _native_edge_friction()):
 		return PackedFloat64Array()
 	if tunables != _tun_for or tunables.revision != _tun_rev:
 		_tun_cache = _build_tick_tun()
 		_tun_full_cache = PackedFloat64Array()
+		_custom_tun.clear()
 		_tun_for = tunables
 		_tun_rev = tunables.revision
 	return _tun_cache
@@ -46,6 +50,36 @@ func _native_edge_friction() -> bool:
 			ClassDB.class_exists(&"GSSimFpsBody") and ClassDB.class_has_method(&"GSSimFpsBody", &"has_edge_friction")
 		) else 0
 	return _native_edge_known == 1
+
+
+## -1 not asked yet, else whether GameSpice Sim's whole tick runs a custom mode's tail ([code]has_swim[/code], API 56).
+static var _native_custom_known: int = -1
+## Custom-mode ticks GameSpice Sim ran whole ([method GSFpsMoveMode._native_tail]), alone or in the batch.
+var custom_native_ticks: int = 0
+## Set by [method batch_prepare] around the head: a custom mode that may run natively leaves its tick to the batch, and
+## [member batch_tun_custom] then holds that [member batch_tun] is [member _custom_tun].
+var _custom_to_batch := false
+var batch_tun_custom := false
+## The full tunables (copied again when [method _native_tun_now] rebuilds them) then the mode's tail, reused per tick.
+var _custom_tun := PackedFloat64Array()
+
+
+## [member _custom_tun] with [param custom]'s tail written in, or empty to run its [code]_simulate[/code].
+func _native_custom_tun(state: GSFpsState, custom: RefCounted) -> PackedFloat64Array:
+	if _native_custom_known < 0:
+		_native_custom_known = 1 if (
+			ClassDB.class_exists(&"GSSimFpsBody") and ClassDB.class_has_method(&"GSSimFpsBody", &"has_swim")
+		) else 0
+	if _native_custom_known == 0 or not native_full or _native_tun_now().is_empty():
+		return PackedFloat64Array()
+	# gs-sim reads the tail at SWIM_TUN_AT (84), just after the edge friction's three values.
+	if _custom_tun.size() < 84:
+		_custom_tun.append_array(_native_full_tun(_tun_cache))
+		if _custom_tun.size() != 84:
+			_custom_tun.clear()
+			return PackedFloat64Array()
+	# Untyped like GSFpsMotor.mode_for: register_mode admits only GSFpsMoveMode, and naming it here would tie the parsers.
+	return _custom_tun if custom._native_tail(state, _custom_tun, 84) else PackedFloat64Array()
 
 
 func _build_tick_tun() -> PackedFloat64Array:
@@ -134,13 +168,14 @@ var _full_in := PackedFloat64Array()
 
 
 ## The whole tick from the start ground check to the end one in one native call: the halves and every move between;
-## false (nothing written) when the body cannot.
+## false (nothing written) when the body cannot. [param tun] is [method _native_full_tun]'s, or a custom mode's
+## [method _native_custom_tun].
 func _native_tick_full(state: GSFpsState, command: GSFpsCommand, delta: float, tun: PackedFloat64Array) -> bool:
 	var a := _full_in
 	if a.size() != 55:
 		a.resize(55)
 	_fill_full_in(state, command, delta, a, 0)
-	var r := body.native_tick(2, a, _native_full_tun(tun))
+	var r := body.native_tick(2, a, tun)
 	if r.size() < 45:
 		return false
 	_native_full_apply(state, r)
@@ -496,6 +531,8 @@ var batch_slot_body: Object = null
 var batch_slot_state: GSFpsState = null
 var batch_slot_tun_for: GSFpsTunables = null
 var batch_slot_tun_rev: int = -1
+## Whether the slot's tunables were last sent with a custom mode's tail ([member batch_tun_custom]).
+var batch_slot_tun_custom := false
 var batch_slot_position := Vector3.ZERO
 var batch_slot_velocity := Vector3.ZERO
 
