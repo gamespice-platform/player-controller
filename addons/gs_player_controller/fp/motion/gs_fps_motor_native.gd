@@ -465,6 +465,34 @@ var batch_tun := PackedFloat64Array()
 ## The clocks and cooldowns of the prepared tick left to GameSpice Sim's row (bit 0), the tick having begun on the ground
 ## (bit 1): a fourth meta value for [code]GSSimMotorBatch.run_rows[/code]. Every end but [method batch_apply] runs them here.
 var batch_clocks: int = 0
+## The row GameSpice Sim's batch keeps for this motor across ticks (API 49): its slot in [member batch_slot_owner]
+## ([code]GSSimMotorBatch[/code]), -1 when none; [GSFpsMotorBatch] makes it and the motor gives it back when freed. The
+## rest is what the slot was made or last sent with, and where the batch's answer left the player.
+var batch_slot: int = -1
+var batch_slot_owner: Object = null
+var batch_slot_body: Object = null
+var batch_slot_state: GSFpsState = null
+var batch_slot_tun_for: GSFpsTunables = null
+var batch_slot_tun_rev: int = -1
+var batch_slot_position := Vector3.ZERO
+var batch_slot_velocity := Vector3.ZERO
+
+
+## Gives back the batch's row ([member batch_slot]), if any.
+func batch_slot_release() -> void:
+	if batch_slot >= 0 and batch_slot_owner != null:
+		batch_slot_owner.slot_remove(batch_slot)
+	batch_slot = -1
+	batch_slot_owner = null
+	batch_slot_body = null
+	batch_slot_state = null
+	batch_slot_tun_for = null
+
+
+func _notification(what: int) -> void:
+	# A RefCounted cannot call its own methods while being deleted, so the slot goes back inline.
+	if what == NOTIFICATION_PREDELETE and batch_slot >= 0 and batch_slot_owner != null:
+		batch_slot_owner.slot_remove(batch_slot)
 
 
 ## Ends a [constant BATCH_READY] tick with the batch's answer, the 45 values at [param at] in [param out].

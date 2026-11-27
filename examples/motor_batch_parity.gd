@@ -247,7 +247,7 @@ func _cols_check(a: Dictionary, rows: Dictionary, cols: Dictionary, label: Strin
 
 
 ## The columns batch with the rest stamps kept by the script ([member GSFpsMotorBatch.native_state] off) is held to
-## the loop too; where the library has [code]run_states[/code] the default run kept them natively.
+## the loop too; where the library has [code]run_slots[/code] the default run kept them, and the columns, natively.
 func _states_check(a: Dictionary, script_kept: Dictionary, native_kept: Dictionary, label: String) -> void:
 	var first := -1
 	for i in range(BATCH_TICKS):
@@ -259,10 +259,14 @@ func _states_check(a: Dictionary, script_kept: Dictionary, native_kept: Dictiona
 	var off: GSFpsMotorBatch = script_kept["batch"]
 	var on: GSFpsMotorBatch = native_kept["batch"]
 	_check(off.state_runs == 0 and off.cols_runs > 0, label + ": native_state off keeps the stamps in the script")
-	if ClassDB.class_has_method(GSFpsMotorBatch.NATIVE_CLASS, &"run_states"):
+	if ClassDB.class_has_method(GSFpsMotorBatch.NATIVE_CLASS, &"run_slots"):
 		_check(on.state_runs == on.runs and on.runs > 0, label + ": every run kept the rest stamps natively (%d)" % on.state_runs)
+		# The columns stay resident: sent when a slot is made or a script write (push, teleport, death) marked them.
+		print("  %s: %d rows, %d column pushes, %d unmarked" % [label, on.rows, on.pushes, on.unmarked])
+		_check(on.pushes > 0 and on.pushes < on.rows, label + ": the columns stayed resident across ticks (%d pushes for %d rows)" % [on.pushes, on.rows])
+		_check(on.unmarked == 0, label + ": every column write marked the state (%d unmarked)" % on.unmarked)
 	else:
-		print("  %s: the library has no run_states; the native stamp path was not run" % label)
+		print("  %s: the library has no run_slots; the native stamp path was not run" % label)
 
 
 ## The batch's events ([member GSFpsMotorBatch.native_events]) are each row's changes exactly, and change nothing else:
