@@ -38,7 +38,7 @@ var surface_resolver: Callable = Callable()
 
 
 ## Modifier definitions by id. The active set lives in [GSFpsState].
-var modifier_defs: Dictionary = {}
+var modifier_defs: Dictionary[StringName, GSFpsModifier] = {}
 
 
 ## Modifier ids in registration order, so an index is stable and can be replicated.
@@ -46,7 +46,7 @@ var _modifier_order: Array[StringName] = []
 
 
 ## Custom modes by id, from [constant GSFpsState.FIRST_CUSTOM_MODE] up.
-var _modes: Dictionary = {}
+var _modes: Dictionary[int, RefCounted] = {}
 
 
 ## The combined effect of the active modifiers, recomputed once per tick.

@@ -71,9 +71,7 @@ addons/gs_player_controller/fp/motion/gs_fps_motor.gd::_surface_id_for::dynamic_
 addons/gs_player_controller/fp/motion/gs_fps_motor.gd::_surface_id_for::string_build	1
 addons/gs_player_controller/fp/motion/gs_fps_motor.gd::batch_refill::alloc	2
 addons/gs_player_controller/fp/motion/gs_fps_motor.gd::describe::untyped_array	1
-addons/gs_player_controller/fp/motion/gs_fps_motor_base.gd::<members>::untyped_array	2
 addons/gs_player_controller/fp/motion/gs_fps_motor_base.gd::add_modifier::alloc	1
-addons/gs_player_controller/fp/motion/gs_fps_motor_batch.gd::<members>::untyped_array	5
 addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::_consts_keep::alloc	2
 addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::_fill_values::alloc	1
 addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::_native_full_tun::alloc	2
@@ -83,8 +81,6 @@ addons/gs_player_controller/fp/motion/gs_fps_motor_native.gd::batch_rest_bits::a
 addons/gs_player_controller/fp/motion/gs_fps_motor_walls.gd::_wall_probe_directions::alloc	1
 addons/gs_player_controller/fp/motion/gs_fps_move_mode.gd::describe::untyped_array	1
 addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::<members>::untyped_array	1
-addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::_raw_rest_query::dynamic_call	3
-addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::_raw_rest_query::untyped_array	1
 addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::copy_for_simulation::dynamic_call	1
 addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::describe::untyped_array	1
 addons/gs_player_controller/fp/motion/gs_fps_physics_body.gd::for_node::dynamic_call	1

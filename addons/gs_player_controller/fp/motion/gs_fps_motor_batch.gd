@@ -56,8 +56,8 @@ var _count: int = 0
 var _motors: Array[GSFpsMotor] = []
 var _states: Array[GSFpsState] = []
 var _commands: Array[GSFpsCommand] = []
-var _bodies: Array = []
-var _tuns: Array = []
+var _bodies: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
+var _tuns: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
 var _stage := PackedByteArray()
 ## Each row's tick length ([method add]'s delta, else [method start]'s).
 var _deltas := PackedFloat64Array()
@@ -65,11 +65,11 @@ var _meta := PackedInt64Array()
 var _in := PackedFloat64Array()
 ## On [member _use_cols]: each row's state columns as they were at [method add], the [constant COLS_EXTRA] values beside them,
 ## the columns the batch answered, and a whole row for [method GSFpsMotor.batch_refill].
-var _cols: Array = []
+var _cols: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
 var _extra := PackedFloat64Array()
-var _cols_new: Array = []
+var _cols_new: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
 ## On [member _use_states]: each row's motor's native state ([method GSFpsMotor.batch_motor_state]).
-var _mstates: Array = []
+var _mstates: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
 var _row := PackedFloat64Array()
 var _sent_position := PackedVector3Array()
 var _sent_velocity := PackedVector3Array()
