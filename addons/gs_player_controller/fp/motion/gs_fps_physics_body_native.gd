@@ -56,6 +56,7 @@ func _nat() -> Object:
 		_native = ClassDB.instantiate(NATIVE_CLASS)
 		_hull_world_sent = false
 		_static_world_sent = false
+		_trace_world_sent = _trace_world == null
 		_native.set_perf_caches(perf_caches)
 		if _in_tick:
 			_native.begin_tick()
@@ -63,6 +64,12 @@ func _nat() -> Object:
 		_static_world_sent = true
 		if _native.has_method(&"set_static_world"):
 			_native.set_static_world(_static_world)
+	if not _trace_world_sent:
+		_trace_world_sent = true
+		if _trace_world != null:
+			_native.set_trace_mirror(_trace_world)
+		elif _native.has_method(&"clear_flat_world"):
+			_native.clear_flat_world()
 	if _native_space != _space:
 		_native_space = _space
 		_native.set_space(_space)
@@ -152,6 +159,36 @@ func set_hull_world(world: Object, slot: int) -> bool:
 		_hull_slot = slot
 		_hull_world_sent = false
 	return world != null
+
+
+## Whether [method set_trace_world] can work: the loaded library has GameSpice Sim's collision mirror ([code]GSSimTraceMirror[/code]) and the native body takes it.
+static func native_trace_world_available() -> bool:
+	if _trace_known < 0:
+		_trace_known = 1 if ClassDB.class_exists(&"GSSimTraceMirror") and ClassDB.class_has_method(NATIVE_CLASS, &"set_trace_mirror") else 0
+	return _trace_known == 1 and native_available()
+
+
+static var _trace_known: int = -1
+var _trace_world: Object = null
+## [member _trace_world] (or its absence) has reached the current native body.
+var _trace_world_sent: bool = true
+
+
+## Answers this body's native queries from a built [code]GSSimTraceMirror[/code] (the map's collision mirror) in place of the physics space; null goes back to the space.
+## Every machine that predicts this body must be given the same mirror, or prediction disagrees with the server. The script answers (no library, [member use_native] off, [member profile]) still ask the space.
+## Returns whether the mirror is in use (false when the library lacks it). Resent when the native body is rebuilt.
+func set_trace_world(world: Object) -> bool:
+	if world != null and not native_trace_world_available():
+		world = null
+	if world != _trace_world:
+		_trace_world = world
+		_trace_world_sent = false
+	return world != null
+
+
+## The mirror [method set_trace_world] put in use, or null.
+func trace_world() -> Object:
+	return _trace_world
 
 
 func native_tick(
