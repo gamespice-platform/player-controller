@@ -6,11 +6,11 @@ extends "res://examples/movement_selftest_net.gd"
 ##
 ## Most tests run on [GSFpsFlatBody] so a failure has one possible cause, the [GSFpsMotor]; [method _test_physics_body] covers the real implementation.
 
-const CHECKS := 540
+const CHECKS := 544
 
 ## Sections entered against sections that ran to their last line, and against this: a
 ## runtime error aborts a section silently. CHECKS is the other half (docs/testing.md).
-const SECTIONS := 65
+const SECTIONS := 66
 
 
 func _ready() -> void:
@@ -54,6 +54,7 @@ func _run_flat() -> void:
 	_test_touch_sampler()
 	_test_wire_round_trip()
 	_test_net_sync_round_trip()
+	_test_exact_timers()
 	_test_fingerprint()
 	_test_replay_determinism()
 	_test_slide()

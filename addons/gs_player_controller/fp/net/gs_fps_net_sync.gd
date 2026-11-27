@@ -579,9 +579,9 @@ static func _push_value(state: GSFpsState, index: int, value: Variant) -> void:
 ## Contact's) calls this for the same writes.
 static func push_core(state: GSFpsState, position: Vector3, velocity: Vector3, yaw: float, flags: int,
 		timers2: int = -1, exact: PackedFloat32Array = PackedFloat32Array()) -> void:
-	var has_exact := exact.size() == EXACT_FLOATS
+	var has_exact := exact.size() == EXACT_FLOATS or exact.size() == EXACT_FLOATS_TIMED
 	if native_pack and _native_unpacker():
-		if has_exact and _native_exact():
+		if exact.size() == EXACT_FLOATS and _native_exact():
 			state._f = _packer.unpack_exact(state._f, position, velocity, yaw, flags, timers2, timer_scale, exact)
 			_push_exact_fields(state, exact)
 		else:
@@ -607,11 +607,37 @@ static func push_core(state: GSFpsState, position: Vector3, velocity: Vector3, y
 ## lays it out this way.
 const EXACT_FLOATS := 14
 
+## The record with two more floats (API 58): slide time (-1 not sliding) and wall-run time (-1 not running), after the first fourteen. Both are counted a tick at a time, and at a tick rate that does not divide 7680 (66 Hz is 116.36 codes a tick) the 1/7680 s codes of net_timers2 round them: a client that rewound to the code replayed a wall run half a code off the server, and every run raised a one-code net_timers2 mismatch and a correction. A [constant EXACT_FLOATS] record is still accepted and leaves both timers to net_timers2.
+const EXACT_FLOATS_TIMED := 16
 
-## Writes an exact movement record ([constant EXACT_FLOATS] long) over [param state]; false, writing nothing,
+
+## A [constant EXACT_FLOATS_TIMED] record of [param state]: what [method push_exact] writes back. The server and the predicting client both go on from [code]push_exact(state, pack_exact(state))[/code], as a rewind does, so a replay and the server count the same float32 timers.
+static func pack_exact(state: GSFpsState) -> PackedFloat32Array:
+	var exact := PackedFloat32Array()
+	exact.resize(EXACT_FLOATS_TIMED)
+	exact[0] = state.position.x
+	exact[1] = state.position.y
+	exact[2] = state.position.z
+	exact[3] = state.velocity.x
+	exact[4] = state.velocity.y
+	exact[5] = state.velocity.z
+	exact[6] = state.crouch_fraction
+	exact[7] = state.time_since_grounded
+	exact[8] = state.time_since_jump
+	exact[9] = state.time_since_jump_pressed
+	exact[10] = state.wall_run_cooldown_left
+	exact[11] = state.stamina
+	exact[12] = 1.0 if state.stamina_exhausted else 0.0
+	exact[13] = state.stamina_delay_left
+	exact[14] = state.slide_time
+	exact[15] = state.wall_run_time
+	return exact
+
+
+## Writes an exact movement record ([constant EXACT_FLOATS] or [constant EXACT_FLOATS_TIMED] long) over [param state]; false, writing nothing,
 ## for a record of another length.
 static func push_exact(state: GSFpsState, exact: PackedFloat32Array) -> bool:
-	if exact.size() != EXACT_FLOATS:
+	if exact.size() != EXACT_FLOATS and exact.size() != EXACT_FLOATS_TIMED:
 		return false
 	state.position = Vector3(exact[0], exact[1], exact[2])
 	state.velocity = Vector3(exact[3], exact[4], exact[5])
@@ -620,6 +646,9 @@ static func push_exact(state: GSFpsState, exact: PackedFloat32Array) -> bool:
 	state.time_since_jump_pressed = exact[9]
 	state.wall_run_cooldown_left = exact[10]
 	_push_exact_fields(state, exact)
+	if exact.size() == EXACT_FLOATS_TIMED:
+		state.slide_time = exact[14]
+		state.wall_run_time = exact[15]
 	return true
 
 

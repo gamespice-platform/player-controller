@@ -127,6 +127,74 @@ func _wire_size_checks(walled: GSFpsState) -> void:
 	)
 
 
+## A wall run and a slide at 66 Hz (116.36 codes of net_timers2 a tick), predicted by a client that is rewound to each snapshot and replays three ticks: how many replayed ticks pack a different net_timers2 than the server's tick (each is a correction). Through the codes alone, then through the 16-long exact record that both ends go on from.
+func _test_exact_timers() -> void:
+	_section("exact wall-run and slide timers (66 Hz)")
+	var delta := 1.0 / 66.0
+	var codes_only := _timers_mismatches(delta, false)
+	var exact := _timers_mismatches(delta, true)
+	print("  net_timers2 mismatches over 3 wall runs and 3 slides: codes only %d, with the exact record %d" % [codes_only, exact])
+	_check(codes_only > 0, "negative control: rewinding to the 1/7680 s codes alone mispredicts net_timers2", "%d" % codes_only)
+	_check(exact == 0, "with slide time and wall-run time in the exact record the replay never mispredicts net_timers2", "%d" % exact)
+	var s := GSFpsState.new()
+	s.slide_time = 0.3
+	s.wall_run_time = -1.0
+	var record := GSFpsNetSync.pack_exact(s)
+	var back := GSFpsState.new()
+	_check(record.size() == GSFpsNetSync.EXACT_FLOATS_TIMED and GSFpsNetSync.push_exact(back, record)
+			and back.slide_time == record[14] and back.wall_run_time == -1.0 and not back.is_wall_running(),
+		"the record round-trips slide time and a wall run that is not running")
+	var short := PackedFloat32Array(record.slice(0, GSFpsNetSync.EXACT_FLOATS))
+	var kept := GSFpsState.new()
+	kept.slide_time = 0.5
+	_check(GSFpsNetSync.push_exact(kept, short) and kept.slide_time == 0.5, "a 14-long record leaves both timers alone")
+	_done()
+
+
+## The replayed ticks whose net_timers2 differs from the server's, over three wall runs and three slides.
+func _timers_mismatches(delta: float, with_exact: bool) -> int:
+	var bad := 0
+	for run in 6:
+		var wall := run < 3
+		var server := GSFpsState.new()
+		var start := 7 * run
+		# The state at the start: running a wall (or sliding) from zero.
+		if wall:
+			server.wall_run_time = 0.0
+		else:
+			server.slide_time = 0.0
+		var ticks := 120 + start
+		var history: Array[int] = []
+		var snapshots: Array = []
+		for t in ticks:
+			_advance_timer(server, delta, wall)
+			if with_exact:
+				GSFpsNetSync.push_exact(server, GSFpsNetSync.pack_exact(server))
+			history.append(GSFpsNetSync.pack_timers2(server))
+			var record := GSFpsNetSync.pack_exact(server)
+			snapshots.append([GSFpsNetSync.pack_timers2(server), record])
+		var every := 2 + run % 3
+		for t in range(0, ticks - 4, every):
+			var client := GSFpsState.new()
+			GSFpsNetSync.unpack_timers2(client, int(snapshots[t][0]))
+			if with_exact:
+				GSFpsNetSync.push_exact(client, snapshots[t][1] as PackedFloat32Array)
+			for k in range(1, 4):
+				_advance_timer(client, delta, wall)
+				if with_exact:
+					GSFpsNetSync.push_exact(client, GSFpsNetSync.pack_exact(client))
+				if GSFpsNetSync.pack_timers2(client) != history[t + k]:
+					bad += 1
+	return bad
+
+
+func _advance_timer(state: GSFpsState, delta: float, wall: bool) -> void:
+	if wall:
+		state.wall_run_time += delta
+	else:
+		state.slide_time += delta
+
+
 func _test_fingerprint() -> void:
 	_section("configuration agreement")
 
