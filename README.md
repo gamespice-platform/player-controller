@@ -120,6 +120,27 @@ class MyController extends GSPlayerController:
 
 The defaults read and write a `CharacterBody3D` or `CharacterBody2D`, so simple controllers can skip four of them. See `examples/controller_selftest.gd`. All docs: [docs/README.md](docs/README.md).
 
+## Used by
+
+All fourteen games vendor it:
+
+- [Fatal Contact](https://zeesgames.com/fatal-contact)
+- [Airdrift](https://zeesgames.com/airdrift)
+- [Playlot](https://zeesgames.com/playlot)
+- [Hungario](https://zeesgames.com/hungario)
+- [Buses From Hell](https://zeesgames.com/buses-from-hell)
+- [Smash Copter](https://zeesgames.com/smash-copter)
+- [Zombie Zone](https://zeesgames.com/zombie-zone)
+- [Hide n Seek](https://zeesgames.com/hide-n-seek)
+- [Prop Hunt](https://zeesgames.com/prop-hunt)
+- [Murder Mystery](https://zeesgames.com/murder-mystery)
+- [Deathrun](https://zeesgames.com/deathrun)
+- [Wipeout](https://zeesgames.com/wipeout)
+- [Dangerous Delivery](https://zeesgames.com/dangerous-delivery)
+- [Look At Me](https://zeesgames.com/look-at-me)
+
+The whole collection is at [zeesgames.com](https://zeesgames.com).
+
 ## Credits
 
 | What | Author / source | License |
@@ -130,6 +151,6 @@ The defaults read and write a `CharacterBody3D` or `CharacterBody2D`, so simple 
 
 ## Status and licence
 
-Part of the [**GameSpice**](https://gamespice.net) platform: a family of Godot addons. Written with Claude Code and maintained by `gamemann`. Every addon has headless tests, but little of this has been played by real users yet, so expect rough edges and please [open an issue](https://github.com/gamespice-platform/player-controller/issues) when you hit one.
+Part of the [**GameSpice**](https://gamespice.net) platform: a family of Godot addons, MIT licensed and built with Claude Code. About twenty headless scenes in `examples/` cover it (`movement_selftest`, `surf_selftest`, `tps_selftest` and the parity checks). Movement is the part players feel first, and the games in [Zee's Games](https://zeesgames.com) run on it on live servers. Bugs go in the [issue tracker](https://github.com/gamespice-platform/player-controller/issues).
 
 MIT licence, see [LICENSE](LICENSE). The only closed part of the [**GameSpice**](https://gamespice.net) platform is the web back end; you can use your own instead of GameSpice's.
