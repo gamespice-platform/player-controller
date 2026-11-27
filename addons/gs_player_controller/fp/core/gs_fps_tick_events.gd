@@ -42,6 +42,12 @@ const MODE_AIR := 1
 ## An event: [code][entity, kind, i0, i1][/code] in [member ints], [code][f0, f1][/code] in [member floats].
 const INTS := 4
 const FLOATS := 2
+## [member side] bits: the row's controller holds a surface change, modifier changes, and its
+## [signal GSFpsController.simulated] for [method GSFpsController.dispatch_row] (not derived: the payload stays on the
+## controller, the native derive never sees them).
+const SIDE_SURFACE := 1
+const SIDE_MODIFIERS := 2
+const SIDE_SIMULATED := 4
 ## The most events one row can make.
 const MAX_PER_ROW := 10
 
@@ -60,6 +66,8 @@ static var native_enabled := true
 ## [member row_count] input rows of [constant IN] floats; grows, never shrinks.
 var rows := PackedFloat64Array()
 var row_count: int = 0
+## Per input row, its [constant SIDE_SURFACE] | [constant SIDE_MODIFIERS] | [constant SIDE_SIMULATED] bits ([method mark_side]).
+var side := PackedInt32Array()
 ## The derived events: the first [member count] of each (the arrays may be longer).
 var ints := PackedInt32Array()
 var floats := PackedFloat64Array()
@@ -108,7 +116,27 @@ func record(entity: int, flags: int, step_height: float,
 	rows[o + IN_A_DASHES] = a_dashes
 	rows[o + IN_A_WALL_JUMPS] = a_wall_jumps
 	rows[o + IN_VIEW_TURN] = view_turn
+	if side.size() <= row_count:
+		var _s := side.resize(maxi(side.size() * 2, row_count + 1))
+	side[row_count] = 0
 	row_count += 1
+
+
+## ORs [param bits] into the last recorded row's [member side].
+func mark_side(bits: int) -> void:
+	side[row_count - 1] |= bits
+
+
+## The entity input row [param row] was recorded for.
+func entity_at(row: int) -> int:
+	return int(rows[row * IN + IN_ENTITY])
+
+
+## The cursor past every derived event of [param entity] from [param cursor] (a row whose controller is gone).
+func skip(cursor: int, entity: int) -> int:
+	while cursor < count and ints[cursor * INTS] == entity:
+		cursor += 1
+	return cursor
 
 
 ## The rows' events into [member ints] and [member floats], in row order; answers [member count].
