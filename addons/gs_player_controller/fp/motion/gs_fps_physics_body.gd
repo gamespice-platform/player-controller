@@ -410,7 +410,7 @@ func _raw_rest_query(at: Vector3, height: float, radius: float) -> Hit:
 	_shape_params.transform = Transform3D(Basis.IDENTITY, at)
 	_shape_params.motion = Vector3.ZERO
 
-	var contact: Dictionary = _q_rest()
+	var contact: Dictionary = _q_rest()  # perf-lint: allow untyped_array get_rest_info's own untyped dictionary
 
 	if contact.is_empty():
 		return null

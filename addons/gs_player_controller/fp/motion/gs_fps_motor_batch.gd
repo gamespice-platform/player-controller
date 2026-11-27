@@ -64,8 +64,8 @@ var _count: int = 0
 var _motors: Array[GSFpsMotor] = []
 var _states: Array[GSFpsState] = []
 var _commands: Array[GSFpsCommand] = []
-var _bodies: Array = []
-var _tuns: Array = []
+var _bodies: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
+var _tuns: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
 var _stage := PackedByteArray()
 ## Each row's tick length ([method add]'s delta, else [method start]'s).
 var _deltas := PackedFloat64Array()
@@ -74,8 +74,8 @@ var _in := PackedFloat64Array()
 ## On [member _use_cols]: the [constant COLS_EXTRA] values beside each row's columns and a whole row for
 ## [method GSFpsMotor.batch_refill]; without [member _use_states] also each row's state columns and the ones answered.
 var _extra := PackedFloat64Array()
-var _cols: Array = []
-var _cols_new: Array = []
+var _cols: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
+var _cols_new: Array = []  # perf-lint: allow untyped_array handed to GSSimMotorBatch as is: the native run takes plain Arrays
 ## On [member _use_states]: each row's resident row in GameSpice Sim ([member GSFpsMotor.batch_slot]).
 var _slots := PackedInt64Array()
 ## Values per row in [member _out]: [constant _SLOT] on [member _use_states], else [constant _OUT].
