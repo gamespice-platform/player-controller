@@ -73,5 +73,8 @@ jobs:
               run: bash project/.deps/gs-sim/ci/install.sh --platform linux-x86_64
             - name: The parity suite, native loaded
               env:
+                  # motor_native_tick_parity compares every stream (swim and ladder included) tick by tick: about
+                  # 5200 checks, 812 s on the PH build VM, past check.sh's 300 s default. Still caught if it hangs.
+                  SUITE_TIMEOUT: 1500
                   SUITES: examples/motor_native_parity examples/motor_native_tick_parity examples/motor_batch_parity examples/flat_world_parity examples/net_pack_parity examples/tick_events_parity examples/motor_determinism_selftest
               run: gs-ci/scripts/check.sh project
