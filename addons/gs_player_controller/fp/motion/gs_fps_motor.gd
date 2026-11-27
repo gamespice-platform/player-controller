@@ -117,8 +117,9 @@ func batch_prepare(
 	return BATCH_READY
 
 
-## [method batch_prepare] for a custom mode GameSpice Sim runs whole ([member batch_tun] holds its tail): the head and
-## crouch have run, so the row leaves nothing else to the batch. Without a batch body the mode ticks here.
+## [method batch_prepare] for a custom mode GameSpice Sim runs whole ([member batch_tun] holds its tail); head and crouch
+## have run. Without a batch body (a [GSFpsHullBody] with no [code]hull_world[/code]) the mode ticks here: natively alone,
+## as [method simulate] would, else in script.
 func _batch_custom(
 	state: GSFpsState, command: GSFpsCommand, delta: float, input: PackedFloat64Array, meta: PackedInt64Array, row: int,
 	meta_len: int, row_len: int
@@ -127,7 +128,10 @@ func _batch_custom(
 	batch_body = body.native_batch(meta, at)
 	if batch_body == null:
 		batch_tun_custom = false
-		mode_for(state.mode)._simulate(state, command, delta, self)
+		if _native_tick_full(state, command, delta, batch_tun):
+			custom_native_ticks += 1
+		else:
+			mode_for(state.mode)._simulate(state, command, delta, self)
 		state.previous_buttons = command.buttons
 		body.end_tick()
 		return BATCH_DONE
@@ -279,7 +283,7 @@ func _simulate_head(
 
 		# GameSpice Sim runs the mode's whole tick where the mode sends a tail (GSFpsMoveMode._native_tail): in the
 		# batch when batch_prepare asks, else alone; the script below is the specification and the fallback.
-		var custom_tun := _native_custom_tun(state, custom)
+		var custom_tun := _native_custom_tun(state, command, custom)
 		if not custom_tun.is_empty():
 			if _custom_to_batch:
 				batch_tun = custom_tun

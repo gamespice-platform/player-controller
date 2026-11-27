@@ -42,10 +42,12 @@ func _uses_crouch() -> bool:
 	return true
 
 
-## Writes into [param out] from [param at] (resized) the tail that lets GameSpice Sim run this mode's whole tick
-## ([code]GSSimFpsBody.has_swim[/code], API 56), bit for bit; false (the default) runs [method _simulate] here, which
-## stays the specification and the fallback.
-func _native_tail(_state: GSFpsState, _out: PackedFloat64Array, _at: int) -> bool:
+## Writes into [param out] from [param at] (resized) the tail that lets GameSpice Sim run this mode's whole tick, bit for
+## bit (API 56; command and motor since 57); false (the default) runs [method _simulate], the spec and fallback. Called
+## where [method _simulate] would be: state it keeps on the instance (a ladder's jump-off tick) is written here too.
+func _native_tail(
+	_state: GSFpsState, _command: GSFpsCommand, _motor: GSFpsMotor, _out: PackedFloat64Array, _at: int
+) -> bool:
 	return false
 
 
