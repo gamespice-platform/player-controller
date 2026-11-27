@@ -511,12 +511,12 @@ var _rest_native := false
 var _rest_in_script := true
 ## Set by [GSFpsMotorBatch] before [method batch_prepare]: this row goes to [code]run_states[/code].
 var batch_states := false
-## Set by [GSFpsMotorBatch] before [method batch_prepare] (API 43): a [member batch_states] row may leave its crouch to
+## Set by [GSFpsMotorBatch] before [method batch_prepare] (API 48): a [member batch_states] row may leave its crouch to
 ## GameSpice Sim (row bit [constant ROW_CROUCH]); the crouch is then run natively at the row's turn, or by
 ## [method batch_crouch_now] on every other end.
 var batch_crouch := false
 var _crouch_pending := false
-## Set by the controller at its tick start ([method batch_events_begin], API 42): nothing but the motor
+## Set by the controller at its tick start ([method batch_events_begin], API 47): nothing but the motor
 ## has written the state since its end-of-tick snapshot, so a [code]run_states[/code] row may ask GameSpice Sim what the
 ## tick changed (row bit [constant ROW_EVENTS]). [method batch_prepare] adds what it knows: the clocks left to the row,
 ## the height unchanged by the crouch.

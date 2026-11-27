@@ -72,7 +72,7 @@ func batch_prepare(
 	if profile:
 		_lap(0)
 	var y_before_crouch := state._f[1]
-	# A row of run_states may leave the crouch to GameSpice Sim (row bit ROW_CROUCH, API 43); every other end runs it here.
+	# A row of run_states may leave the crouch to GameSpice Sim (row bit ROW_CROUCH, API 48); every other end runs it here.
 	_crouch_pending = batch_crouch and batch_states and row_len != 55 and not profile
 	if not _crouch_pending:
 		_update_crouch(state, command, delta)

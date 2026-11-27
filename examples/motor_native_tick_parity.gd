@@ -70,7 +70,7 @@ func _tick_replay(way: int, sc: Array, stream: Array[GSFpsCommand], step: float,
 	GSFpsPhysicsBody.native_enabled = way > 0
 	GSFpsMotor.native_tick = way > 0
 	GSFpsMotor.native_full = way >= 2
-	# Way 3: the whole tick as a one-row GSFpsMotorBatch run that says what each tick changed (API 42).
+	# Way 3: the whole tick as a one-row GSFpsMotorBatch run that says what each tick changed (API 47).
 	var batch: GSFpsMotorBatch = GSFpsMotorBatch.new() if way == 3 else null
 	var events := [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 	var physics := GSFpsPhysicsBody.for_node(self)
@@ -200,7 +200,7 @@ func _tick_runs() -> void:
 	_sections += 1
 
 
-## The crouch tunables _native_full_tun appends after wall_jump_up_speed (API 43).
+## The crouch tunables _native_full_tun appends after wall_jump_up_speed (API 48).
 const CROUCH_TUN := 6
 
 ## The motor keeps its native tunables arrays between ticks; a changed value or a swapped resource must rebuild both.

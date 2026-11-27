@@ -23,11 +23,11 @@ static var native_cols: bool = true
 ## counted. Same bits either way (examples/motor_batch_parity.gd). On by default. Read at [method start].
 static var native_state: bool = true
 ## Whether, on [member native_state], GameSpice Sim also says what each tick changed (mode, height, slide, wall run;
-## [member GSFpsMotor.batch_events], API 42), so the controller's tick end compares only those. Same signals either way
+## [member GSFpsMotor.batch_events], API 47), so the controller's tick end compares only those. Same signals either way
 ## (examples/motor_batch_parity.gd). On by default; the operator switch for it.
 static var native_events: bool = true
 ## Whether, on [member native_state], GameSpice Sim also runs each row's crouch at the row's turn
-## ([member GSFpsMotor.batch_crouch], API 43) instead of the script at [method add]. Same bits either way
+## ([member GSFpsMotor.batch_crouch], API 48) instead of the script at [method add]. Same bits either way
 ## (examples/motor_batch_parity.gd). On by default; the operator switch for it.
 static var native_crouch: bool = true
 
