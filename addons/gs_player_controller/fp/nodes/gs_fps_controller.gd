@@ -537,15 +537,13 @@ func begin_tick(tick: int, delta: float) -> bool:
 	_previous_state.position = state.position
 	_previous_state.crouch_fraction = state.crouch_fraction
 
-	_before_mode = state.mode
-	_before_y = state.position.y
-	_before_fall = state.velocity.y
-	_before_crouched = state.is_crouched()
+	# One copy of the state columns (API 59) instead of six getter reads: the edges and the event row read mode, height,
+	# fall and the crouch, slide and wall-run columns back from it. A duplicate, as a packed array a Variant holds is
+	# shared: a plain assignment would see the motor's writes.
+	_before_f = state._f.duplicate()
 	_before_surface = state.surface
-	_before_sliding = state.is_sliding()
 	_before_launches = motor.launches
 	_before_dashes = motor.dashes
-	_before_wall_running = state.is_wall_running()
 	_before_wall_jumps = motor.wall_jumps
 
 	if prof_t != 0:
@@ -582,7 +580,7 @@ func end_tick(tick: int, delta: float) -> void:
 	if prof_t != 0:
 		_lap_ctrl(3, prof_t)
 	# The crouch edge rides in the table with the motor's other edges.
-	_report_changes(_before_crouched if rows == null else state.is_crouched(), _before_surface)
+	_report_changes(_before_f[_Cols.CROUCH_FRACTION] > 0.001 if rows == null else state.is_crouched(), _before_surface)
 	if prof_t != 0:
 		_lap_ctrl(4, prof_t)
 
